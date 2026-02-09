@@ -1,0 +1,13 @@
+{
+    "agents": [
+        "cursor"
+    ],
+    "guidelines": true,
+    "herd_mcp": false,
+    "mcp": true,
+    "sail": false,
+    "skills": [
+        "fluxui-development",
+        "livewire-development"
+    ]
+}
