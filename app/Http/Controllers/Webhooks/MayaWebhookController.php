@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Webhooks;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessWebhookJob;
 use App\Services\Webhooks\MayaWebhookReplayValidator;
-use App\Services\Webhooks\Normalizers\MayaWebhookNormalizer;
 use App\Services\Webhooks\WebhookProcessor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,13 +13,11 @@ use Illuminate\Support\Facades\Log;
 class MayaWebhookController extends Controller
 {
     public function __construct(
-        protected MayaWebhookReplayValidator $replayValidator,
-        protected MayaWebhookNormalizer $normalizer,
-        protected WebhookProcessor $processor
+        protected MayaWebhookReplayValidator $replayValidator
     ) {}
 
     /**
-     * Handle Maya webhook callback.
+     * Handle Maya webhook callback. Verifies signature, enqueues processing, returns immediately.
      */
     public function handle(Request $request): JsonResponse
     {
@@ -32,13 +30,17 @@ class MayaWebhookController extends Controller
             return response()->json(['message' => 'Invalid signature.'], 401);
         }
 
-        return $this->processor->process(
-            $request,
+        if (! $this->replayValidator->isValid($request, $payload)) {
+            return response()->json(['message' => 'Invalid signature.'], 401);
+        }
+
+        ProcessWebhookJob::dispatch(
+            'Maya',
             $payload,
-            $this->replayValidator,
-            $this->normalizer,
-            'Maya'
+            WebhookProcessor::captureHeadersForPayload($request)
         );
+
+        return response()->json(['received' => true], 200);
     }
 
     /**

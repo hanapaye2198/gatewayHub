@@ -4,131 +4,82 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\CreatePaymentRequest;
-use App\Models\Gateway;
-use App\Models\MerchantGateway;
-use App\Models\Payment;
+use App\Http\Responses\ApiResponse;
 use App\Services\Gateways\Exceptions\GatewayException;
-use App\Services\Gateways\GatewayCapability;
-use App\Services\Gateways\PaymentGatewayManager;
+use App\Services\IdempotencyService;
+use App\Services\PaymentCreationService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class PaymentController extends Controller
 {
     /**
-     * Create a payment via the specified gateway.
-     * Persists Coins.ph (and other gateway) response: provider_reference, status, full raw_response.
-     * For QR-based gateways (e.g. coins), includes qr in the API response.
+     * Create a payment via the specified gateway. Supports Idempotency-Key header.
      */
-    public function create(CreatePaymentRequest $request, PaymentGatewayManager $manager): JsonResponse
-    {
+    public function create(
+        CreatePaymentRequest $request,
+        PaymentCreationService $creationService,
+        IdempotencyService $idempotencyService
+    ): JsonResponse {
         $merchant = $request->merchant();
 
         if ($merchant === null) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+            return ApiResponse::error('Unauthenticated.', 401);
         }
 
-        $gateway = Gateway::query()->where('code', $request->validated('gateway'))->first();
-
-        if ($gateway === null) {
-            return response()->json(['message' => 'Gateway not found.'], 404);
+        $idempotencyKey = $request->header('Idempotency-Key');
+        $cacheKey = null;
+        if ($idempotencyKey !== null && trim($idempotencyKey) !== '') {
+            $idempotencyKey = trim($idempotencyKey);
+            $cacheKey = "{$merchant->id}:{$idempotencyKey}";
+            $cached = $idempotencyService->get($cacheKey);
+            if ($cached !== null) {
+                return ApiResponse::success($cached, 201);
+            }
         }
 
-        $merchantGateway = MerchantGateway::query()
-            ->where('user_id', $merchant->id)
-            ->where('gateway_id', $gateway->id)
-            ->where('is_enabled', true)
-            ->first();
+        $lockKey = $cacheKey ?? 'payment:'.uniqid('', true);
+        $lock = Cache::lock('idempotency_lock:'.hash('sha256', $lockKey), 10);
 
-        if ($merchantGateway === null) {
-            return response()->json(['message' => 'Gateway is not enabled for this merchant.'], 403);
-        }
+        return $lock->block(5, function () use ($request, $merchant, $creationService, $idempotencyService, $cacheKey) {
+            if ($cacheKey !== null) {
+                $cached = $idempotencyService->get($cacheKey);
+                if ($cached !== null) {
+                    return ApiResponse::success($cached, 201);
+                }
+            }
 
-        $gatewayCode = $request->validated('gateway');
+            $gatewayCode = $request->validated('gateway');
 
-        try {
-            $result = DB::transaction(function () use ($request, $manager, $merchantGateway, $merchant, $gatewayCode) {
-                $driver = $manager->getDriver($gatewayCode, $merchantGateway->config_json ?? []);
-                $data = [
-                    'amount' => $request->validated('amount'),
-                    'currency' => $request->validated('currency'),
-                    'reference' => $request->validated('reference'),
-                ];
-                $driverResponse = $driver->createPayment($data);
+            try {
+                $result = $creationService->create($merchant, $gatewayCode, $request->validated());
+            } catch (GatewayException $e) {
+                $msg = $e->getMessage();
+                $status = match (true) {
+                    str_contains($msg, 'not found') => 404,
+                    str_contains($msg, 'missing required credentials') => 422,
+                    default => 403,
+                };
 
-                $payment = Payment::query()->create([
-                    'user_id' => $merchant->id,
-                    'gateway_code' => $gatewayCode,
-                    'amount' => $request->validated('amount'),
-                    'currency' => $request->validated('currency'),
-                    'reference_id' => $request->validated('reference'),
-                    'provider_reference' => $driverResponse['provider_reference'] ?? $driverResponse['reference_id'] ?? null,
-                    'status' => 'pending',
-                    'raw_response' => $driverResponse['raw_response'] ?? $driverResponse,
-                    'paid_at' => null,
-                ]);
+                return ApiResponse::error($msg, $status);
+            }
 
-                return [
-                    'payment' => $payment,
-                    'driver_response' => $driverResponse,
-                ];
-            });
-        } catch (GatewayException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
+            $payment = $result['payment'];
+            $data = [
+                'payment_id' => $payment->id,
+                'gateway' => $payment->gateway_code,
+                'amount' => (float) $payment->amount,
+                'currency' => $payment->currency,
+                'status' => $payment->status,
+                'qr_data' => $result['qr_data'],
+                'expires_at' => $result['expires_at'],
+            ];
 
-        $payment = $result['payment'];
-        $driverResponse = $result['driver_response'];
+            if ($cacheKey !== null) {
+                $idempotencyService->store($cacheKey, $data);
+            }
 
-        $capability = $gateway->getCapability();
-
-        $paymentPayload = [
-            'id' => $payment->id,
-            'reference_id' => $payment->reference_id,
-            'amount' => $payment->amount,
-            'currency' => $payment->currency,
-            'gateway' => $payment->gateway_code,
-            'capability' => $capability->value,
-            'status' => $payment->status,
-        ];
-
-        if ($capability === GatewayCapability::QR && $this->hasQrData($driverResponse)) {
-            $paymentPayload['qr'] = $this->buildQrPayload($driverResponse);
-        }
-
-        return response()->json([
-            'message' => 'Payment created.',
-            'payment' => $paymentPayload,
-        ], 201);
-    }
-
-    /**
-     * @param  array<string, mixed>  $driverResponse
-     */
-    private function hasQrData(array $driverResponse): bool
-    {
-        return isset($driverResponse['qr_string']) || isset($driverResponse['qr_image']);
-    }
-
-    /**
-     * @param  array<string, mixed>  $driverResponse
-     * @return array{type: string, value: string, expires_at: string}
-     */
-    private function buildQrPayload(array $driverResponse): array
-    {
-        $value = $driverResponse['qr_string']
-            ?? $driverResponse['qr_image']
-            ?? '';
-
-        $expiresAt = isset($driverResponse['expires_at'])
-            ? Carbon::parse($driverResponse['expires_at'])->format('c')
-            : Carbon::now()->addSeconds(1800)->format('c');
-
-        return [
-            'type' => 'qrph',
-            'value' => $value,
-            'expires_at' => $expiresAt,
-        ];
+            return ApiResponse::success($data, 201);
+        });
     }
 }

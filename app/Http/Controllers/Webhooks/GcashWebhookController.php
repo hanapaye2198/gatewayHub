@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Webhooks;
 
 use App\Http\Controllers\Controller;
-use App\Services\Webhooks\Normalizers\GcashWebhookNormalizer;
+use App\Jobs\ProcessWebhookJob;
 use App\Services\Webhooks\GcashWebhookReplayValidator;
 use App\Services\Webhooks\WebhookProcessor;
 use Illuminate\Http\JsonResponse;
@@ -13,13 +13,11 @@ use Illuminate\Support\Facades\Log;
 class GcashWebhookController extends Controller
 {
     public function __construct(
-        protected GcashWebhookReplayValidator $replayValidator,
-        protected GcashWebhookNormalizer $normalizer,
-        protected WebhookProcessor $processor
+        protected GcashWebhookReplayValidator $replayValidator
     ) {}
 
     /**
-     * Handle GCash webhook callback.
+     * Handle GCash webhook callback. Verifies signature, enqueues processing, returns immediately.
      */
     public function handle(Request $request): JsonResponse
     {
@@ -32,13 +30,17 @@ class GcashWebhookController extends Controller
             return response()->json(['message' => 'Invalid signature.'], 401);
         }
 
-        return $this->processor->process(
-            $request,
+        if (! $this->replayValidator->isValid($request, $payload)) {
+            return response()->json(['message' => 'Invalid signature.'], 401);
+        }
+
+        ProcessWebhookJob::dispatch(
+            'GCash',
             $payload,
-            $this->replayValidator,
-            $this->normalizer,
-            'GCash'
+            WebhookProcessor::captureHeadersForPayload($request)
         );
+
+        return response()->json(['received' => true], 200);
     }
 
     /**

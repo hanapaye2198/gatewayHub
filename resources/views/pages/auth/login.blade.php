@@ -47,6 +47,15 @@
                     {{ __('Log in') }}
                 </flux:button>
             </div>
+
+            <div class="relative">
+                <flux:separator />
+                <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-zinc-900 px-2 text-sm text-zinc-500 dark:text-zinc-400">{{ __('or') }}</span>
+            </div>
+
+            <flux:link href="{{ route('google.redirect') }}" class="flex items-center justify-center gap-2 w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded text-center font-medium transition" data-test="google-login-button">
+                {{ __('Login with Google') }}
+            </flux:link>
         </form>
 
         @if (Route::has('register'))

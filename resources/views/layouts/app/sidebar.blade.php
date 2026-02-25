@@ -3,7 +3,7 @@
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen bg-white dark:bg-zinc-800">
+    <body class="min-h-screen bg-zinc-100 dark:bg-zinc-900">
         <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
             <flux:sidebar.header>
                 <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
@@ -17,6 +17,12 @@
                     </flux:sidebar.item>
                     <flux:sidebar.item icon="currency-dollar" :href="route('dashboard.payments')" :current="request()->routeIs('dashboard.payments')" wire:navigate>
                         {{ __('Payments') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="key" :href="route('dashboard.api-credentials')" :current="request()->routeIs('dashboard.api-credentials')" wire:navigate>
+                        {{ __('API Credentials') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="credit-card" :href="route('dashboard.gateways')" :current="request()->routeIs('dashboard.gateways')" wire:navigate>
+                        {{ __('Gateways') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>

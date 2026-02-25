@@ -11,6 +11,30 @@ class MayaDriver implements GatewayInterface
         protected array $config = []
     ) {}
 
+    /**
+     * Validation rules for config_json (per merchant).
+     *
+     * @return array<string, mixed>
+     */
+    public static function configValidationRules(): array
+    {
+        return [
+            'client_id' => ['required', 'string', 'max:255'],
+            'client_secret' => ['required', 'string', 'max:255'],
+            'webhook_key' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
+    /**
+     * Required config keys for payment creation.
+     *
+     * @return list<string>
+     */
+    public static function getRequiredConfigKeys(): array
+    {
+        return ['client_id', 'client_secret'];
+    }
+
     public function createPayment(array $data): array
     {
         return [];

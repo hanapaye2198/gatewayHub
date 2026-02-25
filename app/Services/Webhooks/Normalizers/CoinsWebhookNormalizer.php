@@ -59,11 +59,18 @@ class CoinsWebhookNormalizer implements WebhookNormalizerInterface
     }
 
     /**
+     * Extract external payment id (Coins orderId) for finding payment by provider_reference.
+     * Tries orderId first (matches our stored provider_reference), then referenceId.
+     *
      * @param  array<string, mixed>  $payload
      */
     private function extractPaymentReference(array $payload): ?string
     {
-        $value = $payload['referenceId'] ?? null;
+        $orderId = $payload['orderId'] ?? $payload['data']['orderId'] ?? null;
+        if (is_string($orderId) && $orderId !== '') {
+            return $orderId;
+        }
+        $value = $payload['referenceId'] ?? $payload['data']['referenceId'] ?? null;
 
         return is_string($value) && $value !== '' ? $value : null;
     }

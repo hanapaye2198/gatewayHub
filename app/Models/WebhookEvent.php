@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WebhookEvent extends Model
 {
@@ -16,6 +17,7 @@ class WebhookEvent extends Model
     protected $fillable = [
         'provider',
         'event_id',
+        'payment_id',
         'payload',
         'headers',
         'received_at',
@@ -23,6 +25,14 @@ class WebhookEvent extends Model
         'status',
         'error_message',
     ];
+
+    /**
+     * @return BelongsTo<Payment, $this>
+     */
+    public function payment(): BelongsTo
+    {
+        return $this->belongsTo(Payment::class);
+    }
 
     /**
      * Get the attributes that should be cast.

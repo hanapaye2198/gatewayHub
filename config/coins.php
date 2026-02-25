@@ -4,6 +4,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Coins.ph Dynamic QR API (Fiat)
+    |--------------------------------------------------------------------------
+    |
+    | All values from environment. Do not hardcode keys in code.
+    | COINS_BASE_URL, COINS_API_KEY, COINS_SECRET_KEY, COINS_SOURCE.
+    |
+    */
+    'base_url' => env('COINS_BASE_URL') ? rtrim(env('COINS_BASE_URL'), '/') : '',
+    'api_key' => env('COINS_API_KEY', ''),
+    'secret_key' => env('COINS_SECRET_KEY', ''),
+    'source' => env('COINS_SOURCE', 'GATEWAYHUB'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Coins.ph Webhook
     |--------------------------------------------------------------------------
     |

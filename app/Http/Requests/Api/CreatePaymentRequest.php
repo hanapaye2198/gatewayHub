@@ -2,30 +2,36 @@
 
 namespace App\Http\Requests\Api;
 
+use App\Http\Responses\ApiResponse;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 
 class CreatePaymentRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return $this->merchant() !== null;
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, mixed>>
      */
     public function rules(): array
     {
         return [
-            'amount' => ['required', 'numeric'],
-            'currency' => ['required', 'string'],
-            'gateway' => ['required', 'string'],
-            'reference' => ['required', 'string'],
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:999999999.99'],
+            'currency' => ['required', 'string', 'size:3', Rule::in(config('payments.currencies', ['PHP']))],
+            'gateway' => ['required', 'string', 'max:50'],
+            'reference' => ['required', 'string', 'max:255'],
         ];
+    }
+
+    protected function failedValidation(Validator $validator): void
+    {
+        $message = implode(' ', $validator->errors()->all());
+
+        throw new HttpResponseException(ApiResponse::error($message, 422));
     }
 }

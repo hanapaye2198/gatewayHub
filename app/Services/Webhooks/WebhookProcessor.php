@@ -69,10 +69,15 @@ class WebhookProcessor
 
                 $payment = Payment::query()->where('provider_reference', $paymentReference)->first();
                 if ($payment === null) {
+                    $payment = Payment::query()->where('reference_id', $paymentReference)->first();
+                }
+                if ($payment === null) {
                     $event->update(['status' => 'processed', 'processed_at' => now()]);
 
                     return response()->json(['received' => true], 200);
                 }
+
+                $event->update(['payment_id' => $payment->id]);
 
                 if ($payment->status === 'paid') {
                     $event->update(['status' => 'processed', 'processed_at' => now()]);
@@ -82,7 +87,7 @@ class WebhookProcessor
 
                 $this->applyStatusFromNormalized($payment, $normalized);
                 $this->mergeRawResponse($payment, $normalized['raw_payload']);
-                $payment->save();
+                $payment->save(); // PaymentObserver records platform fee when status transitions to paid
 
                 $event->update(['status' => 'processed', 'processed_at' => now()]);
 
@@ -140,9 +145,11 @@ class WebhookProcessor
     }
 
     /**
+     * Capture request headers for logging/audit, excluding sensitive values.
+     *
      * @return array<string, list<string>>
      */
-    private function captureHeaders(Request $request): array
+    public static function captureHeadersForPayload(Request $request): array
     {
         $headers = $request->headers->all();
         $sensitive = ['authorization', 'cookie', 'x-api-key'];
@@ -151,5 +158,13 @@ class WebhookProcessor
         }
 
         return $headers;
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function captureHeaders(Request $request): array
+    {
+        return self::captureHeadersForPayload($request);
     }
 }

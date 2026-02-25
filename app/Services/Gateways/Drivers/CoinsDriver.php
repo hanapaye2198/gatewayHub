@@ -30,13 +30,16 @@ use Illuminate\Support\Facades\Http;
  */
 class CoinsDriver implements GatewayInterface
 {
-    private const SANDBOX_BASE_URL = 'https://api.sandbox.coins.ph';
+    /** Sandbox domain per Coins Partner Integration Guide v2.5 (Dynamic QRPH). */
+    private const SANDBOX_BASE_URL = 'https://api.9001.pl-qa.coinsxyz.me';
 
     private const PROD_BASE_URL = 'https://api.pro.coins.ph';
 
     private const GENERATE_QR_PATH = '/openapi/fiat/v1/generate_qr_code';
 
     private const DEFAULT_EXPIRATION_SECONDS = 1800;
+
+    private const SOURCE_IDENTIFIER = 'GATEWAYHUB';
 
     protected string $clientId = '';
 
@@ -46,6 +49,8 @@ class CoinsDriver implements GatewayInterface
 
     protected string $webhookSecret = '';
 
+    protected bool $includeCanonicalForDebug = false;
+
     protected CoinsSignatureService $signatureService;
 
     public function __construct(array $config = [], ?CoinsSignatureService $signatureService = null)
@@ -54,6 +59,7 @@ class CoinsDriver implements GatewayInterface
         $this->clientSecret = (string) ($config['client_secret'] ?? $config['api_secret'] ?? '');
         $this->apiBase = (string) ($config['api_base'] ?? '');
         $this->webhookSecret = (string) ($config['webhook_secret'] ?? '');
+        $this->includeCanonicalForDebug = (bool) ($config['includeCanonicalForDebug'] ?? false);
         $this->signatureService = $signatureService ?? new CoinsSignatureService;
     }
 
@@ -73,12 +79,25 @@ class CoinsDriver implements GatewayInterface
     }
 
     /**
-     * Create a Dynamic QR PH payment via Coins.ph API.
+     * Required config keys for payment creation. Gateway must have these configured.
+     *
+     * @return list<string>
+     */
+    public static function getRequiredConfigKeys(): array
+    {
+        return ['client_id', 'client_secret', 'api_base'];
+    }
+
+    /**
+     * Create a Dynamic QR PH payment via Coins.ph Fiat API (POST JSON body, header-based signing).
+     *
+     * Follows Coins Partner Integration Guide v2.5: no signature or timestamp in URL;
+     * JSON body only; X-COINS-APIKEY, Timestamp, and Signature in headers.
      *
      * @param  array{amount: float|int|string, currency: string, reference: string}  $data
-     * @return array{provider_reference: string|null, qr_string?: string, qr_image?: string, raw_response: array, reference_id: string, status: string}
+     * @return array{external_payment_id: string, qr_data: string|null, raw: array, provider_reference?: string, qr_string?: string, qr_image?: string}
      *
-     * @throws CoinsApiException
+     * @throws CoinsApiException On non-2xx HTTP status or response status !== 0. No payment record created on error.
      */
     public function createPayment(array $data): array
     {
@@ -89,27 +108,37 @@ class CoinsDriver implements GatewayInterface
         $currency = (string) ($data['currency'] ?? 'PHP');
         $expirationSeconds = self::DEFAULT_EXPIRATION_SECONDS;
 
-        $params = [
+        $bodyParams = [
             'requestId' => $reference,
             'amount' => (string) $amount,
             'currency' => $currency,
             'expiredSeconds' => (string) $expirationSeconds,
-            'recvWindow' => '5000',
-            'timestamp' => (string) (int) (microtime(true) * 1000),
+            'source' => self::SOURCE_IDENTIFIER,
         ];
 
-        $signed = $this->signatureService->sign($params, $this->clientSecret);
-        $params['signature'] = $signed['signature'];
+        $timestampMs = (string) (int) (microtime(true) * 1000);
+        $signed = $this->signatureService->signForFiatRequest(
+            $bodyParams,
+            $timestampMs,
+            $this->clientSecret,
+            $this->includeCanonicalForDebug
+        );
 
-        $baseUrl = $this->getBaseUrl();
-        $queryString = $this->buildQueryString($params);
-        $url = $baseUrl.self::GENERATE_QR_PATH.'?'.$queryString;
+        $url = $this->getBaseUrl().self::GENERATE_QR_PATH;
+
+        $headers = [
+            'X-COINS-APIKEY' => $this->clientId,
+            'Timestamp' => $timestampMs,
+            'Signature' => $signed['signature'],
+            'Content-Type' => 'application/json',
+        ];
+        if ($this->includeCanonicalForDebug && isset($signed['canonical_string'])) {
+            $headers['X-COINS-DEBUG-CANONICAL'] = $signed['canonical_string'];
+        }
 
         try {
             /** @var Response $response */
-            $response = Http::withHeaders([
-                'X-COINS-APIKEY' => $this->clientId,
-            ])->post($url);
+            $response = Http::withHeaders($headers)->post($url, $bodyParams);
         } catch (HttpClientException $e) {
             throw new CoinsApiException(
                 'Coins.ph API request failed: '.$e->getMessage(),
@@ -136,8 +165,9 @@ class CoinsDriver implements GatewayInterface
             );
         }
 
-        if (isset($body['code']) && (int) $body['code'] !== 0 && (int) $body['code'] > 0) {
-            $message = $body['msg'] ?? $body['message'] ?? 'API returned error code '.$body['code'];
+        $status = $body['status'] ?? $body['code'] ?? null;
+        if ($status !== null && (int) $status !== 0) {
+            $message = $body['msg'] ?? $body['message'] ?? 'API returned error status '.$status;
             throw new CoinsApiException(
                 'Coins.ph API error: '.(is_string($message) ? $message : 'Unknown error'),
                 $response->status(),
@@ -180,23 +210,6 @@ class CoinsDriver implements GatewayInterface
         return [];
     }
 
-    /**
-     * Build query string from params (sorted by key) for Coins API.
-     *
-     * @param  array<string, string>  $params
-     */
-    private function buildQueryString(array $params): string
-    {
-        ksort($params, SORT_STRING);
-
-        $pairs = [];
-        foreach ($params as $key => $value) {
-            $pairs[] = $key.'='.$value;
-        }
-
-        return implode('&', $pairs);
-    }
-
     private function ensureConfigValid(): void
     {
         if ($this->clientId === '' || $this->clientSecret === '') {
@@ -213,10 +226,11 @@ class CoinsDriver implements GatewayInterface
     }
 
     /**
-     * Normalize Coins API response to gateway format.
+     * Normalize Coins API response to structured array: external_payment_id, qr_data, raw.
+     * Also includes backward-compatible keys (provider_reference, qr_string, qr_image).
      *
      * @param  array<string, mixed>  $body
-     * @return array{provider_reference: string|null, qr_string?: string, qr_image?: string, raw_response: array, reference_id: string, status: string}
+     * @return array{external_payment_id: string, qr_data: string|null, raw: array, provider_reference: string, qr_string?: string, qr_image?: string}
      */
     private function normalizeResponse(array $body, string $reference): array
     {
@@ -230,7 +244,7 @@ class CoinsDriver implements GatewayInterface
         if (is_array($providerRef)) {
             $providerRef = $reference;
         }
-        $providerRef = $providerRef === null ? $reference : (string) $providerRef;
+        $externalPaymentId = $providerRef === null ? $reference : (string) $providerRef;
 
         $qrString = null;
         $qrImage = null;
@@ -246,11 +260,15 @@ class CoinsDriver implements GatewayInterface
             $qrImage = null;
         }
 
+        $qrData = $qrString ?? $qrImage;
+        $expiresAt = now()->addSeconds(self::DEFAULT_EXPIRATION_SECONDS)->format('c');
+
         $normalized = [
-            'provider_reference' => $providerRef,
-            'raw_response' => $body,
-            'reference_id' => $providerRef,
-            'status' => 'pending',
+            'external_payment_id' => $externalPaymentId,
+            'qr_data' => $qrData,
+            'expires_at' => $expiresAt,
+            'raw' => $body,
+            'provider_reference' => $externalPaymentId,
         ];
         if ($qrString !== null) {
             $normalized['qr_string'] = $qrString;

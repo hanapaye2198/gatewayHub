@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Webhooks;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessWebhookJob;
 use App\Services\PayPal\PayPalWebhookSignatureVerifier;
-use App\Services\Webhooks\Normalizers\PayPalWebhookNormalizer;
 use App\Services\Webhooks\PayPalWebhookReplayValidator;
 use App\Services\Webhooks\WebhookProcessor;
 use Illuminate\Http\JsonResponse;
@@ -15,13 +15,11 @@ class PayPalWebhookController extends Controller
 {
     public function __construct(
         protected PayPalWebhookSignatureVerifier $signatureVerifier,
-        protected PayPalWebhookReplayValidator $replayValidator,
-        protected PayPalWebhookNormalizer $normalizer,
-        protected WebhookProcessor $processor
+        protected PayPalWebhookReplayValidator $replayValidator
     ) {}
 
     /**
-     * Handle PayPal webhook callback.
+     * Handle PayPal webhook callback. Verifies signature, enqueues processing, returns immediately.
      */
     public function handle(Request $request): JsonResponse
     {
@@ -34,13 +32,17 @@ class PayPalWebhookController extends Controller
             return response()->json(['message' => 'Invalid signature.'], 401);
         }
 
-        return $this->processor->process(
-            $request,
+        if (! $this->replayValidator->isValid($request, $payload)) {
+            return response()->json(['message' => 'Invalid signature.'], 401);
+        }
+
+        ProcessWebhookJob::dispatch(
+            'PayPal',
             $payload,
-            $this->replayValidator,
-            $this->normalizer,
-            'PayPal'
+            WebhookProcessor::captureHeadersForPayload($request)
         );
+
+        return response()->json(['received' => true], 200);
     }
 
     /**

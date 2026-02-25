@@ -2,17 +2,18 @@
     "$schema": "https://getcomposer.org/schema.json",
     "name": "laravel/livewire-starter-kit",
     "type": "project",
-    "description": "The official Laravel starter kit for Livewire.",
+    "description": "The official GatewayHub for Livewire.",
     "keywords": [
         "laravel",
         "framework"
     ],
     "license": "MIT",
     "require": {
-        "endroid/qr-code": "^5.1",
         "php": "^8.2",
+        "endroid/qr-code": "^5.1",
         "laravel/fortify": "^1.30",
         "laravel/framework": "^12.0",
+        "laravel/socialite": "^5.24",
         "laravel/tinker": "^2.10.1",
         "livewire/flux": "^2.9.0",
         "livewire/livewire": "^4.0"

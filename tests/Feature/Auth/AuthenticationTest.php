@@ -18,9 +18,9 @@ class AuthenticationTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_users_can_authenticate_using_the_login_screen(): void
+    public function test_merchant_redirects_to_dashboard_after_login(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'merchant']);
 
         $response = $this->post(route('login.store'), [
             'email' => $user->email,
@@ -29,7 +29,39 @@ class AuthenticationTest extends TestCase
 
         $response
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('dashboard', absolute: false));
+            ->assertRedirect(url('/dashboard'));
+
+        $this->assertAuthenticated();
+    }
+
+    public function test_admin_redirects_to_admin_after_login(): void
+    {
+        $user = User::factory()->admin()->create();
+
+        $response = $this->post(route('login.store'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(url('/admin'));
+
+        $this->assertAuthenticated();
+    }
+
+    public function test_unknown_role_redirects_to_login(): void
+    {
+        $user = User::factory()->create(['role' => '']);
+
+        $response = $this->post(route('login.store'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('login'));
 
         $this->assertAuthenticated();
     }

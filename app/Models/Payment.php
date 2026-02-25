@@ -6,6 +6,8 @@ use App\Services\Gateways\GatewayCapability;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 /**
@@ -30,6 +32,8 @@ class Payment extends Model
         'gateway_code',
         'amount',
         'currency',
+        'platform_fee',
+        'net_amount',
         'reference_id',
         'provider_reference',
         'status',
@@ -57,6 +61,8 @@ class Payment extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'platform_fee' => 'decimal:2',
+            'net_amount' => 'decimal:2',
             'raw_response' => 'array',
             'paid_at' => 'datetime',
         ];
@@ -79,6 +85,22 @@ class Payment extends Model
     }
 
     /**
+     * @return HasOne<PlatformFee, $this>
+     */
+    public function platformFee(): HasOne
+    {
+        return $this->hasOne(PlatformFee::class);
+    }
+
+    /**
+     * @return HasMany<WebhookEvent, $this>
+     */
+    public function webhookEvents(): HasMany
+    {
+        return $this->hasMany(WebhookEvent::class)->orderBy('received_at');
+    }
+
+    /**
      * Whether this payment uses a QR-based gateway.
      */
     public function isQrBased(): bool
@@ -86,6 +108,30 @@ class Payment extends Model
         $gateway = $this->gateway ?? $this->gateway()->first();
 
         return $gateway !== null && $gateway->getCapability() === GatewayCapability::QR;
+    }
+
+    /**
+     * Get expiration datetime for QR-based payments. Computed from raw_response or created_at.
+     */
+    public function getExpiresAt(): ?\Carbon\CarbonInterface
+    {
+        $raw = $this->raw_response;
+        if (is_array($raw)) {
+            $expiresAt = $raw['expires_at'] ?? $raw['data']['expires_at'] ?? null;
+            if (is_string($expiresAt)) {
+                try {
+                    return \Illuminate\Support\Carbon::parse($expiresAt);
+                } catch (\Throwable) {
+                    //
+                }
+            }
+        }
+
+        if ($this->isQrBased()) {
+            return $this->created_at->copy()->addSeconds(1800);
+        }
+
+        return null;
     }
 
     /**

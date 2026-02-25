@@ -14,11 +14,55 @@ use App\Services\Gateways\Exceptions\CoinsApiException;
  * 4. Build canonical string: key1=value1&key2=value2&key3=value3 (all values stringified).
  * 5. Compute HMAC-SHA256 with API secret; output lowercase hexadecimal.
  *
+ * For Fiat API (generate_qr_code): use signForFiatRequest() with body params + timestamp;
+ * signature is over body canonical string with timestamp appended (not in query string).
+ *
  * Use for API request signing and webhook signature verification.
  * Do not log apiSecret or expose canonical_string outside debug mode.
  */
 class CoinsSignatureService
 {
+    /**
+     * Sign body for Coins Fiat API (POST JSON body, signature in header).
+     *
+     * Canonical string = body params sorted by key, then "&timestamp={timestamp}".
+     * Signature = HMAC-SHA256(canonical_string, clientSecret) as lowercase hex.
+     *
+     * @param  array<string, mixed>  $bodyParams  Request body parameters only (no timestamp, no signature).
+     * @param  string  $timestampMs  Timestamp in milliseconds (string).
+     * @param  string  $clientSecret  Coins API client secret.
+     * @param  bool  $includeCanonicalForDebug  When true, return canonical_string. Do not use in production logs.
+     * @return array{signature: string, canonical_string?: string}
+     *
+     * @throws CoinsApiException When clientSecret is empty.
+     */
+    public function signForFiatRequest(
+        array $bodyParams,
+        string $timestampMs,
+        string $clientSecret,
+        bool $includeCanonicalForDebug = false
+    ): array {
+        if ($clientSecret === '') {
+            throw new CoinsApiException('Coins signature requires a non-empty API secret.');
+        }
+
+        $normalized = $this->normalizeParams($bodyParams);
+        $canonicalBody = $this->buildCanonicalString($normalized);
+        $canonical = $canonicalBody === ''
+            ? 'timestamp='.$timestampMs
+            : $canonicalBody.'&timestamp='.$timestampMs;
+
+        $signature = hash_hmac('sha256', $canonical, $clientSecret);
+
+        $result = ['signature' => $signature];
+
+        if ($includeCanonicalForDebug) {
+            $result['canonical_string'] = $canonical;
+        }
+
+        return $result;
+    }
+
     /**
      * Sign parameters for Coins.ph API or webhook payload.
      *

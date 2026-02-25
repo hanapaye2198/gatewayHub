@@ -13,6 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
         then: function (): void {
             Route::prefix('api')->group(base_path('routes/webhooks.php'));
+
+            Route::middleware(['web', 'auth', 'verified', \App\Http\Middleware\EnsureAdmin::class])
+                ->prefix('admin')
+                ->group(base_path('routes/admin.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -21,5 +25,20 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->renderable(function (\Throwable $e, $request) {
+            if ($e instanceof \Illuminate\Http\Exceptions\HttpResponseException) {
+                return null;
+            }
+            if ($request instanceof \Illuminate\Http\Request
+                && str_starts_with($request->path(), 'api/webhooks/')) {
+                \Illuminate\Support\Facades\Log::error('Webhook endpoint exception', [
+                    'path' => $request->path(),
+                    'error' => $e->getMessage(),
+                ]);
+
+                return response()->json([
+                    'message' => 'Webhook processing failed. Please retry.',
+                ], 500);
+            }
+        });
     })->create();

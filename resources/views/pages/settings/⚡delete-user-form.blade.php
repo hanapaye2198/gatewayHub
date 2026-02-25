@@ -41,20 +41,18 @@ new class extends Component {
         <form method="POST" wire:submit="deleteUser" class="space-y-6">
             <div>
                 <flux:heading size="lg">{{ __('Are you sure you want to delete your account?') }}</flux:heading>
-
-                <flux:subheading>
+                <flux:subheading class="mt-2 block text-zinc-600 dark:text-zinc-400">
                     {{ __('Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.') }}
                 </flux:subheading>
             </div>
 
             <flux:input wire:model="password" :label="__('Password')" type="password" />
 
-            <div class="flex justify-end space-x-2 rtl:space-x-reverse">
+            <div class="flex flex-wrap justify-end gap-3 pt-2">
                 <flux:modal.close>
-                    <flux:button variant="filled">{{ __('Cancel') }}</flux:button>
+                    <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
                 </flux:modal.close>
-
-                <flux:button variant="danger" type="submit" data-test="confirm-delete-user-button">
+                <flux:button variant="danger" type="submit" class="min-w-[120px]" data-test="confirm-delete-user-button">
                     {{ __('Delete account') }}
                 </flux:button>
             </div>

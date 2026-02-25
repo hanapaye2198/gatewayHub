@@ -108,4 +108,54 @@ class CoinsSignatureServiceTest extends TestCase
         $this->assertStringContainsString('amount=100', $result['canonical_string']);
         $this->assertStringContainsString('flag=1', $result['canonical_string']);
     }
+
+    public function test_sign_for_fiat_request_returns_signature(): void
+    {
+        $bodyParams = ['amount' => '100', 'currency' => 'PHP', 'requestId' => 'REF123', 'expiredSeconds' => '1800', 'source' => 'GATEWAYHUB'];
+        $result = $this->service->signForFiatRequest($bodyParams, '1700000000000', 'my-secret');
+
+        $this->assertArrayHasKey('signature', $result);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $result['signature']);
+        $this->assertArrayNotHasKey('canonical_string', $result);
+    }
+
+    public function test_sign_for_fiat_request_builds_canonical_with_body_then_timestamp(): void
+    {
+        $bodyParams = ['amount' => '100', 'currency' => 'PHP', 'requestId' => 'REF123', 'expiredSeconds' => '1800', 'source' => 'GATEWAYHUB'];
+        $result = $this->service->signForFiatRequest($bodyParams, '1700000000000', 'secret', true);
+
+        $this->assertArrayHasKey('canonical_string', $result);
+        $this->assertSame(
+            'amount=100&currency=PHP&expiredSeconds=1800&requestId=REF123&source=GATEWAYHUB&timestamp=1700000000000',
+            $result['canonical_string']
+        );
+    }
+
+    public function test_sign_for_fiat_request_sorts_body_params_lexicographically(): void
+    {
+        $bodyParams = ['source' => 'GATEWAYHUB', 'requestId' => 'REF123', 'amount' => '100', 'currency' => 'PHP', 'expiredSeconds' => '1800'];
+        $result = $this->service->signForFiatRequest($bodyParams, '1700000000000', 'secret', true);
+
+        $this->assertSame(
+            'amount=100&currency=PHP&expiredSeconds=1800&requestId=REF123&source=GATEWAYHUB&timestamp=1700000000000',
+            $result['canonical_string']
+        );
+    }
+
+    public function test_sign_for_fiat_request_throws_on_empty_secret(): void
+    {
+        $this->expectException(CoinsApiException::class);
+        $this->expectExceptionMessage('non-empty API secret');
+
+        $this->service->signForFiatRequest(['requestId' => 'REF'], '1700000000000', '');
+    }
+
+    public function test_sign_for_fiat_request_is_deterministic(): void
+    {
+        $bodyParams = ['amount' => '100', 'currency' => 'PHP', 'requestId' => 'REF123'];
+        $r1 = $this->service->signForFiatRequest($bodyParams, '1700000000000', 'secret');
+        $r2 = $this->service->signForFiatRequest($bodyParams, '1700000000000', 'secret');
+
+        $this->assertSame($r1['signature'], $r2['signature']);
+    }
 }

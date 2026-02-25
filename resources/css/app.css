@@ -47,20 +47,28 @@
     }
 }
 
+/* Form fields */
 [data-flux-field]:not(ui-radio, ui-checkbox) {
     @apply grid gap-2;
 }
 
 [data-flux-label] {
-    @apply  !mb-0 !leading-tight;
+    @apply !mb-0 !leading-tight font-medium text-zinc-700 dark:text-zinc-300;
 }
 
 input:focus[data-flux-control],
 textarea:focus[data-flux-control],
 select:focus[data-flux-control] {
-    @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
+    @apply outline-hidden ring-2 ring-zinc-400/50 ring-offset-2 ring-offset-white dark:ring-zinc-500/40 dark:ring-offset-zinc-800;
 }
 
-/* \[:where(&)\]:size-4 {
-    @apply size-4;
-} */
+/* Error messages */
+[data-flux-error] {
+    @apply mt-1.5 text-sm font-medium text-red-600 dark:text-red-400;
+}
+
+/* Buttons - consistent rounded corners */
+button[data-flux-button],
+a[data-flux-button] {
+    @apply rounded-lg font-medium;
+}

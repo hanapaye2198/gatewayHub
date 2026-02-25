@@ -45,7 +45,7 @@ new class extends Component {
     <flux:heading class="sr-only">{{ __('Password Settings') }}</flux:heading>
 
     <x-pages::settings.layout :heading="__('Update password')" :subheading="__('Ensure your account is using a long, random password to stay secure')">
-        <form method="POST" wire:submit="updatePassword" class="mt-6 space-y-6">
+        <form method="POST" wire:submit="updatePassword" class="space-y-6">
             <flux:input
                 wire:model="current_password"
                 :label="__('Current password')"
@@ -68,14 +68,11 @@ new class extends Component {
                 autocomplete="new-password"
             />
 
-            <div class="flex items-center gap-4">
-                <div class="flex items-center justify-end">
-                    <flux:button variant="primary" type="submit" class="w-full" data-test="update-password-button">
-                        {{ __('Save') }}
-                    </flux:button>
-                </div>
-
-                <x-action-message class="me-3" on="password-updated">
+            <div class="flex flex-wrap items-center gap-3 pt-2">
+                <flux:button variant="primary" type="submit" class="min-w-[120px]" data-test="update-password-button">
+                    {{ __('Save') }}
+                </flux:button>
+                <x-action-message class="text-sm text-zinc-600 dark:text-zinc-400" on="password-updated">
                     {{ __('Saved.') }}
                 </x-action-message>
             </div>

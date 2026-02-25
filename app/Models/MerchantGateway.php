@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\PartiallyEncryptedJsonCast;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +22,8 @@ class MerchantGateway extends Model
         'gateway_id',
         'is_enabled',
         'config_json',
+        'last_tested_at',
+        'last_test_status',
     ];
 
     /**
@@ -32,7 +35,8 @@ class MerchantGateway extends Model
     {
         return [
             'is_enabled' => 'boolean',
-            'config_json' => 'array',
+            'config_json' => PartiallyEncryptedJsonCast::class,
+            'last_tested_at' => 'datetime',
         ];
     }
 

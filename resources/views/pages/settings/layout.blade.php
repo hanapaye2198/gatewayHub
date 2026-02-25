@@ -13,10 +13,10 @@
     <flux:separator class="md:hidden" />
 
     <div class="flex-1 self-stretch max-md:pt-6">
-        <flux:heading>{{ $heading ?? '' }}</flux:heading>
-        <flux:subheading>{{ $subheading ?? '' }}</flux:subheading>
+        <h1 class="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">{{ $heading ?? '' }}</h1>
+        <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{{ $subheading ?? '' }}</p>
 
-        <div class="mt-5 w-full max-w-lg">
+        <div class="mt-6 w-full max-w-lg space-y-6">
             {{ $slot }}
         </div>
     </div>

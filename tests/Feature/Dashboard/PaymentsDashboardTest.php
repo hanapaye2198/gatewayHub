@@ -5,6 +5,7 @@ namespace Tests\Feature\Dashboard;
 use App\Models\Gateway;
 use App\Models\Payment;
 use App\Models\User;
+use App\Models\WebhookEvent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -136,5 +137,63 @@ class PaymentsDashboardTest extends TestCase
 
         $response->assertSee('Paid');
         $response->assertDontSee('Waiting for payment');
+    }
+
+    public function test_payment_detail_page_displays_payment_info(): void
+    {
+        $user = User::factory()->create();
+        $payment = Payment::factory()->for($user)->paid()->create([
+            'reference_id' => 'DETAIL-REF',
+            'gateway_code' => 'coins',
+            'amount' => 100.50,
+            'currency' => 'PHP',
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->get(route('dashboard.payments.show', $payment));
+
+        $response->assertOk();
+        $response->assertSee('DETAIL-REF');
+        $response->assertSee('100.50');
+        $response->assertSee('PHP');
+        $response->assertSee('Paid');
+        $response->assertSee('Audit Timeline');
+    }
+
+    public function test_payment_detail_returns_404_for_other_merchant_payment(): void
+    {
+        $merchant = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $payment = Payment::factory()->for($otherUser)->create(['reference_id' => 'OTHER-REF']);
+
+        $this->actingAs($merchant);
+        $response = $this->get(route('dashboard.payments.show', $payment));
+
+        $response->assertNotFound();
+    }
+
+    public function test_payment_detail_displays_webhook_audit_timeline(): void
+    {
+        $user = User::factory()->create();
+        $payment = Payment::factory()->for($user)->paid()->create([
+            'reference_id' => 'AUDIT-REF',
+            'gateway_code' => 'coins',
+        ]);
+
+        WebhookEvent::create([
+            'provider' => 'coins',
+            'event_id' => 'evt-123',
+            'payment_id' => $payment->id,
+            'received_at' => now()->subMinutes(5),
+            'processed_at' => now()->subMinutes(4),
+            'status' => 'processed',
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->get(route('dashboard.payments.show', $payment));
+
+        $response->assertOk();
+        $response->assertSee('Webhook received');
+        $response->assertSee('Payment confirmed');
     }
 }
