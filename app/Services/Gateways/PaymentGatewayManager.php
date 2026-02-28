@@ -10,14 +10,22 @@ use Illuminate\Contracts\Container\Container;
 
 class PaymentGatewayManager
 {
+    /**
+     * Payment options that are orchestrated through Coins Dynamic QR.
+     *
+     * @var list<string>
+     */
+    private const COINS_ORCHESTRATED_GATEWAYS = ['coins', 'gcash', 'maya', 'paypal', 'qrph', 'payqrph'];
+
     public function __construct(
         protected Container $container,
-        protected Gateway $gateway
+        protected Gateway $gateway,
+        protected PlatformGatewayConfigService $platformGatewayConfigService
     ) {}
 
     /**
      * Resolve driver for a merchant and gateway. Verifies global and merchant-level
-     * enablement, loads decrypted config from merchant_gateways, and returns configured driver.
+     * enablement, loads platform-level gateway credentials, and returns configured driver.
      *
      * @throws GatewayException
      */
@@ -42,17 +50,27 @@ class PaymentGatewayManager
             throw new GatewayException('Gateway is not enabled for this merchant.');
         }
 
-        $config = $merchantGateway->config_json ?? [];
-        $missing = $this->missingRequiredConfig($gateway->driver_class, $config);
+        $processingGatewayCode = $this->processingGatewayCode($gatewayCode);
+        $processingGateway = $this->gateway->newQuery()->where('code', $processingGatewayCode)->first();
+        if (! $processingGateway instanceof Gateway) {
+            throw new GatewayException("Processing gateway not found: {$processingGatewayCode}.");
+        }
+
+        if (! $processingGateway->is_global_enabled) {
+            throw new GatewayException("Processing gateway is not enabled: {$processingGatewayCode}.");
+        }
+
+        $config = $this->platformGatewayConfigService->forGatewayCode($processingGatewayCode);
+        $missing = $this->missingRequiredConfig($processingGateway->driver_class, $config);
         if ($missing !== null) {
             throw new GatewayException(sprintf(
-                'Gateway "%s" is missing required credentials: %s. Configure them in Dashboard > Gateways.',
-                $gateway->name,
+                'Gateway "%s" is missing required platform credentials: %s. Configure them in SurePay admin settings.',
+                $processingGateway->name,
                 implode(', ', $missing)
             ));
         }
 
-        return $this->getDriver($gatewayCode, $config);
+        return $this->getDriver($processingGatewayCode, $config);
     }
 
     /**
@@ -124,5 +142,14 @@ class PaymentGatewayManager
         }
 
         return $missing === [] ? null : $missing;
+    }
+
+    private function processingGatewayCode(string $selectedGatewayCode): string
+    {
+        if (in_array($selectedGatewayCode, self::COINS_ORCHESTRATED_GATEWAYS, true)) {
+            return 'coins';
+        }
+
+        return $selectedGatewayCode;
     }
 }

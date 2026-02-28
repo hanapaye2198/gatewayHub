@@ -8,13 +8,13 @@
 
         <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
             <flux:heading size="lg">{{ __('Create Payment') }}</flux:heading>
-            <flux:subheading class="mt-1">{{ __('Create a new payment to collect funds via QR or redirect') }}</flux:subheading>
+            <flux:subheading class="mt-1">{{ __('Create a new payment. All options are collected via Coins dynamic QR.') }}</flux:subheading>
 
             @if ($enabledGateways->isEmpty())
                 <flux:callout variant="warning" icon="exclamation-triangle" class="mt-6">
                     {{ __('No gateways are enabled for your account.') }}
                     <flux:link :href="route('dashboard.gateways')" wire:navigate class="font-medium">
-                        {{ __('Configure gateways') }}
+                        {{ __('View gateway status') }}
                     </flux:link>
                 </flux:callout>
             @else

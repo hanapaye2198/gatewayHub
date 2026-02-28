@@ -5,6 +5,7 @@
             paymentId: @js($payment->id),
             initialStatus: @js($payment->status),
             statusUrl: @js(route('dashboard.payments.status', $payment)),
+            paymentsUrl: @js(route('dashboard.payments')),
             expiresAt: @js($expiresAt?->toIso8601String()),
         })"
         x-init="init()"
@@ -18,8 +19,11 @@
         <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
             <flux:heading size="lg">{{ $payment->reference_id }}</flux:heading>
             <flux:subheading class="mt-1">
-                {{ $payment->gateway?->name ?? ucfirst($payment->gateway_code) }} · {{ number_format($payment->amount, 2) }} {{ $payment->currency }}
+                {{ $payment->gateway?->name ?? ucfirst($payment->gateway_code) }} | {{ number_format($payment->amount, 2) }} {{ $payment->currency }}
             </flux:subheading>
+            <flux:text class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                {{ __('Status updates are recorded from Coins webhook events.') }}
+            </flux:text>
 
             <div class="mt-6 flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
                 @if ($qrImageUrl)
@@ -32,7 +36,7 @@
                             height="192"
                         />
                         <p class="text-center text-sm text-zinc-500 dark:text-zinc-400">
-                            {{ __('Scan with GCash, Maya, or bank app') }}
+                            {{ __('Scan with GCash, Maya, Coins wallet, or other QRPH-compatible apps.') }}
                         </p>
                     </div>
                 @endif
@@ -54,7 +58,7 @@
                         @if ($payment->status === 'paid' && $payment->platform_fee !== null)
                             <div>
                                 <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Platform fee') }}</flux:text>
-                                <flux:text class="mt-1 block">− {{ number_format($payment->platform_fee, 2) }} {{ $payment->currency }}</flux:text>
+                                <flux:text class="mt-1 block">-{{ number_format($payment->platform_fee, 2) }} {{ $payment->currency }}</flux:text>
                             </div>
                             <div>
                                 <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Net amount') }}</flux:text>
@@ -99,57 +103,45 @@
             </div>
         </div>
 
-        <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
-            <flux:heading size="md">{{ __('Audit Timeline') }}</flux:heading>
-            <flux:subheading class="mt-1">{{ __('Webhook events for this payment') }}</flux:subheading>
+        @php
+            $rawResponse = is_array($payment->raw_response) ? $payment->raw_response : [];
+            $surepaySendingLogs = is_array($rawResponse['surepay_sending_logs'] ?? null) ? $rawResponse['surepay_sending_logs'] : [];
+            $surepayErrorLogs = is_array($rawResponse['surepay_wallet_errors'] ?? null)
+                ? $rawResponse['surepay_wallet_errors']
+                : (is_array($rawResponse['tunnel_wallet_errors'] ?? null) ? $rawResponse['tunnel_wallet_errors'] : []);
+        @endphp
 
-            @if ($payment->webhookEvents->isEmpty())
-                <flux:text class="mt-6 block text-zinc-500 dark:text-zinc-400">{{ __('No webhook events recorded yet.') }}</flux:text>
-            @else
-                <div class="mt-6 space-y-0">
-                    @foreach ($payment->webhookEvents as $event)
-                        <div class="relative flex gap-4 pb-8 last:pb-0">
-                            @if (!$loop->last)
-                                <div class="absolute left-[11px] top-6 h-full w-px bg-zinc-200 dark:bg-zinc-700" aria-hidden="true"></div>
-                            @endif
-                            <div class="relative flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800">
-                                @if ($event->status === 'processed')
-                                    <flux:icon name="check" class="size-3.5 text-green-600 dark:text-green-400" />
-                                @elseif ($event->status === 'failed')
-                                    <flux:icon name="x-circle" class="size-3.5 text-red-600 dark:text-red-400" />
-                                @else
-                                    <flux:icon name="clock" class="size-3.5 text-zinc-500 dark:text-zinc-400" />
+        @if ($surepaySendingLogs !== [] || $surepayErrorLogs !== [])
+            <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
+                <flux:heading size="md">{{ __('SurePay Flow Logs') }}</flux:heading>
+                <flux:subheading class="mt-1">{{ __('Per-payment orchestration logs and failure details.') }}</flux:subheading>
+
+                <div class="mt-4 space-y-3">
+                    @foreach ($surepaySendingLogs as $log)
+                        @if (is_array($log))
+                            <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-700/40 dark:bg-emerald-900/20 dark:text-emerald-300">
+                                <div class="font-medium">{{ strtoupper((string) ($log['status'] ?? 'success')) }} | {{ (string) ($log['stage'] ?? 'flow') }}</div>
+                                <div class="mt-1 text-xs">{{ (string) ($log['logged_at'] ?? 'N/A') }}</div>
+                                @if (is_string($log['error'] ?? null) && $log['error'] !== '')
+                                    <div class="mt-1 text-xs">{{ $log['error'] }}</div>
                                 @endif
                             </div>
-                            <div class="flex-1 min-w-0">
-                                <flux:text class="font-medium">{{ __('Webhook received') }}</flux:text>
-                                <flux:text class="block text-sm text-zinc-500 dark:text-zinc-400">
-                                    {{ __('Received') }}: {{ $event->received_at->format('M j, Y g:i:s A') }}
-                                </flux:text>
-                                @if ($event->processed_at)
-                                    <flux:text class="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
-                                        {{ __('Processed') }}: {{ $event->processed_at->format('M j, Y g:i:s A') }}
-                                    </flux:text>
-                                @endif
-                                <div class="mt-2">
-                                    <x-status-badge
-                                        :status="$event->status"
-                                        :label="match ($event->status) {
-                                            'processed' => __('Payment confirmed'),
-                                            'failed' => __('Processing failed'),
-                                            default => __('Received'),
-                                        }"
-                                    />
-                                </div>
-                                @if ($event->status === 'failed' && $event->error_message)
-                                    <flux:text class="mt-2 block text-sm text-red-600 dark:text-red-400">{{ $event->error_message }}</flux:text>
-                                @endif
+                        @endif
+                    @endforeach
+
+                    @foreach ($surepayErrorLogs as $log)
+                        @if (is_array($log))
+                            <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-700/40 dark:bg-red-900/20 dark:text-red-300">
+                                <div class="font-medium">{{ __('FAILED') }}</div>
+                                <div class="mt-1 text-xs">{{ (string) ($log['logged_at'] ?? 'N/A') }}</div>
+                                <div class="mt-1 text-xs">{{ (string) ($log['message'] ?? __('Unknown error')) }}</div>
                             </div>
-                        </div>
+                        @endif
                     @endforeach
                 </div>
-            @endif
-        </div>
+            </div>
+        @endif
+
     </div>
 
     <script>
@@ -157,6 +149,7 @@
             Alpine.data('paymentDetail', (config) => ({
                 paymentId: config.paymentId,
                 statusUrl: config.statusUrl,
+                paymentsUrl: config.paymentsUrl,
                 expiresAt: config.expiresAt ? new Date(config.expiresAt) : null,
                 displayStatus: config.initialStatus === 'paid' ? 'success' : (config.initialStatus === 'failed' ? 'failed' : 'pending'),
                 countdownText: '',
@@ -208,7 +201,7 @@
                         if (data.status === 'success') {
                             this.displayStatus = 'success';
                             this.stopPolling();
-                            window.location.reload();
+                            window.location.href = this.paymentsUrl;
                         } else if (data.status === 'failed') {
                             this.displayStatus = 'failed';
                             this.stopPolling();
@@ -219,3 +212,4 @@
         });
     </script>
 </x-layouts::app>
+

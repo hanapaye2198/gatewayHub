@@ -2,9 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
-use App\Enums\PlatformFeeStatus;
 use App\Models\Payment;
-use App\Models\PlatformFee;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -13,54 +11,47 @@ class AdminDashboardMetricsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_dashboard_displays_metrics(): void
+    public function test_admin_dashboard_displays_required_surepay_admin_sections_and_total_collections(): void
     {
         $admin = User::factory()->admin()->create();
         $merchant1 = User::factory()->create(['role' => 'merchant', 'is_active' => true]);
         $merchant2 = User::factory()->create(['role' => 'merchant', 'is_active' => true]);
         $merchant3 = User::factory()->create(['role' => 'merchant', 'is_active' => false]);
 
-        $payment1 = Payment::factory()->for($merchant1)->paid()->create(['amount' => 1000]);
-        $payment2 = Payment::factory()->for($merchant1)->paid()->create(['amount' => 2000]);
-        $payment3 = Payment::factory()->for($merchant2)->paid()->create(['amount' => 500]);
-
-        PlatformFee::query()->create([
-            'payment_id' => $payment1->id,
-            'merchant_id' => $merchant1->id,
-            'gateway_code' => 'coins',
-            'gross_amount' => 1000,
-            'fee_rate' => 0.005,
-            'fee_amount' => 5,
-            'net_amount' => 995,
-            'status' => PlatformFeeStatus::Posted,
-        ]);
-        PlatformFee::query()->create([
-            'payment_id' => $payment2->id,
-            'merchant_id' => $merchant1->id,
-            'gateway_code' => 'coins',
-            'gross_amount' => 2000,
-            'fee_rate' => 0.005,
-            'fee_amount' => 10,
-            'net_amount' => 1990,
-            'status' => PlatformFeeStatus::Posted,
-        ]);
-        PlatformFee::query()->create([
-            'payment_id' => $payment3->id,
-            'merchant_id' => $merchant2->id,
-            'gateway_code' => 'coins',
-            'gross_amount' => 500,
-            'fee_rate' => 0.005,
-            'fee_amount' => 2.50,
-            'net_amount' => 497.50,
-            'status' => PlatformFeeStatus::Posted,
-        ]);
+        Payment::factory()->for($merchant1)->paid()->create(['amount' => 1000]);
+        Payment::factory()->for($merchant1)->paid()->create(['amount' => 2000]);
+        Payment::factory()->for($merchant2)->paid()->create(['amount' => 500]);
+        Payment::factory()->for($merchant3)->create(['amount' => 900, 'status' => 'pending']);
 
         $response = $this->actingAs($admin)->get(route('admin.index'));
 
         $response->assertOk();
-        $response->assertSee('3', false); // Total Payments
-        $response->assertSee('3,500.00', false); // Total Payment Volume (1000+2000+500)
-        $response->assertSee('17.50', false); // Platform Revenue (5+10+2.50)
-        $response->assertSee('2', false); // Active Merchants (merchant1, merchant2)
+        $response->assertSee('SurePay Admin Dashboard');
+        $response->assertSee('PHP 3,500.00', false);
+        $response->assertSee($merchant1->name);
+        $response->assertSee($merchant2->name);
+        $response->assertSee($merchant3->name);
+        $response->assertSee('Configure Gateways Per Client');
+        $response->assertDontSee('Platform Revenue');
+        $response->assertDontSee('Net Volume');
+        $response->assertDontSee('Revenue by Gateway');
+        $response->assertDontSee('Total Payments');
+    }
+
+    public function test_admin_dashboard_filters_total_collections_per_client(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $merchant1 = User::factory()->create(['role' => 'merchant', 'is_active' => true]);
+        $merchant2 = User::factory()->create(['role' => 'merchant', 'is_active' => true]);
+
+        Payment::factory()->for($merchant1)->paid()->create(['amount' => 1000]);
+        Payment::factory()->for($merchant1)->paid()->create(['amount' => 2000]);
+        Payment::factory()->for($merchant2)->paid()->create(['amount' => 500]);
+
+        $response = $this->actingAs($admin)->get(route('admin.index', ['client_id' => $merchant1->id]));
+
+        $response->assertOk();
+        $response->assertSee('Filtered client: '.$merchant1->name);
+        $response->assertSee('PHP 3,000.00', false);
     }
 }

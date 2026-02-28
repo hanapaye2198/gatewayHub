@@ -29,6 +29,14 @@
                     <flux:sidebar.item icon="currency-dollar" :href="route('admin.payments.index')" :current="request()->routeIs('admin.payments.*')" wire:navigate>
                         Payments
                     </flux:sidebar.item>
+                    @if (config('surepay.features.wallet_settlement', false))
+                        <flux:sidebar.item icon="wallet" :href="route('admin.surepay-wallets.index')" :current="request()->routeIs('admin.surepay-wallets.*') || request()->routeIs('admin.tunnel-wallets.*')" wire:navigate>
+                            Settlement Controls
+                        </flux:sidebar.item>
+                        <flux:sidebar.item icon="banknotes" :href="route('admin.surepay-wallets.dashboard')" :current="request()->routeIs('admin.surepay-wallets.dashboard') || request()->routeIs('admin.tunnel-wallets.dashboard')" wire:navigate>
+                            Settlement Dashboard
+                        </flux:sidebar.item>
+                    @endif
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 

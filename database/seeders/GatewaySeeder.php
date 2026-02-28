@@ -33,6 +33,16 @@ class GatewaySeeder extends Seeder
                 'name' => 'PayPal',
                 'driver_class' => 'App\Services\Gateways\Drivers\PaypalDriver',
             ],
+            [
+                'code' => 'payqrph',
+                'name' => 'PayQRPH',
+                'driver_class' => 'App\Services\Gateways\Drivers\QrphDriver',
+            ],
+            [
+                'code' => 'qrph',
+                'name' => 'QRPH',
+                'driver_class' => 'App\Services\Gateways\Drivers\QrphDriver',
+            ],
         ];
 
         foreach ($gateways as $gateway) {

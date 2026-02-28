@@ -2,8 +2,9 @@
 
 namespace App\Observers;
 
+use App\Jobs\ProcessPaymentPaidEffectsJob;
+use App\Jobs\ProcessPaymentReversalEffectsJob;
 use App\Models\Payment;
-use App\Services\Billing\PlatformFeeService;
 use Illuminate\Support\Facades\Log;
 
 class PaymentObserver
@@ -33,12 +34,12 @@ class PaymentObserver
         }
 
         if ($payment->wasChanged('status') && $payment->status === 'paid') {
-            app(PlatformFeeService::class)->record($payment);
+            ProcessPaymentPaidEffectsJob::dispatch($payment->id)->afterCommit();
         }
 
         if ($payment->wasChanged('status') && in_array($payment->status, ['refunded', 'failed_after_paid'], true)) {
             $reason = $payment->status === 'refunded' ? 'Payment refunded' : 'Failed after paid';
-            app(PlatformFeeService::class)->reverseForPayment($payment, $reason);
+            ProcessPaymentReversalEffectsJob::dispatch($payment->id, $reason)->afterCommit();
         }
     }
 

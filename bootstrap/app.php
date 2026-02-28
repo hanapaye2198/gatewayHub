@@ -30,7 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
             if ($request instanceof \Illuminate\Http\Request
-                && str_starts_with($request->path(), 'api/webhooks/')) {
+                && str_starts_with($request->path(), 'api/webhooks')) {
                 \Illuminate\Support\Facades\Log::error('Webhook endpoint exception', [
                     'path' => $request->path(),
                     'error' => $e->getMessage(),

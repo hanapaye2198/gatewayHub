@@ -22,7 +22,7 @@ class PaymentCreationService
      * Create a payment. Resolves driver, calls gateway API, persists payment.
      *
      * @param  array{amount: float|int|string, currency: string, reference: string}  $data
-     * @return array{payment: Payment, qr_data: string|null, expires_at: string|null}
+     * @return array{payment: Payment, qr_data: string|null, expires_at: string|null, redirect_url: string|null}
      *
      * @throws GatewayException
      */
@@ -60,11 +60,14 @@ class PaymentCreationService
         $qrData = is_string($qrData) && $qrData !== '' ? $qrData : null;
         $expiresAt = $response['expires_at'] ?? null;
         $expiresAt = is_string($expiresAt) && $expiresAt !== '' ? $expiresAt : null;
+        $redirectUrl = $response['redirect_url'] ?? $response['checkout_url'] ?? $response['checkoutUrl'] ?? $response['url'] ?? null;
+        $redirectUrl = is_string($redirectUrl) && $redirectUrl !== '' ? $redirectUrl : null;
 
         return [
             'payment' => $payment,
             'qr_data' => $qrData,
             'expires_at' => $expiresAt,
+            'redirect_url' => $redirectUrl,
         ];
     }
 }

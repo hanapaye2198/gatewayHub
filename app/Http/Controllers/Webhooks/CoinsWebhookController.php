@@ -4,21 +4,20 @@ namespace App\Http\Controllers\Webhooks;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessWebhookJob;
-use App\Models\Gateway;
-use App\Models\MerchantGateway;
 use App\Services\Coins\CoinsSignatureService;
 use App\Services\Coins\CoinsWebhookReplayValidator;
 use App\Services\Gateways\Exceptions\CoinsApiException;
+use App\Services\Gateways\PlatformGatewayConfigService;
 use App\Services\Webhooks\WebhookProcessor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class CoinsWebhookController extends Controller
 {
     public function __construct(
         protected CoinsSignatureService $signatureService,
-        protected CoinsWebhookReplayValidator $replayValidator
+        protected CoinsWebhookReplayValidator $replayValidator,
+        protected PlatformGatewayConfigService $platformGatewayConfigService
     ) {}
 
     /**
@@ -33,8 +32,19 @@ class CoinsWebhookController extends Controller
             return response()->json(['received' => true], 200);
         }
 
-        if (! $this->verifyWebhookSignature($request, $payload)) {
-            return response()->json(['message' => 'Invalid signature.'], 401);
+        if (! config('coins.webhook.allow_dev_bypass', false)) {
+            $platformConfig = $this->platformGatewayConfigService->forGatewayCode('coins');
+            $secret = (string) ($platformConfig['webhook_secret'] ?? config('coins.webhook.secret', ''));
+            $signature = $this->getSignature($request);
+            if ($secret === '' || ! is_string($signature) || $signature === '') {
+                return response()->json(['message' => 'Invalid signature.'], 401);
+            }
+
+            try {
+                $this->signatureService->verify($payload, $secret, $signature);
+            } catch (CoinsApiException) {
+                return response()->json(['message' => 'Invalid signature.'], 401);
+            }
         }
 
         if (! $this->replayValidator->isValid($request, $payload)) {
@@ -44,7 +54,10 @@ class CoinsWebhookController extends Controller
         ProcessWebhookJob::dispatch(
             'Coins',
             $payload,
-            WebhookProcessor::captureHeadersForPayload($request)
+            WebhookProcessor::captureHeadersForPayload($request),
+            [
+                'skip_replay_validation' => true,
+            ],
         );
 
         return response()->json(['received' => true], 200);
@@ -65,64 +78,11 @@ class CoinsWebhookController extends Controller
         return is_array($decoded) ? $decoded : null;
     }
 
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function verifyWebhookSignature(Request $request, array $payload): bool
-    {
-        if (config('coins.webhook.allow_dev_bypass', false)) {
-            Log::warning('Coins webhook: dev bypass enabled, skipping signature verification');
-
-            return true;
-        }
-
-        $signature = $this->getSignature($request);
-        if ($signature === null || $signature === '') {
-            return false;
-        }
-
-        return $this->resolveWebhookSecret($payload, $signature) !== null;
-    }
-
     private function getSignature(Request $request): ?string
     {
         $headerName = config('coins.webhook.signature_header', 'X-COINS-SIGNATURE');
         $value = $request->header($headerName);
 
         return is_string($value) ? $value : null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function resolveWebhookSecret(array $payload, string $receivedSignature): ?string
-    {
-        $gateway = Gateway::query()->where('code', 'coins')->first();
-        if ($gateway === null) {
-            return null;
-        }
-
-        $merchantGateways = MerchantGateway::query()
-            ->where('gateway_id', $gateway->id)
-            ->where('is_enabled', true)
-            ->get();
-
-        foreach ($merchantGateways as $mg) {
-            $config = $mg->config_json ?? [];
-            $secret = $config['webhook_secret'] ?? '';
-            if (! is_string($secret) || $secret === '') {
-                continue;
-            }
-
-            try {
-                $this->signatureService->verify($payload, $secret, $receivedSignature);
-
-                return $secret;
-            } catch (CoinsApiException) {
-                continue;
-            }
-        }
-
-        return null;
     }
 }

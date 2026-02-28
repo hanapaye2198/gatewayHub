@@ -101,6 +101,14 @@ class Payment extends Model
     }
 
     /**
+     * @return HasMany<WalletTransaction, $this>
+     */
+    public function walletTransactions(): HasMany
+    {
+        return $this->hasMany(WalletTransaction::class);
+    }
+
+    /**
      * Whether this payment uses a QR-based gateway.
      */
     public function isQrBased(): bool
@@ -163,5 +171,17 @@ class Payment extends Model
         }
 
         return null;
+    }
+
+    public function getRedirectUrl(): ?string
+    {
+        $raw = $this->raw_response;
+        if (! is_array($raw)) {
+            return null;
+        }
+
+        $redirectUrl = $raw['redirect_url'] ?? $raw['checkout_url'] ?? $raw['checkoutUrl'] ?? $raw['url'] ?? null;
+
+        return is_string($redirectUrl) && $redirectUrl !== '' ? $redirectUrl : null;
     }
 }

@@ -7,14 +7,19 @@ use App\Models\Payment;
 use App\Services\QrCodeGenerator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 
 class PaymentDetailController extends Controller
 {
-    public function __invoke(Payment $payment, QrCodeGenerator $qrGenerator): View|Response
+    public function __invoke(Payment $payment, QrCodeGenerator $qrGenerator): View|Response|RedirectResponse
     {
         if ($payment->user_id !== auth()->id()) {
             abort(404);
+        }
+
+        if ($payment->status === 'paid') {
+            return redirect()->route('dashboard.payments');
         }
 
         $payment->load(['gateway', 'webhookEvents']);

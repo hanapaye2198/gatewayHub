@@ -31,7 +31,7 @@ class PaymentStatusTest extends TestCase
         $user = User::factory()->create(['api_key' => 'key-1']);
         MerchantGateway::query()->create([
             'user_id' => $user->id,
-            'gateway_id' => Gateway::first()->id,
+            'gateway_id' => Gateway::query()->where('code', 'coins')->firstOrFail()->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
         ]);
@@ -51,7 +51,7 @@ class PaymentStatusTest extends TestCase
         $user = User::factory()->create(['api_key' => 'key-2']);
         MerchantGateway::query()->create([
             'user_id' => $user->id,
-            'gateway_id' => Gateway::first()->id,
+            'gateway_id' => Gateway::query()->where('code', 'coins')->firstOrFail()->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
         ]);
@@ -71,7 +71,7 @@ class PaymentStatusTest extends TestCase
         $user = User::factory()->create(['api_key' => 'key-3']);
         MerchantGateway::query()->create([
             'user_id' => $user->id,
-            'gateway_id' => Gateway::first()->id,
+            'gateway_id' => Gateway::query()->where('code', 'coins')->firstOrFail()->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
         ]);
@@ -92,7 +92,7 @@ class PaymentStatusTest extends TestCase
         $otherUser = User::factory()->create(['api_key' => 'key-other']);
         MerchantGateway::query()->create([
             'user_id' => $user->id,
-            'gateway_id' => Gateway::first()->id,
+            'gateway_id' => Gateway::query()->where('code', 'coins')->firstOrFail()->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
         ]);

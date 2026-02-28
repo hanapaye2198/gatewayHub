@@ -56,9 +56,12 @@ class ApiCredentialsPageTest extends TestCase
             ->assertRedirect(route('dashboard.api-credentials'));
 
         $merchant->refresh();
-        $this->assertNotSame('old-key', $merchant->api_key);
+        $this->assertNull($merchant->api_key);
+        $this->assertNotNull($merchant->api_key_hash);
+        $this->assertSame(64, strlen($merchant->api_key_hash));
+        $this->assertNotNull($merchant->api_key_last_four);
+        $this->assertSame(4, strlen($merchant->api_key_last_four));
         $this->assertNotNull($merchant->api_key_generated_at);
-        $this->assertSame(64, strlen($merchant->api_key));
     }
 
     public function test_after_regenerate_key_is_new_and_masked_on_page(): void
@@ -70,13 +73,15 @@ class ApiCredentialsPageTest extends TestCase
         Livewire::test('pages::dashboard.api-credentials')->call('regenerateApiKey');
 
         $merchant->refresh();
-        $this->assertNotSame('previous', $merchant->api_key);
-        $this->assertNotNull($merchant->api_key);
-        $this->assertSame(64, strlen($merchant->api_key));
+        $this->assertNull($merchant->api_key);
+        $this->assertNotNull($merchant->api_key_hash);
+        $this->assertSame(64, strlen($merchant->api_key_hash));
+        $this->assertNotNull($merchant->api_key_last_four);
+        $this->assertSame(4, strlen($merchant->api_key_last_four));
 
         $response = $this->get(route('dashboard.api-credentials'));
         $response->assertOk();
         $response->assertDontSee('previous');
-        $response->assertSee('****'.substr($merchant->api_key, -4));
+        $response->assertSee('****'.$merchant->api_key_last_four);
     }
 }

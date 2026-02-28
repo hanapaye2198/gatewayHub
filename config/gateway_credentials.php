@@ -16,22 +16,15 @@ return [
         ['key' => 'webhook_secret', 'label' => 'Webhook Secret', 'type' => 'password', 'required' => false, 'masked' => true],
     ],
 
-    'gcash' => [
-        ['key' => 'client_id', 'label' => 'Client ID', 'type' => 'text', 'required' => true, 'masked' => false],
-        ['key' => 'client_secret', 'label' => 'Client Secret', 'type' => 'password', 'required' => true, 'masked' => true],
-        ['key' => 'webhook_key', 'label' => 'Webhook Key', 'type' => 'password', 'required' => false, 'masked' => true],
-    ],
+    // Customer-facing selections are orchestrated via Coins dynamic QR in the current model.
+    'gcash' => [],
 
-    'maya' => [
-        ['key' => 'client_id', 'label' => 'Client ID', 'type' => 'text', 'required' => true, 'masked' => false],
-        ['key' => 'client_secret', 'label' => 'Client Secret', 'type' => 'password', 'required' => true, 'masked' => true],
-        ['key' => 'webhook_key', 'label' => 'Webhook Key', 'type' => 'password', 'required' => false, 'masked' => true],
-    ],
+    'maya' => [],
 
-    'paypal' => [
-        ['key' => 'client_id', 'label' => 'Client ID', 'type' => 'text', 'required' => true, 'masked' => false],
-        ['key' => 'client_secret', 'label' => 'Client Secret', 'type' => 'password', 'required' => true, 'masked' => true],
-        ['key' => 'webhook_id', 'label' => 'Webhook ID', 'type' => 'text', 'required' => false, 'masked' => false],
-    ],
+    'paypal' => [],
+
+    'qrph' => [],
+
+    'payqrph' => [],
 
 ];

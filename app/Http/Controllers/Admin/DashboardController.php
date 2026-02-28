@@ -2,45 +2,53 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Enums\PlatformFeeStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\FilterAdminDashboardRequest;
 use App\Models\Payment;
-use App\Models\PlatformFee;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(): View
+    public function __invoke(FilterAdminDashboardRequest $request): View
     {
-        $totalPayments = Payment::query()->count();
-        $totalGrossProcessed = (float) Payment::query()->where('status', 'paid')->sum('amount');
-        $platformRevenue = (float) PlatformFee::query()
-            ->where('status', PlatformFeeStatus::Posted)
-            ->sum('fee_amount');
-        $totalNetVolume = (float) Payment::query()->where('status', 'paid')->sum('net_amount');
-        $activeMerchants = User::query()
-            ->where('role', 'merchant')
-            ->where('is_active', true)
-            ->count();
+        $validated = $request->validated();
+        $selectedClientId = isset($validated['client_id']) ? (int) $validated['client_id'] : null;
 
-        $revenueByGateway = PlatformFee::query()
-            ->where('status', PlatformFeeStatus::Posted)
-            ->selectRaw('gateway_code, SUM(fee_amount) as total')
-            ->groupBy('gateway_code')
-            ->orderByDesc('total')
-            ->pluck('total', 'gateway_code')
-            ->map(fn ($v) => (float) $v)
-            ->all();
+        $clients = User::query()
+            ->where('role', 'merchant')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $collectionsByClient = Payment::query()
+            ->where('status', 'paid')
+            ->selectRaw('user_id, SUM(amount) as total')
+            ->groupBy('user_id')
+            ->pluck('total', 'user_id');
+
+        $clientRows = $clients->map(static function (User $client) use ($collectionsByClient): array {
+            return [
+                'id' => (int) $client->id,
+                'name' => $client->name,
+                'total_collections' => (float) ($collectionsByClient[$client->id] ?? 0),
+            ];
+        });
+
+        $totalCollections = (float) $clientRows->sum('total_collections');
+        $filteredCollections = $selectedClientId === null
+            ? $totalCollections
+            : (float) ($collectionsByClient[$selectedClientId] ?? 0);
+        $selectedClientName = $selectedClientId === null
+            ? null
+            : $clients->firstWhere('id', $selectedClientId)?->name;
 
         return view('admin.dashboard', [
             'title' => 'Dashboard',
-            'totalPayments' => $totalPayments,
-            'totalGrossProcessed' => $totalGrossProcessed,
-            'platformRevenue' => $platformRevenue,
-            'totalNetVolume' => $totalNetVolume,
-            'activeMerchants' => $activeMerchants,
-            'revenueByGateway' => $revenueByGateway,
+            'totalCollections' => $totalCollections,
+            'filteredCollections' => $filteredCollections,
+            'selectedClientId' => $selectedClientId,
+            'selectedClientName' => $selectedClientName,
+            'clientRows' => $clientRows,
         ]);
     }
 }

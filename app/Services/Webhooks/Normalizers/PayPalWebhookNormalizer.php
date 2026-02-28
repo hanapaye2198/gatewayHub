@@ -15,7 +15,7 @@ class PayPalWebhookNormalizer implements WebhookNormalizerInterface
     /**
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $headers
-     * @return array{provider: string, event_id: string|null, payment_reference: string|null, status: 'paid'|'failed'|'pending', amount: string|float|null, currency: string|null, paid_at?: int|null, raw_payload: array<string, mixed>}
+     * @return array{provider: string, event_id: string|null, payment_reference: string|null, status: 'paid'|'failed'|'pending'|'refunded', amount: string|float|null, currency: string|null, paid_at?: int|null, raw_payload: array<string, mixed>}
      */
     public function normalize(array $payload, array $headers): array
     {
@@ -79,7 +79,7 @@ class PayPalWebhookNormalizer implements WebhookNormalizerInterface
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return 'paid'|'failed'|'pending'
+     * @return 'paid'|'failed'|'pending'|'refunded'
      */
     private function normalizeStatus(array $payload): string
     {
@@ -89,8 +89,9 @@ class PayPalWebhookNormalizer implements WebhookNormalizerInterface
         }
 
         return match (strtoupper($eventType)) {
-            'PAYMENT.CAPTURE.COMPLETED', 'PAYMENT.SALE.COMPLETED', 'CHECKOUT.ORDER.APPROVED' => 'paid',
-            'PAYMENT.CAPTURE.DENIED', 'PAYMENT.CAPTURE.REFUNDED', 'PAYMENT.AUTHORIZATION.VOIDED' => 'failed',
+            'PAYMENT.CAPTURE.COMPLETED', 'PAYMENT.SALE.COMPLETED' => 'paid',
+            'PAYMENT.CAPTURE.REFUNDED' => 'refunded',
+            'PAYMENT.CAPTURE.DENIED', 'PAYMENT.AUTHORIZATION.VOIDED' => 'failed',
             default => 'pending',
         };
     }
@@ -140,10 +141,12 @@ class PayPalWebhookNormalizer implements WebhookNormalizerInterface
 
         if (is_numeric($createTime)) {
             $ts = (int) $createTime;
+
             return $ts > 0 ? $ts : null;
         }
         if (is_string($createTime)) {
             $ts = strtotime($createTime);
+
             return $ts !== false ? $ts : null;
         }
 

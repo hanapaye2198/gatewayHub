@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -23,5 +24,47 @@ class DashboardTest extends TestCase
 
         $response = $this->get(route('dashboard'));
         $response->assertOk();
+        $response->assertSee('Track payments collected through Coins dynamic QR.');
+        $response->assertSee('Create Payment');
+        $response->assertDontSee('View payment history');
+        $response->assertDontSee('Manage your API key');
+        $response->assertDontSee('Review gateway availability');
+        $response->assertDontSee('Use the sidebar to navigate');
+        $response->assertDontSee('configure gateways');
+        $response->assertDontSee('Repository');
+        $response->assertDontSee('Documentation');
+    }
+
+    public function test_dashboard_displays_total_collections_for_logged_in_merchant(): void
+    {
+        $merchant = User::factory()->create();
+        $otherMerchant = User::factory()->create();
+
+        Payment::factory()->create([
+            'user_id' => $merchant->id,
+            'status' => 'paid',
+            'amount' => 120.50,
+        ]);
+        Payment::factory()->create([
+            'user_id' => $merchant->id,
+            'status' => 'paid',
+            'amount' => 30.25,
+        ]);
+        Payment::factory()->create([
+            'user_id' => $merchant->id,
+            'status' => 'pending',
+            'amount' => 999.99,
+        ]);
+        Payment::factory()->create([
+            'user_id' => $otherMerchant->id,
+            'status' => 'paid',
+            'amount' => 500,
+        ]);
+
+        $response = $this->actingAs($merchant)->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('Paid collections');
+        $response->assertSee('PHP 150.75');
     }
 }

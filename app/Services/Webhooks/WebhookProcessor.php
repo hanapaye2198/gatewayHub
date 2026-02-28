@@ -19,15 +19,18 @@ class WebhookProcessor
      * Caller must verify signature before invoking.
      *
      * @param  array<string, mixed>  $payload  Decoded JSON payload (already signature-verified).
+     * @param  array<string, mixed>  $context
      */
     public function process(
         Request $request,
         array $payload,
         WebhookReplayValidatorInterface $replayValidator,
         WebhookNormalizerInterface $normalizer,
-        string $providerName
+        string $providerName,
+        array $context = []
     ): JsonResponse {
-        if (! $replayValidator->isValid($request, $payload)) {
+        $skipReplayValidation = (bool) ($context['skip_replay_validation'] ?? false);
+        if (! $skipReplayValidation && ! $replayValidator->isValid($request, $payload)) {
             return response()->json(['message' => 'Invalid signature.'], 401);
         }
 
@@ -40,8 +43,10 @@ class WebhookProcessor
 
         $eventId = $normalized['event_id'];
         $paymentReference = $normalized['payment_reference'];
+        $provider = (string) ($normalized['provider'] ?? '');
+        $verifiedMerchantIds = $this->extractVerifiedMerchantIds($context);
 
-        return DB::transaction(function () use ($request, $normalized, $eventId, $paymentReference, $providerName): JsonResponse {
+        return DB::transaction(function () use ($request, $normalized, $eventId, $paymentReference, $providerName, $provider, $verifiedMerchantIds): JsonResponse {
             $event = WebhookEvent::firstOrCreate(
                 ['provider' => $normalized['provider'], 'event_id' => $eventId],
                 [
@@ -67,10 +72,7 @@ class WebhookProcessor
                     return response()->json(['received' => true], 200);
                 }
 
-                $payment = Payment::query()->where('provider_reference', $paymentReference)->first();
-                if ($payment === null) {
-                    $payment = Payment::query()->where('reference_id', $paymentReference)->first();
-                }
+                $payment = $this->resolvePayment($provider, $paymentReference, $verifiedMerchantIds);
                 if ($payment === null) {
                     $event->update(['status' => 'processed', 'processed_at' => now()]);
 
@@ -79,7 +81,7 @@ class WebhookProcessor
 
                 $event->update(['payment_id' => $payment->id]);
 
-                if ($payment->status === 'paid') {
+                if ($payment->status === 'paid' && in_array($normalized['status'], ['paid', 'pending'], true)) {
                     $event->update(['status' => 'processed', 'processed_at' => now()]);
 
                     return response()->json(['received' => true], 200);
@@ -111,7 +113,7 @@ class WebhookProcessor
     /**
      * Update payment from normalized webhook data.
      *
-     * @param  array{status: 'paid'|'failed'|'pending', paid_at?: int|null}  $normalized
+     * @param  array{status: 'paid'|'failed'|'pending'|'refunded'|'failed_after_paid', paid_at?: int|null}  $normalized
      */
     private function applyStatusFromNormalized(Payment $payment, array $normalized): void
     {
@@ -126,7 +128,25 @@ class WebhookProcessor
         }
 
         if ($status === 'failed') {
+            if ($payment->status === 'paid') {
+                $payment->status = 'failed_after_paid';
+
+                return;
+            }
+
             $payment->status = 'failed';
+
+            return;
+        }
+
+        if ($status === 'failed_after_paid') {
+            $payment->status = 'failed_after_paid';
+
+            return;
+        }
+
+        if ($status === 'refunded') {
+            $payment->status = 'refunded';
 
             return;
         }
@@ -166,5 +186,64 @@ class WebhookProcessor
     private function captureHeaders(Request $request): array
     {
         return self::captureHeadersForPayload($request);
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return list<int>
+     */
+    private function extractVerifiedMerchantIds(array $context): array
+    {
+        $merchantIds = $context['verified_merchant_ids'] ?? null;
+        if (! is_array($merchantIds)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($merchantIds as $merchantId) {
+            if (! is_int($merchantId) && ! (is_string($merchantId) && ctype_digit($merchantId))) {
+                continue;
+            }
+
+            $intMerchantId = (int) $merchantId;
+            if ($intMerchantId <= 0) {
+                continue;
+            }
+
+            $result[] = $intMerchantId;
+        }
+
+        return array_values(array_unique($result));
+    }
+
+    /**
+     * @param  list<int>  $verifiedMerchantIds
+     */
+    private function resolvePayment(string $provider, string $paymentReference, array $verifiedMerchantIds): ?Payment
+    {
+        $query = Payment::query()->where(function ($gatewayQuery) use ($provider): void {
+            if ($provider === 'coins') {
+                $gatewayQuery->whereIn('gateway_code', ['coins', 'gcash', 'maya', 'paypal', 'qrph', 'payqrph']);
+
+                return;
+            }
+
+            $gatewayQuery->where('gateway_code', $provider);
+        })->where(function ($paymentQuery) use ($paymentReference): void {
+            $paymentQuery
+                ->where('provider_reference', $paymentReference)
+                ->orWhere('reference_id', $paymentReference);
+        });
+
+        if ($verifiedMerchantIds !== []) {
+            $query->whereIn('user_id', $verifiedMerchantIds);
+        }
+
+        $matches = $query->limit(2)->get();
+        if ($matches->count() !== 1) {
+            return null;
+        }
+
+        return $matches->first();
     }
 }

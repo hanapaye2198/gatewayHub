@@ -165,16 +165,16 @@
             {{-- Stats row --}}
             <div class="fade-up fade-up-5 mt-16 grid grid-cols-3 max-w-lg mx-auto gap-px bg-zinc-200 dark:bg-zinc-700 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-700 shadow-sm">
                 <div class="bg-white dark:bg-zinc-900 px-6 py-5 text-center">
-                    <p class="stat-num text-2xl font-bold text-zinc-900 dark:text-zinc-50">20+</p>
+                    <p class="stat-num text-2xl font-bold text-zinc-900 dark:text-zinc-50">{{ number_format((int) ($stats['gateway_total'] ?? 0)) }}</p>
                     <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Gateways</p>
                 </div>
                 <div class="bg-white dark:bg-zinc-900 px-6 py-5 text-center">
-                    <p class="stat-num text-2xl font-bold text-zinc-900 dark:text-zinc-50">∞</p>
+                    <p class="stat-num text-2xl font-bold text-zinc-900 dark:text-zinc-50">{{ number_format((int) ($stats['merchant_total'] ?? 0)) }}</p>
                     <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Merchants</p>
                 </div>
                 <div class="bg-white dark:bg-zinc-900 px-6 py-5 text-center">
-                    <p class="stat-num text-2xl font-bold text-zinc-900 dark:text-zinc-50">99.9%</p>
-                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Uptime</p>
+                    <p class="stat-num text-lg font-bold text-zinc-900 dark:text-zinc-50">PHP {{ number_format((float) ($stats['paid_collections'] ?? 0), 2) }}</p>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Paid Collections</p>
                 </div>
             </div>
 
@@ -209,10 +209,10 @@
                     <div class="flex items-center gap-2 text-sm text-zinc-500">
                         <span class="inline-flex items-center gap-1.5">
                             <span class="size-2 rounded-full bg-emerald-500"></span>
-                            4 active
+                            {{ number_format((int) ($stats['enabled_gateway_total'] ?? 0)) }} active
                         </span>
                         <span class="text-zinc-300 dark:text-zinc-600">/</span>
-                        <span>5 total</span>
+                        <span>{{ number_format((int) ($stats['gateway_total'] ?? 0)) }} total</span>
                     </div>
                 </div>
 
@@ -228,17 +228,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @php
-                            $mockGateways = [
-                                ['name' => 'Coins.ph', 'code' => 'coins',   'enabled' => true],
-                                ['name' => 'GCash',   'code' => 'gcash',   'enabled' => true],
-                                ['name' => 'Maya',    'code' => 'maya',    'enabled' => true],
-                                ['name' => 'PayPal',  'code' => 'paypal',  'enabled' => true],
-                                ['name' => 'QRPH',    'code' => 'qrph',    'enabled' => false],
-                            ];
-                            @endphp
-
-                            @foreach ($mockGateways as $i => $gw)
+                            @forelse ($previewGateways as $gateway)
                             <tr class="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors gateway-card">
                                 <td class="px-4 py-3">
                                     <div class="flex items-center gap-3">
@@ -247,14 +237,14 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/>
                                             </svg>
                                         </div>
-                                        <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ $gw['name'] }}</span>
+                                        <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ $gateway->name }}</span>
                                     </div>
                                 </td>
                                 <td class="px-4 py-3">
-                                    <code class="px-2 py-0.5 text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-md font-mono">{{ $gw['code'] }}</code>
+                                    <code class="px-2 py-0.5 text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-md font-mono">{{ $gateway->code }}</code>
                                 </td>
                                 <td class="px-4 py-3">
-                                    @if ($gw['enabled'])
+                                    @if ($gateway->is_global_enabled)
                                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-500/20">
                                             <span class="size-1.5 rounded-full bg-emerald-500"></span>
                                             Enabled
@@ -267,7 +257,7 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-3 text-right">
-                                    @if ($gw['enabled'])
+                                    @if ($gateway->is_global_enabled)
                                         <button class="px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg border border-zinc-200 dark:border-zinc-600 transition-colors">
                                             Disable
                                         </button>
@@ -278,7 +268,13 @@
                                     @endif
                                 </td>
                             </tr>
-                            @endforeach
+                            @empty
+                            <tr>
+                                <td colspan="4" class="px-4 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                                    No gateways configured yet.
+                                </td>
+                            </tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>
@@ -370,14 +366,15 @@
             </div>
 
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                @php
-                $gateways = ['Coins.ph', 'GCash', 'Maya', 'PayPal', 'QRPH'];
-                @endphp
-                @foreach ($gateways as $gw)
+                @forelse ($supportedGatewayNames as $gatewayName)
                 <div class="flex items-center justify-center px-4 py-3 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-default">
-                    {{ $gw }}
+                    {{ $gatewayName }}
                 </div>
-                @endforeach
+                @empty
+                <div class="col-span-full flex items-center justify-center px-4 py-6 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                    No gateways available yet.
+                </div>
+                @endforelse
             </div>
 
         </div>

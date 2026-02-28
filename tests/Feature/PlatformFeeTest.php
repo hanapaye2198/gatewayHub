@@ -19,6 +19,13 @@ class PlatformFeeTest extends TestCase
 
     private const WEBHOOK_SECRET = 'test-webhook-secret';
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set('coins.webhook.secret', self::WEBHOOK_SECRET);
+    }
+
     public function test_platform_fee_applied_when_payment_becomes_paid_via_webhook(): void
     {
         config(['platform.fees' => ['percentage' => 1.5, 'fixed' => 5]]);
@@ -65,7 +72,7 @@ class PlatformFeeTest extends TestCase
         $signatureService = new CoinsSignatureService;
         $signed = $signatureService->sign($payload, self::WEBHOOK_SECRET);
 
-        $response = $this->postJson('/api/webhooks/coins', $payload, [
+        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => $signed['signature'],
         ]);
@@ -127,7 +134,7 @@ class PlatformFeeTest extends TestCase
         $signatureService = new CoinsSignatureService;
         $signed = $signatureService->sign($payload, self::WEBHOOK_SECRET);
 
-        $response = $this->postJson('/api/webhooks/coins', $payload, [
+        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => $signed['signature'],
         ]);

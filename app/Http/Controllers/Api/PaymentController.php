@@ -57,7 +57,7 @@ class PaymentController extends Controller
                 $msg = $e->getMessage();
                 $status = match (true) {
                     str_contains($msg, 'not found') => 404,
-                    str_contains($msg, 'missing required credentials') => 422,
+                    str_contains($msg, 'missing required') => 422,
                     default => 403,
                 };
 
@@ -73,6 +73,7 @@ class PaymentController extends Controller
                 'status' => $payment->status,
                 'qr_data' => $result['qr_data'],
                 'expires_at' => $result['expires_at'],
+                'redirect_url' => $result['redirect_url'] ?? null,
             ];
 
             if ($cacheKey !== null) {

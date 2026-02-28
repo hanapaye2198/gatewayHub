@@ -24,4 +24,19 @@ return [
         'max_age' => (int) env('PAYPAL_WEBHOOK_MAX_AGE', 300),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | SurePay Platform Gateway Credentials (PayPal)
+    |--------------------------------------------------------------------------
+    */
+    'gateway' => [
+        'client_id' => env('PAYPAL_CLIENT_ID', ''),
+        'client_secret' => env('PAYPAL_CLIENT_SECRET', ''),
+        'webhook_id' => env('PAYPAL_WEBHOOK_ID', ''),
+        'mode' => env('PAYPAL_MODE', 'sandbox'),
+        'redirect_success_url' => env('PAYPAL_REDIRECT_SUCCESS_URL'),
+        'redirect_failure_url' => env('PAYPAL_REDIRECT_FAILURE_URL'),
+        'redirect_cancel_url' => env('PAYPAL_REDIRECT_CANCEL_URL'),
+    ],
+
 ];

@@ -9,6 +9,7 @@ class GatewayConfigValidator
 {
     /**
      * Get validation rules for a gateway's config_json from its driver.
+     * This validates platform-level gateway credentials.
      *
      * @return array<string, mixed>
      */

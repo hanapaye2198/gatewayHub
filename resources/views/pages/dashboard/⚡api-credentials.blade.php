@@ -41,7 +41,7 @@ new class extends Component
             <flux:subheading class="mt-1">{{ __('Use this key in the Authorization header when calling the API.') }}</flux:subheading>
 
             @php $user = auth()->user(); @endphp
-            @if ($user->api_key)
+            @if ($user?->hasApiKey())
                 <div class="mt-4 flex flex-wrap items-center gap-3">
                     <flux:field class="min-w-0 flex-1">
                         <flux:input
@@ -63,7 +63,7 @@ new class extends Component
 
             <div class="mt-6">
                 <flux:button variant="danger" icon="key" wire:click="confirmRegenerate" wire:loading.attr="disabled">
-                    {{ $user->api_key ? __('Regenerate API Key') : __('Generate API Key') }}
+                    {{ $user?->hasApiKey() ? __('Regenerate API Key') : __('Generate API Key') }}
                 </flux:button>
             </div>
         </div>

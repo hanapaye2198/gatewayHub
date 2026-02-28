@@ -32,11 +32,13 @@ class ProcessWebhookJob implements ShouldQueue
     /**
      * @param  array<string, mixed>  $payload
      * @param  array<string, list<string>>  $headers
+     * @param  array<string, mixed>  $context
      */
     public function __construct(
         public string $provider,
         public array $payload,
-        public array $headers
+        public array $headers,
+        public array $context = []
     ) {}
 
     public function handle(WebhookProcessor $processor): void
@@ -45,7 +47,7 @@ class ProcessWebhookJob implements ShouldQueue
         $normalizer = $this->resolveNormalizer();
         $replayValidator = $this->resolveReplayValidator();
 
-        $processor->process($request, $this->payload, $replayValidator, $normalizer, $this->provider);
+        $processor->process($request, $this->payload, $replayValidator, $normalizer, $this->provider, $this->context);
     }
 
     public function failed(\Throwable $exception): void
@@ -67,7 +69,7 @@ class ProcessWebhookJob implements ShouldQueue
             $server[$key] = is_array($values) ? ($values[0] ?? '') : $values;
         }
 
-        $path = '/api/webhooks/'.strtolower($this->provider);
+        $path = '/api/webhooks?provider='.strtolower($this->provider);
 
         return Request::create($path, 'POST', [], [], [], $server, $content);
     }

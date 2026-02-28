@@ -34,8 +34,26 @@ return [
 
     'webhook' => [
         'signature_header' => env('COINS_WEBHOOK_SIGNATURE_HEADER', 'X-COINS-SIGNATURE'),
+        'secret' => env('COINS_WEBHOOK_SECRET', env('COINS_SECRET_KEY', '')),
+        'timestamp_header' => env('COINS_WEBHOOK_TIMESTAMP_HEADER'),
         'allow_dev_bypass' => filter_var(env('COINS_WEBHOOK_ALLOW_DEV_BYPASS', false), FILTER_VALIDATE_BOOLEAN),
         'max_age' => (int) env('COINS_WEBHOOK_MAX_AGE', 300),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | SurePay Platform Gateway Credentials (Coins)
+    |--------------------------------------------------------------------------
+    |
+    | Centralized gateway credentials managed by SurePay admin.
+    | Merchants can only enable/disable gateway access; credentials stay here.
+    |
+    */
+    'gateway' => [
+        'client_id' => env('COINS_GATEWAY_CLIENT_ID', env('COINS_API_KEY', '')),
+        'client_secret' => env('COINS_GATEWAY_CLIENT_SECRET', env('COINS_SECRET_KEY', '')),
+        'api_base' => env('COINS_GATEWAY_API_BASE', 'sandbox'),
+        'source' => env('COINS_SOURCE', 'GATEWAYHUB'),
     ],
 
 ];

@@ -9,7 +9,7 @@ namespace App\Services\Webhooks\Contracts;
  *     provider: string,
  *     event_id: string|null,
  *     payment_reference: string|null,
- *     status: 'paid'|'failed'|'pending',
+ *     status: 'paid'|'failed'|'pending'|'refunded'|'failed_after_paid',
  *     amount: string|float|null,
  *     currency: string|null,
  *     paid_at?: int|null,

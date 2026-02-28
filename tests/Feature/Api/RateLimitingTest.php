@@ -34,7 +34,7 @@ class RateLimitingTest extends TestCase
         $user = User::factory()->create(['api_key' => 'test-api-key']);
         MerchantGateway::query()->create([
             'user_id' => $user->id,
-            'gateway_id' => Gateway::first()->id,
+            'gateway_id' => Gateway::query()->where('code', 'coins')->firstOrFail()->id,
             'is_enabled' => true,
             'config_json' => [
                 'client_id' => 'c',
@@ -76,7 +76,7 @@ class RateLimitingTest extends TestCase
             RateLimiter::hit($key);
         }
 
-        $response = $this->postJson('/api/webhooks/coins', [
+        $response = $this->postJson('/api/webhooks?provider=coins', [
             'referenceId' => 'x',
             'status' => 'SUCCEEDED',
             'timestamp' => (string) (time() * 1000),

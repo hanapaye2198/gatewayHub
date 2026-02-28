@@ -4,16 +4,18 @@ namespace App\Http\Controllers\Webhooks;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessWebhookJob;
+use App\Services\Gateways\Drivers\GcashDriver;
+use App\Services\Gateways\PlatformGatewayConfigService;
 use App\Services\Webhooks\GcashWebhookReplayValidator;
 use App\Services\Webhooks\WebhookProcessor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class GcashWebhookController extends Controller
 {
     public function __construct(
-        protected GcashWebhookReplayValidator $replayValidator
+        protected GcashWebhookReplayValidator $replayValidator,
+        protected PlatformGatewayConfigService $platformGatewayConfigService
     ) {}
 
     /**
@@ -26,8 +28,15 @@ class GcashWebhookController extends Controller
             return response()->json(['received' => true], 200);
         }
 
-        if (! $this->verifyWebhook($request, $payload)) {
-            return response()->json(['message' => 'Invalid signature.'], 401);
+        if (! config('gcash.webhook.allow_dev_bypass', false)) {
+            $platformConfig = $this->platformGatewayConfigService->forGatewayCode('gcash');
+            $driver = new GcashDriver([
+                'webhook_key' => (string) ($platformConfig['webhook_key'] ?? config('gcash.webhook.secret', '')),
+            ]);
+
+            if (! $driver->verifyWebhook($request)) {
+                return response()->json(['message' => 'Invalid signature.'], 401);
+            }
         }
 
         if (! $this->replayValidator->isValid($request, $payload)) {
@@ -37,7 +46,10 @@ class GcashWebhookController extends Controller
         ProcessWebhookJob::dispatch(
             'GCash',
             $payload,
-            WebhookProcessor::captureHeadersForPayload($request)
+            WebhookProcessor::captureHeadersForPayload($request),
+            [
+                'skip_replay_validation' => true,
+            ],
         );
 
         return response()->json(['received' => true], 200);
@@ -56,19 +68,5 @@ class GcashWebhookController extends Controller
         $decoded = json_decode($content, true);
 
         return is_array($decoded) ? $decoded : null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function verifyWebhook(Request $request, array $payload): bool
-    {
-        if (config('gcash.webhook.allow_dev_bypass', false)) {
-            Log::warning('GCash webhook: dev bypass enabled, skipping signature verification');
-
-            return true;
-        }
-
-        return true;
     }
 }

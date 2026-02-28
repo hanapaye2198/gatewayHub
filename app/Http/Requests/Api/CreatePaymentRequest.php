@@ -12,7 +12,9 @@ class CreatePaymentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->merchant() !== null;
+        $merchant = $this->merchant();
+
+        return $merchant !== null && $merchant->role === 'merchant';
     }
 
     /**

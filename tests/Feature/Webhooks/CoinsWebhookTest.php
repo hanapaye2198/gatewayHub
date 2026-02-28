@@ -28,6 +28,8 @@ class CoinsWebhookTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->app['config']->set('coins.webhook.allow_dev_bypass', false);
+        $this->app['config']->set('coins.webhook.secret', self::WEBHOOK_SECRET);
         $this->signatureService = new CoinsSignatureService;
         $this->coinsGateway = Gateway::query()->create([
             'code' => 'coins',
@@ -58,7 +60,7 @@ class CoinsWebhookTest extends TestCase
         ];
         $body = json_encode($payload);
 
-        $response = $this->postJson('/api/webhooks/coins', $payload, [
+        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
         ]);
 
@@ -74,7 +76,7 @@ class CoinsWebhookTest extends TestCase
             'timestamp' => (string) (int) (microtime(true) * 1000),
         ];
 
-        $response = $this->postJson('/api/webhooks/coins', $payload, [
+        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => 'invalid-signature',
         ]);
@@ -92,7 +94,7 @@ class CoinsWebhookTest extends TestCase
         ];
         $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
 
-        $response = $this->postJson('/api/webhooks/coins', $payload, [
+        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => $signed['signature'],
         ]);
@@ -122,7 +124,7 @@ class CoinsWebhookTest extends TestCase
         ];
         $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
 
-        $response = $this->postJson('/api/webhooks/coins', $payload, [
+        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => $signed['signature'],
         ]);
@@ -143,6 +145,61 @@ class CoinsWebhookTest extends TestCase
         $this->assertArrayHasKey('content-type', $event->headers ?? []);
     }
 
+    public function test_webhook_does_not_update_when_reference_collides_across_merchants(): void
+    {
+        $otherMerchant = User::factory()->create();
+        MerchantGateway::query()->create([
+            'user_id' => $otherMerchant->id,
+            'gateway_id' => $this->coinsGateway->id,
+            'is_enabled' => true,
+            'config_json' => [
+                'client_id' => 'client-2',
+                'client_secret' => 'secret-2',
+                'api_base' => 'sandbox',
+                'webhook_secret' => 'other-secret',
+            ],
+        ]);
+
+        $merchantOnePayment = Payment::factory()->create([
+            'user_id' => $this->user->id,
+            'gateway_code' => 'coins',
+            'provider_reference' => 'ORDER-COLLISION-001',
+            'status' => 'pending',
+            'paid_at' => null,
+        ]);
+
+        $merchantTwoPayment = Payment::factory()->create([
+            'user_id' => $otherMerchant->id,
+            'gateway_code' => 'coins',
+            'provider_reference' => 'ORDER-COLLISION-001',
+            'status' => 'pending',
+            'paid_at' => null,
+        ]);
+
+        $payload = [
+            'referenceId' => 'ORDER-COLLISION-001',
+            'status' => 'SUCCEEDED',
+            'amount' => '700.00',
+            'currency' => 'PHP',
+            'settleDate' => 1707475200000,
+            'timestamp' => (string) (int) (microtime(true) * 1000),
+        ];
+
+        $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
+        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
+            'Content-Type' => 'application/json',
+            'X-COINS-SIGNATURE' => $signed['signature'],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['received' => true]);
+
+        $merchantOnePayment->refresh();
+        $merchantTwoPayment->refresh();
+        $this->assertSame('pending', $merchantOnePayment->status);
+        $this->assertSame('pending', $merchantTwoPayment->status);
+    }
+
     public function test_webhook_idempotent_when_already_paid(): void
     {
         $payment = Payment::factory()->paid()->create([
@@ -159,7 +216,7 @@ class CoinsWebhookTest extends TestCase
         ];
         $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
 
-        $response = $this->postJson('/api/webhooks/coins', $payload, [
+        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => $signed['signature'],
         ]);
@@ -188,7 +245,7 @@ class CoinsWebhookTest extends TestCase
         ];
         $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
 
-        $response = $this->postJson('/api/webhooks/coins', $payload, [
+        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => $signed['signature'],
         ]);
@@ -214,7 +271,7 @@ class CoinsWebhookTest extends TestCase
         ];
         $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
 
-        $response = $this->postJson('/api/webhooks/coins', $payload, [
+        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => $signed['signature'],
         ]);
@@ -243,7 +300,7 @@ class CoinsWebhookTest extends TestCase
         ];
         $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
 
-        $this->postJson('/api/webhooks/coins', $payload, [
+        $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => $signed['signature'],
         ]);
@@ -264,7 +321,7 @@ class CoinsWebhookTest extends TestCase
     {
         $response = $this->call(
             'POST',
-            '/api/webhooks/coins',
+            '/api/webhooks?provider=coins',
             [],
             [],
             [],
@@ -288,7 +345,7 @@ class CoinsWebhookTest extends TestCase
         ];
         $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
 
-        $response = $this->postJson('/api/webhooks/coins', $payload, [
+        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => $signed['signature'],
         ]);
@@ -309,7 +366,7 @@ class CoinsWebhookTest extends TestCase
         ];
         $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
 
-        $response = $this->postJson('/api/webhooks/coins', $payload, [
+        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => $signed['signature'],
         ]);
@@ -335,7 +392,7 @@ class CoinsWebhookTest extends TestCase
         ];
         $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
 
-        $this->postJson('/api/webhooks/coins', $payload, [
+        $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => $signed['signature'],
         ]);
@@ -343,7 +400,7 @@ class CoinsWebhookTest extends TestCase
         $payment->refresh();
         $this->assertSame('paid', $payment->status);
 
-        $response = $this->postJson('/api/webhooks/coins', $payload, [
+        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => $signed['signature'],
         ]);
@@ -364,7 +421,7 @@ class CoinsWebhookTest extends TestCase
         ];
         $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
 
-        $response = $this->postJson('/api/webhooks/coins', $payload, [
+        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => $signed['signature'],
         ]);

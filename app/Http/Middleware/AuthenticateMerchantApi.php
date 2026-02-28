@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
 class AuthenticateMerchantApi
 {
     /**
-     * Handle an incoming request. Find user by Authorization Bearer token (api_key).
+     * Handle an incoming request. Find user by Authorization Bearer token hash.
      * Returns 401 for invalid/missing key, 403 for inactive merchant.
      */
     public function handle(Request $request, Closure $next): Response
@@ -22,7 +22,10 @@ class AuthenticateMerchantApi
             return ApiResponse::error('Unauthenticated.', 401);
         }
 
-        $user = User::query()->where('api_key', $token)->first();
+        $tokenHash = hash('sha256', $token);
+        $user = User::query()
+            ->where('api_key_hash', $tokenHash)
+            ->first();
 
         if ($user === null) {
             return ApiResponse::error('Invalid API key.', 401);

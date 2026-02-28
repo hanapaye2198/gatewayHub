@@ -99,5 +99,127 @@
         </div>
     </div>
 
+    <div class="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm transition-shadow duration-200 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800">
+        <div class="border-b border-zinc-200/80 px-6 py-4 dark:border-zinc-700">
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Per-Merchant Gateway Access</h2>
+            <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Central control for enabling or disabling gateways per merchant.</p>
+        </div>
+        <div class="overflow-x-auto px-6 py-6 sm:px-8 sm:py-6">
+            <table class="min-w-[860px] w-full divide-y divide-zinc-200 dark:divide-zinc-700">
+                <thead class="bg-zinc-50 dark:bg-zinc-900/30">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Merchant</th>
+                        @foreach ($gateways as $gateway)
+                            <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                {{ $gateway->name }}
+                            </th>
+                        @endforeach
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                    @forelse ($merchants as $merchant)
+                        <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-700/40">
+                            <td class="px-4 py-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $merchant->name }}</td>
+                            @foreach ($gateways as $gateway)
+                                @php
+                                    $merchantGateway = $gateway->merchantGateways->firstWhere('user_id', $merchant->id);
+                                    $isEnabled = (bool) ($merchantGateway?->is_enabled ?? false);
+                                @endphp
+                                <td class="px-4 py-3 text-center">
+                                    @if (! $gateway->is_global_enabled)
+                                        <span class="inline-flex rounded-full bg-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">Global Off</span>
+                                    @else
+                                        <form method="POST" action="{{ route('admin.gateways.merchant-update', ['gateway' => $gateway, 'user' => $merchant]) }}" class="inline">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="hidden" name="is_enabled" value="{{ $isEnabled ? 0 : 1 }}">
+                                            <flux:button type="submit" size="sm" variant="{{ $isEnabled ? 'danger' : 'primary' }}">
+                                                {{ $isEnabled ? 'Disable' : 'Enable' }}
+                                            </flux:button>
+                                        </form>
+                                    @endif
+                                </td>
+                            @endforeach
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="{{ $gateways->count() + 1 }}" class="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                                No merchants found.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm transition-shadow duration-200 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800">
+        <div class="border-b border-zinc-200/80 px-6 py-4 dark:border-zinc-700">
+            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Platform Gateway Credentials</h2>
+            <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Current model: customer-facing options (GCash, Maya, PayPal, PayQRPH) are collected through Coins dynamic QR. Configure Coins platform credentials only.</p>
+        </div>
+        <div class="space-y-6 px-6 py-6 sm:px-8 sm:py-6">
+            @foreach ($gateways as $gateway)
+                @php
+                    $fields = $platformCredentialFields[$gateway->id] ?? [];
+                    $config = $platformConfigs[$gateway->id] ?? [];
+                @endphp
+                @continue($fields === [])
+                <div class="rounded-xl border border-zinc-200/80 p-4 dark:border-zinc-700">
+                    <div class="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                            <h3 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{{ $gateway->name }}</h3>
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ strtoupper($gateway->code) }}</p>
+                        </div>
+                    </div>
+                    <form method="POST" action="{{ route('admin.gateways.platform-config', ['gateway' => $gateway]) }}" class="space-y-4">
+                        @csrf
+                        @method('PATCH')
+                        <div class="grid gap-4 md:grid-cols-2">
+                            @foreach ($fields as $field)
+                                @php
+                                    $key = $field['key'] ?? null;
+                                    $label = $field['label'] ?? $key;
+                                    $type = $field['type'] ?? 'text';
+                                    $required = (bool) ($field['required'] ?? false);
+                                    $masked = (bool) ($field['masked'] ?? false);
+                                    $value = is_string($key) ? ($config[$key] ?? '') : '';
+                                @endphp
+                                @if (is_string($key) && $key !== '')
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                            {{ $label }} @if($required)<span class="text-red-500">*</span>@endif
+                                        </label>
+                                        @if ($type === 'select')
+                                            <select name="config[{{ $key }}]" class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900">
+                                                @foreach (($field['options'] ?? []) as $optionValue => $optionLabel)
+                                                    <option value="{{ $optionValue }}" @selected((string) $value === (string) $optionValue)>{{ $optionLabel }}</option>
+                                                @endforeach
+                                            </select>
+                                        @else
+                                            <input
+                                                type="{{ $type === 'password' ? 'password' : 'text' }}"
+                                                name="config[{{ $key }}]"
+                                                value="{{ $masked ? '' : $value }}"
+                                                placeholder="{{ $masked ? 'Leave blank to keep current' : '' }}"
+                                                class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+                                            >
+                                        @endif
+                                        @error('config.'.$key)
+                                            <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+                                @endif
+                            @endforeach
+                        </div>
+                        <div>
+                            <flux:button type="submit" size="sm" variant="primary">Save Platform Credentials</flux:button>
+                        </div>
+                    </form>
+                </div>
+            @endforeach
+        </div>
+    </div>
+
 </div>
 @endsection

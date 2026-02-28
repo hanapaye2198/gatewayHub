@@ -30,6 +30,8 @@ class ValidateProductionEnvironment
 
         $this->validateDatabase($errors);
         $this->validatePayPal($errors);
+        $this->validateCoinsGateway($errors);
+        $this->validateSecurityFlags($errors);
 
         if ($errors !== []) {
             throw new RuntimeException(
@@ -85,6 +87,47 @@ class ValidateProductionEnvironment
 
         if ($anySet && ! $allSet) {
             $errors[] = 'PayPal: when using PayPal webhooks, PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, and PAYPAL_WEBHOOK_ID must all be set.';
+        }
+    }
+
+    /**
+     * @param  list<string>  $errors
+     */
+    private function validateCoinsGateway(array &$errors): void
+    {
+        $clientId = trim((string) config('coins.gateway.client_id', ''));
+        $clientSecret = trim((string) config('coins.gateway.client_secret', ''));
+        $webhookSecret = trim((string) config('coins.webhook.secret', ''));
+
+        if ($clientId === '' || $clientSecret === '') {
+            $errors[] = 'Coins gateway credentials must be set: COINS_GATEWAY_CLIENT_ID and COINS_GATEWAY_CLIENT_SECRET.';
+        }
+
+        if ($webhookSecret === '') {
+            $errors[] = 'COINS_WEBHOOK_SECRET must be set.';
+        }
+    }
+
+    /**
+     * @param  list<string>  $errors
+     */
+    private function validateSecurityFlags(array &$errors): void
+    {
+        if ((bool) config('app.debug', false)) {
+            $errors[] = 'APP_DEBUG must be false in production.';
+        }
+
+        $bypassFlags = [
+            'coins.webhook.allow_dev_bypass' => 'COINS_WEBHOOK_ALLOW_DEV_BYPASS',
+            'gcash.webhook.allow_dev_bypass' => 'GCASH_WEBHOOK_ALLOW_DEV_BYPASS',
+            'maya.webhook.allow_dev_bypass' => 'MAYA_WEBHOOK_ALLOW_DEV_BYPASS',
+            'paypal.webhook.allow_dev_bypass' => 'PAYPAL_WEBHOOK_ALLOW_DEV_BYPASS',
+        ];
+
+        foreach ($bypassFlags as $path => $envKey) {
+            if ((bool) config($path, false)) {
+                $errors[] = "{$envKey} must be false in production.";
+            }
         }
     }
 }

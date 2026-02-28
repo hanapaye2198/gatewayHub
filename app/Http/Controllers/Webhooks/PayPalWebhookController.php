@@ -28,7 +28,8 @@ class PayPalWebhookController extends Controller
             return response()->json(['received' => true], 200);
         }
 
-        if (! $this->verifyWebhook($request, $payload)) {
+        $verificationContext = $this->resolveVerificationContext($request, $payload);
+        if (! $verificationContext['verified']) {
             return response()->json(['message' => 'Invalid signature.'], 401);
         }
 
@@ -39,7 +40,10 @@ class PayPalWebhookController extends Controller
         ProcessWebhookJob::dispatch(
             'PayPal',
             $payload,
-            WebhookProcessor::captureHeadersForPayload($request)
+            WebhookProcessor::captureHeadersForPayload($request),
+            [
+                'skip_replay_validation' => true,
+            ],
         );
 
         return response()->json(['received' => true], 200);
@@ -63,14 +67,18 @@ class PayPalWebhookController extends Controller
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function verifyWebhook(Request $request, array $payload): bool
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{verified: bool, merchant_ids: list<int>}
+     */
+    private function resolveVerificationContext(Request $request, array $payload): array
     {
         if (config('paypal.webhook.allow_dev_bypass', false)) {
             Log::warning('PayPal webhook: dev bypass enabled, skipping signature verification');
 
-            return true;
+            return ['verified' => true, 'merchant_ids' => []];
         }
 
-        return $this->signatureVerifier->verify($request, $payload);
+        return $this->signatureVerifier->resolveVerificationContext($request, $payload);
     }
 }

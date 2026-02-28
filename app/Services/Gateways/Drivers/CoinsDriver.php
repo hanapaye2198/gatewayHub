@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Http;
 /**
  * Coins.ph gateway driver.
  *
- * Expected merchant_gateways.config_json structure for this driver (per merchant):
+ * Expected gateways.config_json structure for this driver (platform-managed):
  *
  * Credentials may use either naming convention (resolved with priority):
  * - client_id (preferred) or api_key
@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\Http;
  *   "webhook_secret": "string"   // Optional. For webhook signature verification (later phase).
  * }
  *
- * One merchant can have different credentials than another; config is stored per merchant_gateways row.
+ * The same platform credentials are shared across merchants for this gateway.
  */
 class CoinsDriver implements GatewayInterface
 {
@@ -64,7 +64,7 @@ class CoinsDriver implements GatewayInterface
     }
 
     /**
-     * Validation rules for Coins.ph config_json (use in Form Requests when saving merchant gateway config).
+     * Validation rules for Coins.ph platform gateway config_json.
      *
      * @return array<string, mixed>
      */

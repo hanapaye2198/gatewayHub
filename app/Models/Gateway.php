@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\PartiallyEncryptedJsonCast;
 use App\Services\Gateways\GatewayCapability;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +22,7 @@ class Gateway extends Model
         'code',
         'name',
         'driver_class',
+        'config_json',
         'is_global_enabled',
     ];
 
@@ -33,6 +35,7 @@ class Gateway extends Model
     {
         return [
             'is_global_enabled' => 'boolean',
+            'config_json' => PartiallyEncryptedJsonCast::class,
         ];
     }
 

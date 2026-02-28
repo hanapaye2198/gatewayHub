@@ -1,7 +1,10 @@
 <?php
 
 use App\Services\Gateways\Drivers\CoinsDriver;
+use App\Services\Gateways\Drivers\GcashDriver;
+use App\Services\Gateways\Drivers\MayaDriver;
 use App\Services\Gateways\Drivers\PaypalDriver;
+use App\Services\Gateways\Drivers\QrphDriver;
 
 return [
 
@@ -12,15 +15,16 @@ return [
     |
     | Keys: qr, redirect, api_only. Used so the frontend can react correctly
     | (e.g. show QR vs redirect). No database column; resolved from driver_class.
-    | GCash / Maya: add when implemented (default is api_only).
+    | In the current model, customer-facing options are collected via Coins QR.
     |
     */
 
     'capabilities' => [
         CoinsDriver::class => 'qr',
-        PaypalDriver::class => 'redirect',
-        // GcashDriver::class => 'api_only',
-        // MayaDriver::class => 'api_only',
+        GcashDriver::class => 'qr',
+        MayaDriver::class => 'qr',
+        PaypalDriver::class => 'qr',
+        QrphDriver::class => 'qr',
     ],
 
 ];

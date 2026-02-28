@@ -7,6 +7,7 @@ use App\Models\MerchantGateway;
 use App\Models\User;
 use App\Services\Gateways\Drivers\CoinsDriver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -29,9 +30,10 @@ class ApiPaymentHardeningTest extends TestCase
     public function test_inactive_merchant_receives_403(): void
     {
         $user = User::factory()->create(['api_key' => 'inactive-key', 'is_active' => false]);
+        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
             'user_id' => $user->id,
-            'gateway_id' => Gateway::first()->id,
+            'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
         ]);
@@ -63,9 +65,10 @@ class ApiPaymentHardeningTest extends TestCase
     public function test_amount_zero_returns_422(): void
     {
         $user = User::factory()->create(['api_key' => 'key-1']);
+        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
             'user_id' => $user->id,
-            'gateway_id' => Gateway::first()->id,
+            'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
         ]);
@@ -81,14 +84,78 @@ class ApiPaymentHardeningTest extends TestCase
         $response->assertJson(['success' => false]);
     }
 
+    public function test_hashed_api_key_can_authenticate_without_plaintext_key(): void
+    {
+        $user = User::factory()->create([
+            'api_key' => null,
+            'api_key_hash' => hash('sha256', 'key-hash-only'),
+            'api_key_last_four' => 'only',
+        ]);
+        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
+        MerchantGateway::query()->create([
+            'user_id' => $user->id,
+            'gateway_id' => $coinsGateway->id,
+            'is_enabled' => true,
+            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
+        ]);
+
+        $response = $this->postJson('/api/payments', [
+            'amount' => 0,
+            'currency' => 'PHP',
+            'gateway' => 'coins',
+            'reference' => 'ref-hash-only',
+        ], ['Authorization' => 'Bearer key-hash-only']);
+
+        $response->assertStatus(422);
+        $response->assertJson(['success' => false]);
+    }
+
+    public function test_plaintext_only_legacy_api_key_is_rejected(): void
+    {
+        $user = User::factory()->create([
+            'api_key' => null,
+            'api_key_hash' => null,
+            'api_key_last_four' => null,
+        ]);
+        DB::table('users')
+            ->where('id', $user->id)
+            ->update([
+                'api_key' => 'legacy-plaintext-key',
+                'api_key_hash' => null,
+                'api_key_last_four' => null,
+            ]);
+
+        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
+        MerchantGateway::query()->create([
+            'user_id' => $user->id,
+            'gateway_id' => $coinsGateway->id,
+            'is_enabled' => true,
+            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
+        ]);
+
+        $response = $this->postJson('/api/payments', [
+            'amount' => 100,
+            'currency' => 'PHP',
+            'gateway' => 'coins',
+            'reference' => 'ref-legacy-plaintext',
+        ], ['Authorization' => 'Bearer legacy-plaintext-key']);
+
+        $response->assertStatus(401);
+        $response->assertJson([
+            'success' => false,
+            'error' => 'Invalid API key.',
+        ]);
+    }
+
     public function test_idempotency_key_returns_cached_response(): void
     {
         Http::fake(['*' => Http::response(['code' => 0, 'data' => ['orderId' => 'ord-1', 'qrCode' => 'qr123']], 200)]);
 
         $user = User::factory()->create(['api_key' => 'key-idem']);
+        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
             'user_id' => $user->id,
-            'gateway_id' => Gateway::first()->id,
+            'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
         ]);
@@ -122,9 +189,10 @@ class ApiPaymentHardeningTest extends TestCase
         Http::fake(['*' => Http::response(['code' => 0, 'data' => ['orderId' => 'x', 'qrCode' => 'y']], 200)]);
 
         $user = User::factory()->create(['api_key' => 'key-format']);
+        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
             'user_id' => $user->id,
-            'gateway_id' => Gateway::first()->id,
+            'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
         ]);

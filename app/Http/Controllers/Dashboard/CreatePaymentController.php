@@ -52,6 +52,10 @@ class CreatePaymentController extends Controller
             return back()->withInput()->withErrors(['gateway' => $e->getMessage()]);
         }
 
+        if (is_string($result['redirect_url'] ?? null) && $result['redirect_url'] !== '') {
+            return redirect()->away($result['redirect_url']);
+        }
+
         return redirect()->route('dashboard.payments.show', $result['payment'])->with('success', __('Payment created.'));
     }
 }
