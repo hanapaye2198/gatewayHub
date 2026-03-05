@@ -32,6 +32,7 @@ class CoinsSignatureService
      * @param  string  $timestampMs  Timestamp in milliseconds (string).
      * @param  string  $clientSecret  Coins API client secret.
      * @param  bool  $includeCanonicalForDebug  When true, return canonical_string. Do not use in production logs.
+     * @param  bool  $sortKeys  When true, sort body keys lexicographically before signing.
      * @return array{signature: string, canonical_string?: string}
      *
      * @throws CoinsApiException When clientSecret is empty.
@@ -40,14 +41,15 @@ class CoinsSignatureService
         array $bodyParams,
         string $timestampMs,
         string $clientSecret,
-        bool $includeCanonicalForDebug = false
+        bool $includeCanonicalForDebug = false,
+        bool $sortKeys = true
     ): array {
         if ($clientSecret === '') {
             throw new CoinsApiException('Coins signature requires a non-empty API secret.');
         }
 
         $normalized = $this->normalizeParams($bodyParams);
-        $canonicalBody = $this->buildCanonicalString($normalized);
+        $canonicalBody = $this->buildCanonicalString($normalized, $sortKeys);
         $canonical = $canonicalBody === ''
             ? 'timestamp='.$timestampMs
             : $canonicalBody.'&timestamp='.$timestampMs;
@@ -195,9 +197,12 @@ class CoinsSignatureService
      *
      * @param  array<string, string>  $params
      */
-    private function buildCanonicalString(array $params): string
+    private function buildCanonicalString(array $params, bool $sortKeys = true): string
     {
-        ksort($params, SORT_STRING);
+        if ($sortKeys) {
+            ksort($params, SORT_STRING);
+        }
+
         $pairs = [];
         foreach ($params as $key => $value) {
             $pairs[] = $key.'='.$value;

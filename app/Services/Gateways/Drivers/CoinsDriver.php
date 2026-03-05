@@ -41,6 +41,8 @@ class CoinsDriver implements GatewayInterface
 
     private const SOURCE_IDENTIFIER = 'GATEWAYHUB';
 
+    private const SIGNATURE_INVALID_CODE = -1022;
+
     protected string $clientId = '';
 
     protected string $clientSecret = '';
@@ -122,64 +124,13 @@ class CoinsDriver implements GatewayInterface
             'source' => $this->source,
         ];
 
-        $timestampMs = (string) (int) (microtime(true) * 1000);
-        $signed = $this->signatureService->signForFiatRequest(
-            $bodyParams,
-            $timestampMs,
-            $this->clientSecret,
-            $this->includeCanonicalForDebug
-        );
+        [$response, $body] = $this->sendCreateQrRequest($bodyParams, true);
 
-        $url = $this->getBaseUrl().self::GENERATE_QR_PATH;
-
-        $headers = [
-            'X-COINS-APIKEY' => $this->clientId,
-            'Timestamp' => $timestampMs,
-            'Signature' => $signed['signature'],
-            'Content-Type' => 'application/json',
-        ];
-        if ($this->includeCanonicalForDebug && isset($signed['canonical_string'])) {
-            $headers['X-COINS-DEBUG-CANONICAL'] = $signed['canonical_string'];
+        if ($this->isSignatureInvalidResponse($response, $body)) {
+            [$response, $body] = $this->sendCreateQrRequest($bodyParams, false);
         }
 
-        try {
-            /** @var Response $response */
-            $response = Http::withHeaders($headers)->post($url, $bodyParams);
-        } catch (HttpClientException $e) {
-            throw new CoinsApiException(
-                'Coins.ph API request failed: '.$e->getMessage(),
-                null,
-                null,
-                $e
-            );
-        }
-
-        $body = $response->json();
-        if (! is_array($body)) {
-            $body = [];
-        }
-
-        if (! $response->successful()) {
-            $message = $body['msg'] ?? $body['message'] ?? $response->body();
-            if (is_array($message)) {
-                $message = json_encode($message);
-            }
-            throw new CoinsApiException(
-                'Coins.ph API error: '.(is_string($message) ? $message : 'Unknown error'),
-                $response->status(),
-                $body
-            );
-        }
-
-        $status = $body['status'] ?? $body['code'] ?? null;
-        if ($status !== null && (int) $status !== 0) {
-            $message = $body['msg'] ?? $body['message'] ?? 'API returned error status '.$status;
-            throw new CoinsApiException(
-                'Coins.ph API error: '.(is_string($message) ? $message : 'Unknown error'),
-                $response->status(),
-                $body
-            );
-        }
+        $this->throwIfResponseHasError($response, $body);
 
         return $this->normalizeResponse($body, $reference);
     }
@@ -229,6 +180,115 @@ class CoinsDriver implements GatewayInterface
     private function getBaseUrl(): string
     {
         return $this->apiBase === 'sandbox' ? self::SANDBOX_BASE_URL : self::PROD_BASE_URL;
+    }
+
+    /**
+     * @param  array<string, string>  $bodyParams
+     * @return array{0: Response, 1: array<string, mixed>}
+     */
+    private function sendCreateQrRequest(array $bodyParams, bool $sortKeys): array
+    {
+        $timestampMs = (string) (int) (microtime(true) * 1000);
+        $signed = $this->signatureService->signForFiatRequest(
+            $bodyParams,
+            $timestampMs,
+            $this->clientSecret,
+            $this->includeCanonicalForDebug,
+            $sortKeys
+        );
+
+        $headers = [
+            'X-COINS-APIKEY' => $this->clientId,
+            'Timestamp' => $timestampMs,
+            'Signature' => $signed['signature'],
+            'Content-Type' => 'application/json',
+        ];
+
+        if ($this->includeCanonicalForDebug && isset($signed['canonical_string'])) {
+            $headers['X-COINS-DEBUG-CANONICAL'] = $signed['canonical_string'];
+        }
+
+        $url = $this->getBaseUrl().self::GENERATE_QR_PATH;
+
+        try {
+            $response = Http::withHeaders($headers)->post($url, $bodyParams);
+        } catch (HttpClientException $e) {
+            throw new CoinsApiException(
+                'Coins.ph API request failed: '.$e->getMessage(),
+                null,
+                null,
+                $e
+            );
+        }
+
+        $body = $response->json();
+
+        if (! is_array($body)) {
+            $body = [];
+        }
+
+        return [$response, $body];
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     */
+    private function throwIfResponseHasError(Response $response, array $body): void
+    {
+        if (! $response->successful()) {
+            throw new CoinsApiException(
+                'Coins.ph API error: '.$this->extractResponseMessage($body, $response),
+                $response->status(),
+                $body
+            );
+        }
+
+        $status = $body['status'] ?? $body['code'] ?? null;
+        if ($status !== null && (int) $status !== 0) {
+            throw new CoinsApiException(
+                'Coins.ph API error: '.$this->extractResponseMessage($body, $response, $status),
+                $response->status(),
+                $body
+            );
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     */
+    private function isSignatureInvalidResponse(Response $response, array $body): bool
+    {
+        if ($response->successful()) {
+            $status = $body['status'] ?? $body['code'] ?? null;
+            if ($status !== null && (int) $status === self::SIGNATURE_INVALID_CODE) {
+                return true;
+            }
+        }
+
+        $message = strtolower($this->extractResponseMessage($body, $response));
+
+        return str_contains($message, 'signature') && str_contains($message, 'not valid');
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     */
+    private function extractResponseMessage(array $body, Response $responseBodySource, mixed $status = null): string
+    {
+        $message = $body['msg'] ?? $body['message'] ?? null;
+        if (is_array($message)) {
+            $message = json_encode($message);
+        }
+        if (is_string($message) && $message !== '') {
+            return $message;
+        }
+        if ($status !== null) {
+            return 'API returned error status '.$status;
+        }
+
+        $responseBody = $responseBodySource->body();
+
+        return $responseBody !== '' ? $responseBody : 'Unknown error';
     }
 
     /**

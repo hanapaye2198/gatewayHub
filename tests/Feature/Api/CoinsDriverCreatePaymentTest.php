@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Services\Coins\CoinsSignatureService;
 use App\Services\Gateways\Drivers\CoinsDriver;
 use App\Services\Gateways\Exceptions\CoinsApiException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -145,6 +146,64 @@ class CoinsDriverCreatePaymentTest extends TestCase
 
         $this->assertSame('trimmed-ord', $result['external_payment_id']);
         $this->assertSame('trimmed-qr', $result['qr_data']);
+    }
+
+    public function test_create_payment_retries_with_unsorted_signature_when_signature_is_rejected(): void
+    {
+        $requestCount = 0;
+        $signatureService = new CoinsSignatureService;
+
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/*' => function ($request) use (&$requestCount, $signatureService) {
+                $requestCount++;
+
+                $timestamp = (string) ($request->header('Timestamp')[0] ?? '');
+                $signature = (string) ($request->header('Signature')[0] ?? '');
+                $body = json_decode((string) $request->body(), true) ?? [];
+
+                $expected = $signatureService->signForFiatRequest(
+                    $body,
+                    $timestamp,
+                    'retry-secret',
+                    false,
+                    $requestCount === 1
+                );
+
+                $this->assertNotSame('', $timestamp);
+                $this->assertSame($expected['signature'], $signature);
+
+                if ($requestCount === 1) {
+                    return Http::response([
+                        'status' => -1022,
+                        'msg' => 'Signature for this request is not valid.',
+                    ], 200);
+                }
+
+                return Http::response([
+                    'status' => 0,
+                    'data' => [
+                        'orderId' => 'retry-order-123',
+                        'qrCode' => 'retry-qr-123',
+                    ],
+                ], 200);
+            },
+        ]);
+
+        $driver = new CoinsDriver([
+            'client_id' => 'retry-client',
+            'client_secret' => 'retry-secret',
+            'api_base' => 'sandbox',
+        ]);
+
+        $result = $driver->createPayment([
+            'amount' => 250,
+            'currency' => 'PHP',
+            'reference' => 'retry-ref-001',
+        ]);
+
+        $this->assertSame(2, $requestCount);
+        $this->assertSame('retry-order-123', $result['external_payment_id']);
+        $this->assertSame('retry-qr-123', $result['qr_data']);
     }
 
     public function test_create_payment_throws_when_config_missing_credentials(): void

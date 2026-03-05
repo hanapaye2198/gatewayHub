@@ -142,6 +142,17 @@ class CoinsSignatureServiceTest extends TestCase
         );
     }
 
+    public function test_sign_for_fiat_request_preserves_body_order_when_sorting_disabled(): void
+    {
+        $bodyParams = ['requestId' => 'REF123', 'amount' => '100', 'source' => 'GATEWAYHUB'];
+        $result = $this->service->signForFiatRequest($bodyParams, '1700000000000', 'secret', true, false);
+
+        $this->assertSame(
+            'requestId=REF123&amount=100&source=GATEWAYHUB&timestamp=1700000000000',
+            $result['canonical_string']
+        );
+    }
+
     public function test_sign_for_fiat_request_throws_on_empty_secret(): void
     {
         $this->expectException(CoinsApiException::class);

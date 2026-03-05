@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\CoinsTransaction;
+use App\Services\Coins\CoinsSignatureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -96,6 +97,67 @@ class CoinsQrGenerationTest extends TestCase
         $response->assertStatus(200);
         $response->assertJson(['success' => false, 'message' => 'Coins API error: Invalid API key']);
         $this->assertDatabaseCount('coins_transactions', 0);
+    }
+
+    public function test_generate_qr_retries_with_unsorted_signature_when_signature_is_rejected(): void
+    {
+        config([
+            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
+            'coins.api_key' => 'test-key',
+            'coins.secret_key' => 'test-secret',
+        ]);
+
+        $requestCount = 0;
+        $signatureService = new CoinsSignatureService;
+
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/*' => function ($request) use (&$requestCount, $signatureService) {
+                $requestCount++;
+
+                $timestamp = (string) ($request->header('Timestamp')[0] ?? '');
+                $signature = (string) ($request->header('Signature')[0] ?? '');
+                $body = json_decode((string) $request->body(), true) ?? [];
+
+                $expected = $signatureService->signForFiatRequest(
+                    $body,
+                    $timestamp,
+                    'test-secret',
+                    false,
+                    $requestCount === 1
+                );
+
+                $this->assertNotSame('', $timestamp);
+                $this->assertSame($expected['signature'], $signature);
+
+                if ($requestCount === 1) {
+                    return Http::response([
+                        'status' => -1022,
+                        'msg' => 'Signature for this request is not valid.',
+                    ], 200);
+                }
+
+                return Http::response([
+                    'status' => 0,
+                    'data' => [
+                        'orderId' => 'retry-coins-order-123',
+                        'qrCode' => 'retry-qr-payload',
+                    ],
+                ], 200);
+            },
+        ]);
+
+        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 55]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'status' => 'PENDING',
+            'qr_code_string' => 'retry-qr-payload',
+            'reference_id' => 'retry-coins-order-123',
+        ]);
+
+        $this->assertSame(2, $requestCount);
+        $this->assertDatabaseCount('coins_transactions', 1);
     }
 
     public function test_generate_qr_returns_error_key_when_response_code_1006(): void
