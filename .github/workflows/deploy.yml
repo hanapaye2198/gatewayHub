@@ -56,4 +56,11 @@ jobs:
             php artisan queue:restart
 
             php artisan up
+
+            HEALTH_BODY="$(curl --silent --show-error --fail --max-time 15 http://127.0.0.1/health)"
+            if [ "${HEALTH_BODY}" != "ok" ]; then
+              echo "Health check failed: expected 'ok', got '${HEALTH_BODY}'"
+              exit 1
+            fi
+
             trap - EXIT

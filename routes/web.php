@@ -12,6 +12,7 @@ Route::get('/auth/google', [GoogleController::class, 'redirect'])->name('google.
 Route::get('/auth/google/callback', [GoogleController::class, 'callback'])->name('google.callback');
 
 Route::get('/', HomeController::class)->name('home');
+Route::get('/health', fn () => response('ok', 200))->name('health');
 
 Route::get('/demo/checkout', fn () => view('demo.checkout'))->name('demo.checkout');
 
