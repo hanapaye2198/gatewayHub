@@ -21,22 +21,36 @@ jobs:
           DO_HOST: ${{ secrets.DO_HOST }}
           DO_USERNAME: ${{ secrets.DO_USERNAME }}
           DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
+          DO_SSH_KEY_B64: ${{ secrets.DO_SSH_KEY_B64 }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
-          if [ -z "${DO_HOST}" ] || [ -z "${DO_USERNAME}" ] || [ -z "${DO_SSH_KEY}" ]; then
-            echo "Missing required deployment secrets: DO_HOST, DO_USERNAME, or DO_SSH_KEY."
+          if [ -z "${DO_HOST}" ] || [ -z "${DO_USERNAME}" ]; then
+            echo "Missing required deployment secrets: DO_HOST or DO_USERNAME."
             exit 1
           fi
 
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%b' "${DO_SSH_KEY}" | tr -d '\r' > ~/.ssh/deploy_key
+
+          if [ -n "${DO_SSH_KEY_B64:-}" ]; then
+            printf '%s' "${DO_SSH_KEY_B64}" | base64 --decode > ~/.ssh/deploy_key
+          elif [ -n "${DO_SSH_KEY:-}" ]; then
+            printf '%b' "${DO_SSH_KEY}" | tr -d '\r' > ~/.ssh/deploy_key
+          else
+            echo "Missing required deployment secret: DO_SSH_KEY_B64 (preferred) or DO_SSH_KEY."
+            exit 1
+          fi
+
           chmod 600 ~/.ssh/deploy_key
 
-          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null
+          if ! ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null 2>&1; then
+            echo "Invalid private key format. Check DO_SSH_KEY_B64 / DO_SSH_KEY content."
+            exit 1
+          fi
+
           ssh-keyscan -H "${DO_HOST}" >> ~/.ssh/known_hosts 2> /dev/null
 
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes "${DO_USERNAME}@${DO_HOST}" \
