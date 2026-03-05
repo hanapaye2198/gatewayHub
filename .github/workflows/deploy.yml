@@ -27,6 +27,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          DO_HOST="$(printf '%s' "${DO_HOST}" | tr -d '\r\n' | xargs)"
+          DO_USERNAME="$(printf '%s' "${DO_USERNAME}" | tr -d '\r\n' | xargs)"
+
           if [ -z "${DO_HOST}" ] || [ -z "${DO_USERNAME}" ]; then
             echo "Missing required deployment secrets: DO_HOST or DO_USERNAME."
             exit 1
@@ -36,7 +39,7 @@ jobs:
           chmod 700 ~/.ssh
 
           if [ -n "${DO_SSH_KEY_B64:-}" ]; then
-            printf '%s' "${DO_SSH_KEY_B64}" | base64 --decode > ~/.ssh/deploy_key
+            printf '%s' "${DO_SSH_KEY_B64}" | tr -d '\r\n' | base64 --decode > ~/.ssh/deploy_key
           elif [ -n "${DO_SSH_KEY:-}" ]; then
             printf '%b' "${DO_SSH_KEY}" | tr -d '\r' > ~/.ssh/deploy_key
           else
@@ -52,6 +55,11 @@ jobs:
           fi
 
           ssh-keyscan -H "${DO_HOST}" >> ~/.ssh/known_hosts 2> /dev/null
+
+          if ! ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes "${DO_USERNAME}@${DO_HOST}" "echo SSH_AUTH_OK" >/dev/null 2>&1; then
+            echo "SSH authentication failed for ${DO_USERNAME}@${DO_HOST}. Ensure this user's ~/.ssh/authorized_keys contains the public key for DO_SSH_KEY_B64."
+            exit 1
+          fi
 
           ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes "${DO_USERNAME}@${DO_HOST}" \
             "GITHUB_REF_NAME='${GITHUB_REF_NAME}' GITHUB_SHA='${GITHUB_SHA}' bash -se" <<'REMOTE_SCRIPT'
