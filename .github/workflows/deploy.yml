@@ -16,13 +16,6 @@ jobs:
     environment: Production
 
     steps:
-      - name: Prepare SSH key
-        run: |
-          set -euo pipefail
-          KEY_PATH="${{ runner.temp }}/do_ssh_key"
-          printf '%b' "${{ secrets.DO_SSH_KEY }}" | tr -d '\r' > "${KEY_PATH}"
-          chmod 600 "${KEY_PATH}"
-
       - name: Deploy to DigitalOcean Droplet
         uses: appleboy/ssh-action@v1.2.2
         env:
@@ -30,8 +23,9 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.DO_HOST }}
+          port: 22
           username: ${{ secrets.DO_USERNAME }}
-          key_path: ${{ runner.temp }}/do_ssh_key
+          key: ${{ secrets.DO_SSH_KEY }}
           passphrase: ${{ secrets.DO_SSH_PASSPHRASE }}
           envs: GITHUB_REF_NAME,GITHUB_SHA
           command_timeout: 30m
