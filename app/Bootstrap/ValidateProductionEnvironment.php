@@ -97,14 +97,11 @@ class ValidateProductionEnvironment
     {
         $clientId = trim((string) config('coins.gateway.client_id', ''));
         $clientSecret = trim((string) config('coins.gateway.client_secret', ''));
-        $webhookSecret = trim((string) config('coins.webhook.secret', ''));
+        $hasClientId = $clientId !== '';
+        $hasClientSecret = $clientSecret !== '';
 
-        if ($clientId === '' || $clientSecret === '') {
-            $errors[] = 'Coins gateway credentials must be set: COINS_GATEWAY_CLIENT_ID and COINS_GATEWAY_CLIENT_SECRET.';
-        }
-
-        if ($webhookSecret === '') {
-            $errors[] = 'COINS_WEBHOOK_SECRET must be set.';
+        if ($hasClientId xor $hasClientSecret) {
+            $errors[] = 'Coins fallback credentials must set both COINS_GATEWAY_CLIENT_ID and COINS_GATEWAY_CLIENT_SECRET together, or leave both empty.';
         }
     }
 

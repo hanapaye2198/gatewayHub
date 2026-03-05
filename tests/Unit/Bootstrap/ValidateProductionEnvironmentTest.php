@@ -66,7 +66,7 @@ class ValidateProductionEnvironmentTest extends TestCase
         $validator->bootstrap($this->applicationMock(true));
     }
 
-    public function test_it_fails_when_coins_credentials_are_missing_in_production(): void
+    public function test_it_allows_production_without_coins_env_credentials(): void
     {
         config()->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
         config()->set('database.default', 'sqlite');
@@ -85,8 +85,32 @@ class ValidateProductionEnvironmentTest extends TestCase
 
         $validator = new ValidateProductionEnvironment;
 
+        $validator->bootstrap($this->applicationMock(true));
+
+        $this->assertTrue(true);
+    }
+
+    public function test_it_fails_when_only_one_coins_fallback_credential_is_set(): void
+    {
+        config()->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
+        config()->set('database.default', 'sqlite');
+        config()->set('database.connections.sqlite.database', ':memory:');
+        config()->set('app.debug', false);
+        config()->set('coins.gateway.client_id', 'coins-client-id');
+        config()->set('coins.gateway.client_secret', '');
+        config()->set('coins.webhook.secret', '');
+        config()->set('coins.webhook.allow_dev_bypass', false);
+        config()->set('gcash.webhook.allow_dev_bypass', false);
+        config()->set('maya.webhook.allow_dev_bypass', false);
+        config()->set('paypal.webhook.allow_dev_bypass', false);
+        config()->set('paypal.webhook.client_id', '');
+        config()->set('paypal.webhook.client_secret', '');
+        config()->set('paypal.webhook.webhook_id', '');
+
+        $validator = new ValidateProductionEnvironment;
+
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Coins gateway credentials must be set');
+        $this->expectExceptionMessage('Coins fallback credentials must set both');
 
         $validator->bootstrap($this->applicationMock(true));
     }
