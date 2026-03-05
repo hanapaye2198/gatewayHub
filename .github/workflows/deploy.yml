@@ -38,12 +38,24 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
+          KEY_READY=0
+
           if [ -n "${DO_SSH_KEY_B64:-}" ]; then
-            printf '%s' "${DO_SSH_KEY_B64}" | tr -d '\r\n' | base64 --decode > ~/.ssh/deploy_key
-          elif [ -n "${DO_SSH_KEY:-}" ]; then
+            CLEANED_B64="$(printf '%s' "${DO_SSH_KEY_B64}" | tr -d '\r\n\t ')"
+            if printf '%s' "${CLEANED_B64}" | base64 --decode > ~/.ssh/deploy_key 2> /dev/null; then
+              KEY_READY=1
+            else
+              echo "DO_SSH_KEY_B64 is not valid base64. Falling back to DO_SSH_KEY if provided."
+            fi
+          fi
+
+          if [ "${KEY_READY}" -ne 1 ] && [ -n "${DO_SSH_KEY:-}" ]; then
             printf '%b' "${DO_SSH_KEY}" | tr -d '\r' > ~/.ssh/deploy_key
-          else
-            echo "Missing required deployment secret: DO_SSH_KEY_B64 (preferred) or DO_SSH_KEY."
+            KEY_READY=1
+          fi
+
+          if [ "${KEY_READY}" -ne 1 ]; then
+            echo "Missing valid SSH key secret. Provide DO_SSH_KEY_B64 (preferred) or DO_SSH_KEY."
             exit 1
           fi
 
