@@ -17,19 +17,30 @@ jobs:
 
     steps:
       - name: Deploy to DigitalOcean Droplet
-        uses: appleboy/ssh-action@v1.2.2
         env:
+          DO_HOST: ${{ secrets.DO_HOST }}
+          DO_USERNAME: ${{ secrets.DO_USERNAME }}
+          DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_SHA: ${{ github.sha }}
-        with:
-          host: ${{ secrets.DO_HOST }}
-          port: 22
-          username: ${{ secrets.DO_USERNAME }}
-          key: ${{ secrets.DO_SSH_KEY }}
-          passphrase: ${{ secrets.DO_SSH_PASSPHRASE }}
-          envs: GITHUB_REF_NAME,GITHUB_SHA
-          command_timeout: 30m
-          script: |
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DO_HOST}" ] || [ -z "${DO_USERNAME}" ] || [ -z "${DO_SSH_KEY}" ]; then
+            echo "Missing required deployment secrets: DO_HOST, DO_USERNAME, or DO_SSH_KEY."
+            exit 1
+          fi
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%b' "${DO_SSH_KEY}" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null
+          ssh-keyscan -H "${DO_HOST}" >> ~/.ssh/known_hosts 2> /dev/null
+
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes "${DO_USERNAME}@${DO_HOST}" \
+            "GITHUB_REF_NAME='${GITHUB_REF_NAME}' GITHUB_SHA='${GITHUB_SHA}' bash -se" <<'REMOTE_SCRIPT'
             set -euo pipefail
 
             APP_DIR="/var/www/gatewayhub"
@@ -81,3 +92,4 @@ jobs:
             fi
 
             trap - EXIT
+          REMOTE_SCRIPT
