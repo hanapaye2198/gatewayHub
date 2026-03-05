@@ -20,11 +20,12 @@ jobs:
         uses: appleboy/ssh-action@v1.2.2
         env:
           GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.DO_HOST }}
           username: ${{ secrets.DO_USERNAME }}
           key: ${{ secrets.DO_SSH_KEY }}
-          envs: GITHUB_REF_NAME
+          envs: GITHUB_REF_NAME,GITHUB_SHA
           script_stop: true
           command_timeout: 30m
           script: |
@@ -32,6 +33,7 @@ jobs:
 
             APP_DIR="/var/www/gatewayhub"
             BRANCH="${GITHUB_REF_NAME}"
+            TARGET_SHA="${GITHUB_SHA}"
 
             if [ ! -d "${APP_DIR}" ]; then
               echo "Missing app directory: ${APP_DIR}"
@@ -40,6 +42,13 @@ jobs:
 
             cd "${APP_DIR}"
 
+            if [ ! -f ".env" ]; then
+              echo "Missing .env in ${APP_DIR}"
+              exit 1
+            fi
+
+            git config --global --add safe.directory "${APP_DIR}" || true
+
             php artisan down || true
             trap 'cd "${APP_DIR}" && php artisan up || true' EXIT
 
@@ -47,11 +56,18 @@ jobs:
             git checkout "${BRANCH}"
             git pull --ff-only origin "${BRANCH}"
 
+            CURRENT_SHA="$(git rev-parse HEAD)"
+            if [ "${CURRENT_SHA}" != "${TARGET_SHA}" ]; then
+              echo "Warning: deployed HEAD (${CURRENT_SHA}) differs from workflow SHA (${TARGET_SHA})."
+            fi
+
+            export COMPOSER_ALLOW_SUPERUSER=1
             composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
             npm ci
             npm run build
 
             php artisan migrate --force
+            php artisan optimize:clear
             php artisan optimize
             php artisan queue:restart
 
