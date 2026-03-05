@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\CoinsTransaction;
-use App\Services\Coins\CoinsSignatureService;
+use App\Services\Coins\CoinsGenerateQrSigner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -11,6 +11,18 @@ use Tests\TestCase;
 class CoinsQrGenerationTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'coins.auth.generate_qr.strategy' => 'auto',
+            'coins.auth.generate_qr.timestamp_unit' => 'milliseconds',
+            'coins.auth.generate_qr.signature_encoding' => 'hex_lower',
+            'coins.auth.generate_qr.max_attempts' => 4,
+        ]);
+    }
 
     public function test_generate_qr_page_loads(): void
     {
@@ -108,22 +120,21 @@ class CoinsQrGenerationTest extends TestCase
         ]);
 
         $requestCount = 0;
-        $signatureService = new CoinsSignatureService;
+        $signer = new CoinsGenerateQrSigner;
 
         Http::fake([
-            'api.9001.pl-qa.coinsxyz.me/*' => function ($request) use (&$requestCount, $signatureService) {
+            'api.9001.pl-qa.coinsxyz.me/*' => function ($request) use (&$requestCount, $signer) {
                 $requestCount++;
 
                 $timestamp = (string) ($request->header('Timestamp')[0] ?? '');
                 $signature = (string) ($request->header('Signature')[0] ?? '');
                 $body = json_decode((string) $request->body(), true) ?? [];
 
-                $expected = $signatureService->signForFiatRequest(
+                $expected = $signer->sign(
                     $body,
-                    $timestamp,
                     'test-secret',
-                    false,
-                    $requestCount === 1
+                    $timestamp,
+                    $requestCount === 1 ? CoinsGenerateQrSigner::STRATEGY_RAW_JSON : CoinsGenerateQrSigner::STRATEGY_KV_SORTED_WITH_TIMESTAMP
                 );
 
                 $this->assertNotSame('', $timestamp);
@@ -158,6 +169,144 @@ class CoinsQrGenerationTest extends TestCase
 
         $this->assertSame(2, $requestCount);
         $this->assertDatabaseCount('coins_transactions', 1);
+    }
+
+    public function test_generate_qr_retries_with_raw_json_seconds_on_fourth_attempt(): void
+    {
+        config([
+            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
+            'coins.api_key' => 'test-key',
+            'coins.secret_key' => 'test-secret',
+        ]);
+
+        $requestCount = 0;
+        $signer = new CoinsGenerateQrSigner;
+        $timestamps = [];
+
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/*' => function ($request) use (&$requestCount, $signer, &$timestamps) {
+                $requestCount++;
+
+                $timestamp = (string) ($request->header('Timestamp')[0] ?? '');
+                $timestamps[] = $timestamp;
+                $signature = (string) ($request->header('Signature')[0] ?? '');
+                $body = json_decode((string) $request->body(), true) ?? [];
+
+                if ($requestCount === 1) {
+                    $expected = $signer->sign($body, 'test-secret', $timestamp, CoinsGenerateQrSigner::STRATEGY_RAW_JSON);
+                    $this->assertSame($expected['signature'], $signature);
+                } elseif ($requestCount === 2) {
+                    $expected = $signer->sign($body, 'test-secret', $timestamp, CoinsGenerateQrSigner::STRATEGY_KV_SORTED_WITH_TIMESTAMP);
+                    $this->assertSame($expected['signature'], $signature);
+                } elseif ($requestCount === 3) {
+                    $expected = $signer->sign($body, 'test-secret', $timestamp, CoinsGenerateQrSigner::STRATEGY_KV_INPUT_ORDER_WITH_TIMESTAMP);
+                    $this->assertSame($expected['signature'], $signature);
+                } else {
+                    $expected = $signer->sign($body, 'test-secret', $timestamp, CoinsGenerateQrSigner::STRATEGY_RAW_JSON);
+                    $this->assertSame($expected['signature'], $signature);
+                    $this->assertSame(10, strlen($timestamp));
+                }
+
+                if ($requestCount < 4) {
+                    return Http::response([
+                        'status' => -1022,
+                        'msg' => 'Signature for this request is not valid.',
+                    ], 200);
+                }
+
+                return Http::response([
+                    'status' => 0,
+                    'data' => [
+                        'orderId' => 'retry-raw-seconds-order-123',
+                        'qrCode' => 'retry-raw-seconds-qr-payload',
+                    ],
+                ], 200);
+            },
+        ]);
+
+        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 65]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'status' => 'PENDING',
+            'qr_code_string' => 'retry-raw-seconds-qr-payload',
+            'reference_id' => 'retry-raw-seconds-order-123',
+        ]);
+
+        $this->assertSame(4, $requestCount);
+        $this->assertSame($timestamps[0], $timestamps[1]);
+        $this->assertSame($timestamps[1], $timestamps[2]);
+        $this->assertNotSame($timestamps[2], $timestamps[3]);
+        $this->assertDatabaseCount('coins_transactions', 1);
+    }
+
+    public function test_generate_qr_does_not_fallback_when_strategy_is_not_auto(): void
+    {
+        config([
+            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
+            'coins.api_key' => 'test-key',
+            'coins.secret_key' => 'test-secret',
+            'coins.auth.generate_qr.strategy' => 'raw_json',
+            'coins.auth.generate_qr.timestamp_unit' => 'milliseconds',
+        ]);
+
+        $requestCount = 0;
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/*' => function () use (&$requestCount) {
+                $requestCount++;
+
+                return Http::response([
+                    'status' => -1022,
+                    'msg' => 'Signature for this request is not valid.',
+                ], 200);
+            },
+        ]);
+
+        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 65]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => false,
+            'message' => 'Coins API error: Signature for this request is not valid.',
+        ]);
+        $this->assertSame(1, $requestCount);
+        $this->assertDatabaseCount('coins_transactions', 0);
+    }
+
+    public function test_generate_qr_uses_seconds_timestamp_unit_when_configured(): void
+    {
+        config([
+            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
+            'coins.api_key' => 'test-key',
+            'coins.secret_key' => 'test-secret',
+            'coins.auth.generate_qr.strategy' => 'raw_json',
+            'coins.auth.generate_qr.timestamp_unit' => 'seconds',
+        ]);
+
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/*' => function ($request) {
+                $timestamp = (string) ($request->header('Timestamp')[0] ?? '');
+                $this->assertSame(10, strlen($timestamp));
+
+                return Http::response([
+                    'status' => 0,
+                    'data' => [
+                        'orderId' => 'seconds-order-123',
+                        'qrCode' => 'seconds-qr-payload',
+                    ],
+                ], 200);
+            },
+        ]);
+
+        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 75]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'reference_id' => 'seconds-order-123',
+            'qr_code_string' => 'seconds-qr-payload',
+        ]);
     }
 
     public function test_generate_qr_returns_error_key_when_response_code_1006(): void

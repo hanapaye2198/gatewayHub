@@ -2,17 +2,15 @@
 
 namespace App\Services;
 
-use App\Services\Coins\CoinsSignatureService;
+use App\Services\Coins\CoinsGenerateQrRequestExecutor;
 use App\Services\Gateways\Exceptions\CoinsApiException;
-use Illuminate\Http\Client\HttpClientException;
-use Illuminate\Support\Facades\Http;
 
 /**
  * Coins.ph Dynamic QR (Fiat) API client.
  *
  * Uses config only (no env() in service): config('coins.base_url'), config('coins.api_key'),
- * config('coins.secret_key'), config('coins.source'). Sends POST with JSON body and
- * header-based HMAC-SHA256 signature (params sorted alphabetically, query string format).
+ * config('coins.secret_key'), config('coins.source').
+ * Signing strategy and timestamp behavior are controlled via config('coins.auth.generate_qr.*').
  */
 class CoinsService
 {
@@ -20,13 +18,14 @@ class CoinsService
 
     private const DEFAULT_EXPIRATION_SECONDS = 1800;
 
-    private const SIGNATURE_INVALID_CODE = -1022;
-
     public const ERROR_CODE_IP_NOT_WHITELISTED = 1006;
 
-    public function __construct(
-        protected CoinsSignatureService $signatureService
-    ) {}
+    protected CoinsGenerateQrRequestExecutor $generateQrRequestExecutor;
+
+    public function __construct(?CoinsGenerateQrRequestExecutor $generateQrRequestExecutor = null)
+    {
+        $this->generateQrRequestExecutor = $generateQrRequestExecutor ?? new CoinsGenerateQrRequestExecutor;
+    }
 
     /**
      * Call Coins generate_qr_code API and return decoded response.
@@ -42,10 +41,14 @@ class CoinsService
         $amount = $params['amount'] ?? 0;
         $currency = (string) ($params['currency'] ?? 'PHP');
 
-        $baseUrl = config('coins.base_url');
-        $apiKey = config('coins.api_key');
-        $secretKey = config('coins.secret_key');
-        $source = config('coins.source', 'GATEWAYHUB');
+        $baseUrl = rtrim((string) config('coins.base_url', ''), '/');
+        $apiKey = trim((string) config('coins.api_key', ''));
+        $secretKey = trim((string) config('coins.secret_key', ''));
+        $source = (string) config('coins.source', 'GATEWAYHUB');
+
+        if ($baseUrl === '') {
+            throw new CoinsApiException('Coins API is not configured: set COINS_BASE_URL.');
+        }
 
         if ($apiKey === '' || $secretKey === '') {
             throw new CoinsApiException('Coins API is not configured: set COINS_API_KEY and COINS_SECRET_KEY.');
@@ -59,11 +62,25 @@ class CoinsService
             'source' => $source,
         ];
 
-        [$response, $body] = $this->sendGenerateQrRequest($baseUrl, $apiKey, $secretKey, $bodyParams, true);
+        $url = str_ends_with($baseUrl, self::GENERATE_QR_PATH)
+            ? $baseUrl
+            : $baseUrl.self::GENERATE_QR_PATH;
 
-        if ($this->isSignatureInvalidResponse($response, $body)) {
-            [$response, $body] = $this->sendGenerateQrRequest($baseUrl, $apiKey, $secretKey, $bodyParams, false);
-        }
+        $execution = $this->generateQrRequestExecutor->execute(
+            $url,
+            $apiKey,
+            $secretKey,
+            $bodyParams,
+            [
+                'api_base' => $baseUrl,
+                'endpoint' => 'generate_qr_code',
+                'request_id' => $requestId,
+                'include_canonical_for_debug' => false,
+            ]
+        );
+
+        $response = $execution['response'];
+        $body = $execution['body'];
 
         $this->throwIfResponseHasError($response, $body);
 
@@ -88,54 +105,6 @@ class CoinsService
             'reference_id' => $referenceId,
             'raw' => $body,
         ];
-    }
-
-    /**
-     * @param  array<string, string>  $bodyParams
-     * @return array{0: \Illuminate\Http\Client\Response, 1: array<string, mixed>}
-     */
-    private function sendGenerateQrRequest(
-        string $baseUrl,
-        string $apiKey,
-        string $secretKey,
-        array $bodyParams,
-        bool $sortKeys
-    ): array {
-        $timestampMs = (string) (int) (microtime(true) * 1000);
-        $signed = $this->signatureService->signForFiatRequest(
-            $bodyParams,
-            $timestampMs,
-            $secretKey,
-            false,
-            $sortKeys
-        );
-
-        $headers = [
-            'X-COINS-APIKEY' => $apiKey,
-            'Timestamp' => $timestampMs,
-            'Signature' => $signed['signature'],
-            'Content-Type' => 'application/json',
-        ];
-
-        $url = $baseUrl.self::GENERATE_QR_PATH;
-
-        try {
-            $response = Http::withHeaders($headers)->post($url, $bodyParams);
-        } catch (HttpClientException $e) {
-            throw new CoinsApiException(
-                'Coins API request failed: '.$e->getMessage(),
-                null,
-                null,
-                $e
-            );
-        }
-
-        $body = $response->json();
-        if (! is_array($body)) {
-            $body = [];
-        }
-
-        return [$response, $body];
     }
 
     /**
@@ -167,23 +136,6 @@ class CoinsService
                 $body
             );
         }
-    }
-
-    /**
-     * @param  array<string, mixed>  $body
-     */
-    private function isSignatureInvalidResponse(\Illuminate\Http\Client\Response $response, array $body): bool
-    {
-        if ($response->successful()) {
-            $status = $body['status'] ?? $body['code'] ?? null;
-            if ($status !== null && (int) $status === self::SIGNATURE_INVALID_CODE) {
-                return true;
-            }
-        }
-
-        $message = strtolower($this->extractResponseMessage($body, $response));
-
-        return str_contains($message, 'signature') && str_contains($message, 'not valid');
     }
 
     /**

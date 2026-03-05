@@ -97,11 +97,22 @@ class ValidateProductionEnvironment
     {
         $clientId = trim((string) config('coins.gateway.client_id', ''));
         $clientSecret = trim((string) config('coins.gateway.client_secret', ''));
+        $webhookSecret = trim((string) config('coins.webhook.secret', ''));
         $hasClientId = $clientId !== '';
         $hasClientSecret = $clientSecret !== '';
 
         if ($hasClientId xor $hasClientSecret) {
             $errors[] = 'Coins fallback credentials must set both COINS_GATEWAY_CLIENT_ID and COINS_GATEWAY_CLIENT_SECRET together, or leave both empty.';
+        }
+
+        foreach ([
+            'COINS_GATEWAY_CLIENT_ID' => $clientId,
+            'COINS_GATEWAY_CLIENT_SECRET' => $clientSecret,
+            'COINS_WEBHOOK_SECRET' => $webhookSecret,
+        ] as $envKey => $value) {
+            if ($value !== '' && $this->isPlaceholderCredentialValue($value)) {
+                $errors[] = "{$envKey} must be a real credential value (placeholder detected).";
+            }
         }
     }
 
@@ -126,5 +137,24 @@ class ValidateProductionEnvironment
                 $errors[] = "{$envKey} must be false in production.";
             }
         }
+    }
+
+    private function isPlaceholderCredentialValue(string $value): bool
+    {
+        $normalized = strtolower(trim($value));
+        $placeholders = [
+            'your_real_client_id',
+            'your_real_client_secret',
+            'your_real_webhook_secret',
+            'your_client_id',
+            'your_client_secret',
+            'your_webhook_secret',
+            'your_api_key',
+            'your_api_secret',
+            'change_me',
+            'replace_me',
+        ];
+
+        return in_array($normalized, $placeholders, true);
     }
 }

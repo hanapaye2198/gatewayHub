@@ -56,4 +56,40 @@ return [
         'source' => env('COINS_SOURCE', 'GATEWAYHUB'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Coins.ph Generate QR Authentication
+    |--------------------------------------------------------------------------
+    |
+    | strategy:
+    | - auto
+    | - raw_json
+    | - kv_sorted_with_timestamp
+    | - kv_input_order_with_timestamp
+    |
+    | timestamp_unit:
+    | - milliseconds
+    | - seconds
+    |
+    | signature_encoding:
+    | - hex_lower
+    |
+    */
+    'auth' => [
+        'generate_qr' => [
+            'strategy' => env('COINS_GENERATE_QR_STRATEGY', 'auto'),
+            'timestamp_unit' => env('COINS_GENERATE_QR_TIMESTAMP_UNIT', 'milliseconds'),
+            'signature_encoding' => env('COINS_GENERATE_QR_SIGNATURE_ENCODING', 'hex_lower'),
+            'max_attempts' => (int) env('COINS_GENERATE_QR_MAX_ATTEMPTS', 4),
+        ],
+        'endpoint_profiles' => [
+            'generate_qr_code' => [
+                'mode' => 'header_signed',
+            ],
+            'cancel_qr_code' => [
+                'mode' => 'query_signed',
+            ],
+        ],
+    ],
+
 ];

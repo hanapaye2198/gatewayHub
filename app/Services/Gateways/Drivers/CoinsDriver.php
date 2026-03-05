@@ -2,13 +2,12 @@
 
 namespace App\Services\Gateways\Drivers;
 
+use App\Services\Coins\CoinsGenerateQrRequestExecutor;
 use App\Services\Coins\CoinsSignatureService;
 use App\Services\Gateways\Contracts\GatewayInterface;
 use App\Services\Gateways\Exceptions\CoinsApiException;
-use Illuminate\Http\Client\HttpClientException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 
 /**
  * Coins.ph gateway driver.
@@ -41,8 +40,6 @@ class CoinsDriver implements GatewayInterface
 
     private const SOURCE_IDENTIFIER = 'GATEWAYHUB';
 
-    private const SIGNATURE_INVALID_CODE = -1022;
-
     protected string $clientId = '';
 
     protected string $clientSecret = '';
@@ -55,10 +52,15 @@ class CoinsDriver implements GatewayInterface
 
     protected bool $includeCanonicalForDebug = false;
 
+    protected CoinsGenerateQrRequestExecutor $generateQrRequestExecutor;
+
     protected CoinsSignatureService $signatureService;
 
-    public function __construct(array $config = [], ?CoinsSignatureService $signatureService = null)
-    {
+    public function __construct(
+        array $config = [],
+        ?CoinsGenerateQrRequestExecutor $generateQrRequestExecutor = null,
+        ?CoinsSignatureService $signatureService = null
+    ) {
         $this->clientId = trim((string) ($config['client_id'] ?? $config['api_key'] ?? ''));
         $this->clientSecret = trim((string) ($config['client_secret'] ?? $config['api_secret'] ?? ''));
         $this->apiBase = strtolower(trim((string) ($config['api_base'] ?? '')));
@@ -68,6 +70,7 @@ class CoinsDriver implements GatewayInterface
             $this->source = self::SOURCE_IDENTIFIER;
         }
         $this->includeCanonicalForDebug = (bool) ($config['includeCanonicalForDebug'] ?? false);
+        $this->generateQrRequestExecutor = $generateQrRequestExecutor ?? new CoinsGenerateQrRequestExecutor;
         $this->signatureService = $signatureService ?? new CoinsSignatureService;
     }
 
@@ -124,11 +127,21 @@ class CoinsDriver implements GatewayInterface
             'source' => $this->source,
         ];
 
-        [$response, $body] = $this->sendCreateQrRequest($bodyParams, true);
+        $execution = $this->generateQrRequestExecutor->execute(
+            $this->getBaseUrl().self::GENERATE_QR_PATH,
+            $this->clientId,
+            $this->clientSecret,
+            $bodyParams,
+            [
+                'api_base' => $this->apiBase,
+                'endpoint' => 'generate_qr_code',
+                'request_id' => $reference,
+                'include_canonical_for_debug' => $this->includeCanonicalForDebug,
+            ]
+        );
 
-        if ($this->isSignatureInvalidResponse($response, $body)) {
-            [$response, $body] = $this->sendCreateQrRequest($bodyParams, false);
-        }
+        $response = $execution['response'];
+        $body = $execution['body'];
 
         $this->throwIfResponseHasError($response, $body);
 
@@ -183,54 +196,6 @@ class CoinsDriver implements GatewayInterface
     }
 
     /**
-     * @param  array<string, string>  $bodyParams
-     * @return array{0: Response, 1: array<string, mixed>}
-     */
-    private function sendCreateQrRequest(array $bodyParams, bool $sortKeys): array
-    {
-        $timestampMs = (string) (int) (microtime(true) * 1000);
-        $signed = $this->signatureService->signForFiatRequest(
-            $bodyParams,
-            $timestampMs,
-            $this->clientSecret,
-            $this->includeCanonicalForDebug,
-            $sortKeys
-        );
-
-        $headers = [
-            'X-COINS-APIKEY' => $this->clientId,
-            'Timestamp' => $timestampMs,
-            'Signature' => $signed['signature'],
-            'Content-Type' => 'application/json',
-        ];
-
-        if ($this->includeCanonicalForDebug && isset($signed['canonical_string'])) {
-            $headers['X-COINS-DEBUG-CANONICAL'] = $signed['canonical_string'];
-        }
-
-        $url = $this->getBaseUrl().self::GENERATE_QR_PATH;
-
-        try {
-            $response = Http::withHeaders($headers)->post($url, $bodyParams);
-        } catch (HttpClientException $e) {
-            throw new CoinsApiException(
-                'Coins.ph API request failed: '.$e->getMessage(),
-                null,
-                null,
-                $e
-            );
-        }
-
-        $body = $response->json();
-
-        if (! is_array($body)) {
-            $body = [];
-        }
-
-        return [$response, $body];
-    }
-
-    /**
      * @param  array<string, mixed>  $body
      */
     private function throwIfResponseHasError(Response $response, array $body): void
@@ -251,23 +216,6 @@ class CoinsDriver implements GatewayInterface
                 $body
             );
         }
-    }
-
-    /**
-     * @param  array<string, mixed>  $body
-     */
-    private function isSignatureInvalidResponse(Response $response, array $body): bool
-    {
-        if ($response->successful()) {
-            $status = $body['status'] ?? $body['code'] ?? null;
-            if ($status !== null && (int) $status === self::SIGNATURE_INVALID_CODE) {
-                return true;
-            }
-        }
-
-        $message = strtolower($this->extractResponseMessage($body, $response));
-
-        return str_contains($message, 'signature') && str_contains($message, 'not valid');
     }
 
     /**

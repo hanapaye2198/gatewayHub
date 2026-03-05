@@ -86,4 +86,57 @@ class UpdatePlatformGatewayConfigRequest extends FormRequest
 
         return $rules;
     }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator): void {
+            $gateway = $this->route('gateway');
+            if (! $gateway instanceof Gateway || $gateway->code !== 'coins') {
+                return;
+            }
+
+            $config = $this->input('config');
+            if (! is_array($config)) {
+                return;
+            }
+
+            foreach (['client_id', 'client_secret', 'api_key', 'api_secret', 'webhook_secret'] as $key) {
+                $value = $config[$key] ?? null;
+                if (! is_string($value)) {
+                    continue;
+                }
+
+                $trimmed = trim($value);
+                if ($trimmed === '') {
+                    continue;
+                }
+
+                if ($this->isPlaceholderCredentialValue($trimmed)) {
+                    $validator->errors()->add(
+                        'config.'.$key,
+                        'Placeholder credentials are not allowed. Enter real Coins.ph values.'
+                    );
+                }
+            }
+        });
+    }
+
+    private function isPlaceholderCredentialValue(string $value): bool
+    {
+        $normalized = strtolower(trim($value));
+        $placeholders = [
+            'your_real_client_id',
+            'your_real_client_secret',
+            'your_real_webhook_secret',
+            'your_client_id',
+            'your_client_secret',
+            'your_webhook_secret',
+            'your_api_key',
+            'your_api_secret',
+            'change_me',
+            'replace_me',
+        ];
+
+        return in_array($normalized, $placeholders, true);
+    }
 }

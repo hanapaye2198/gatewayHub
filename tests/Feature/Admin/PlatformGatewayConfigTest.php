@@ -94,4 +94,36 @@ class PlatformGatewayConfigTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    public function test_admin_cannot_save_placeholder_coins_credentials(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $gateway = Gateway::query()->create([
+            'code' => 'coins',
+            'name' => 'Coins.ph',
+            'driver_class' => \App\Services\Gateways\Drivers\CoinsDriver::class,
+            'is_global_enabled' => true,
+            'config_json' => [],
+        ]);
+
+        $response = $this->actingAs($admin)->from(route('admin.gateways.index'))->patch(
+            route('admin.gateways.platform-config', ['gateway' => $gateway]),
+            [
+                'config' => [
+                    'client_id' => 'your_real_client_id',
+                    'client_secret' => 'your_real_client_secret',
+                    'api_base' => 'sandbox',
+                ],
+            ]
+        );
+
+        $response->assertRedirect(route('admin.gateways.index'));
+        $response->assertSessionHasErrors([
+            'config.client_id',
+            'config.client_secret',
+        ]);
+
+        $gateway->refresh();
+        $this->assertSame([], $gateway->config_json ?? []);
+    }
 }

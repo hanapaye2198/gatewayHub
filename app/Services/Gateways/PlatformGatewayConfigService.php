@@ -11,35 +11,43 @@ class PlatformGatewayConfigService
      */
     public function forGatewayCode(string $code): array
     {
-        $defaults = $this->defaultsForGatewayCode($code);
+        $resolved = $this->forGatewayCodeWithMeta($code);
+
+        return $resolved['config'];
+    }
+
+    /**
+     * @return array{config: array<string, mixed>, credential_source: string}
+     */
+    public function forGatewayCodeWithMeta(string $code): array
+    {
+        $defaults = $this->normalizeConfig($this->defaultsForGatewayCode($code));
         $gateway = Gateway::query()->where('code', $code)->first();
         if (! $gateway instanceof Gateway) {
-            return $defaults;
+            return [
+                'config' => $defaults,
+                'credential_source' => 'env',
+            ];
         }
 
         $stored = $gateway->config_json;
         if (! is_array($stored)) {
-            return $defaults;
+            return [
+                'config' => $defaults,
+                'credential_source' => 'env',
+            ];
         }
 
-        $overrides = [];
-        foreach ($stored as $key => $value) {
-            if ($value === null) {
-                continue;
-            }
-
-            if (is_string($value) && trim($value) === '') {
-                continue;
-            }
-
-            $overrides[$key] = is_string($value) ? trim($value) : $value;
-        }
+        $overrides = $this->normalizeConfig($stored);
 
         if (in_array($code, ['qrph', 'payqrph'], true) && $overrides === []) {
-            return $this->forGatewayCode('coins');
+            return $this->forGatewayCodeWithMeta('coins');
         }
 
-        return array_merge($defaults, $overrides);
+        return [
+            'config' => array_merge($defaults, $overrides),
+            'credential_source' => $overrides === [] ? 'env' : 'db',
+        ];
     }
 
     /**
@@ -103,5 +111,52 @@ class PlatformGatewayConfigService
         }
 
         return is_string($fallback) ? trim($fallback) : '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @return array<string, mixed>
+     */
+    private function normalizeConfig(array $config): array
+    {
+        $normalized = [];
+        foreach ($config as $key => $value) {
+            if (! is_string($key) || $key === '' || $value === null) {
+                continue;
+            }
+
+            if (is_string($value)) {
+                $trimmed = trim($value);
+                if ($trimmed === '' || $this->isPlaceholderCredentialValue($trimmed)) {
+                    continue;
+                }
+                $normalized[$key] = $trimmed;
+
+                continue;
+            }
+
+            $normalized[$key] = $value;
+        }
+
+        return $normalized;
+    }
+
+    private function isPlaceholderCredentialValue(string $value): bool
+    {
+        $normalized = strtolower(trim($value));
+        $placeholders = [
+            'your_real_client_id',
+            'your_real_client_secret',
+            'your_real_webhook_secret',
+            'your_client_id',
+            'your_client_secret',
+            'your_webhook_secret',
+            'your_api_key',
+            'your_api_secret',
+            'change_me',
+            'replace_me',
+        ];
+
+        return in_array($normalized, $placeholders, true);
     }
 }

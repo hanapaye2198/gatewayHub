@@ -115,6 +115,31 @@ class ValidateProductionEnvironmentTest extends TestCase
         $validator->bootstrap($this->applicationMock(true));
     }
 
+    public function test_it_fails_when_coins_fallback_values_are_placeholders(): void
+    {
+        config()->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
+        config()->set('database.default', 'sqlite');
+        config()->set('database.connections.sqlite.database', ':memory:');
+        config()->set('app.debug', false);
+        config()->set('coins.gateway.client_id', 'your_real_client_id');
+        config()->set('coins.gateway.client_secret', 'your_real_client_secret');
+        config()->set('coins.webhook.secret', 'your_real_webhook_secret');
+        config()->set('coins.webhook.allow_dev_bypass', false);
+        config()->set('gcash.webhook.allow_dev_bypass', false);
+        config()->set('maya.webhook.allow_dev_bypass', false);
+        config()->set('paypal.webhook.allow_dev_bypass', false);
+        config()->set('paypal.webhook.client_id', '');
+        config()->set('paypal.webhook.client_secret', '');
+        config()->set('paypal.webhook.webhook_id', '');
+
+        $validator = new ValidateProductionEnvironment;
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('placeholder detected');
+
+        $validator->bootstrap($this->applicationMock(true));
+    }
+
     private function applicationMock(bool $isProduction): Application
     {
         $app = $this->createMock(Application::class);
