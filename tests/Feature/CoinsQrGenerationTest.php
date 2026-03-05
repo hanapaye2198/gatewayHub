@@ -111,6 +111,31 @@ class CoinsQrGenerationTest extends TestCase
         $this->assertDatabaseCount('coins_transactions', 0);
     }
 
+    public function test_generate_qr_surfaces_provider_error_message_from_error_field(): void
+    {
+        config([
+            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
+            'coins.api_key' => 'test-key',
+            'coins.secret_key' => 'test-secret',
+        ]);
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/*' => Http::response([
+                'status' => 88010063,
+                'error' => 'You do not support this feature currently, please contact customer service.',
+                'data' => null,
+            ], 200),
+        ]);
+
+        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 50]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => false,
+            'message' => 'Coins API error: You do not support this feature currently, please contact customer service.',
+        ]);
+        $this->assertDatabaseCount('coins_transactions', 0);
+    }
+
     public function test_generate_qr_retries_with_unsorted_signature_when_signature_is_rejected(): void
     {
         config([

@@ -237,12 +237,23 @@ class CoinsGenerateQrRequestExecutor
      */
     private function extractResponseMessage(array $body, Response $response): string
     {
-        $message = $body['msg'] ?? $body['message'] ?? null;
-        if (is_array($message)) {
-            $message = json_encode($message);
-        }
-        if (is_string($message) && $message !== '') {
-            return $message;
+        $data = $body['data'] ?? null;
+        $candidates = [
+            $body['msg'] ?? null,
+            $body['message'] ?? null,
+            $body['error'] ?? null,
+            $body['errorMsg'] ?? null,
+            is_array($data) ? ($data['errorMsg'] ?? null) : null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_array($candidate)) {
+                $candidate = json_encode($candidate);
+            }
+
+            if (is_string($candidate) && trim($candidate) !== '') {
+                return $candidate;
+            }
         }
 
         $responseBody = $response->body();
