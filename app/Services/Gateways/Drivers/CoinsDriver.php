@@ -49,16 +49,22 @@ class CoinsDriver implements GatewayInterface
 
     protected string $webhookSecret = '';
 
+    protected string $source = self::SOURCE_IDENTIFIER;
+
     protected bool $includeCanonicalForDebug = false;
 
     protected CoinsSignatureService $signatureService;
 
     public function __construct(array $config = [], ?CoinsSignatureService $signatureService = null)
     {
-        $this->clientId = (string) ($config['client_id'] ?? $config['api_key'] ?? '');
-        $this->clientSecret = (string) ($config['client_secret'] ?? $config['api_secret'] ?? '');
-        $this->apiBase = (string) ($config['api_base'] ?? '');
-        $this->webhookSecret = (string) ($config['webhook_secret'] ?? '');
+        $this->clientId = trim((string) ($config['client_id'] ?? $config['api_key'] ?? ''));
+        $this->clientSecret = trim((string) ($config['client_secret'] ?? $config['api_secret'] ?? ''));
+        $this->apiBase = strtolower(trim((string) ($config['api_base'] ?? '')));
+        $this->webhookSecret = trim((string) ($config['webhook_secret'] ?? ''));
+        $this->source = trim((string) ($config['source'] ?? self::SOURCE_IDENTIFIER));
+        if ($this->source === '') {
+            $this->source = self::SOURCE_IDENTIFIER;
+        }
         $this->includeCanonicalForDebug = (bool) ($config['includeCanonicalForDebug'] ?? false);
         $this->signatureService = $signatureService ?? new CoinsSignatureService;
     }
@@ -113,7 +119,7 @@ class CoinsDriver implements GatewayInterface
             'amount' => (string) $amount,
             'currency' => $currency,
             'expiredSeconds' => (string) $expirationSeconds,
-            'source' => self::SOURCE_IDENTIFIER,
+            'source' => $this->source,
         ];
 
         $timestampMs = (string) (int) (microtime(true) * 1000);
@@ -215,7 +221,7 @@ class CoinsDriver implements GatewayInterface
         if ($this->clientId === '' || $this->clientSecret === '') {
             throw new CoinsApiException('Coins.ph driver is missing client_id or client_secret in config.');
         }
-        if ($this->apiBase === '') {
+        if (! in_array($this->apiBase, ['sandbox', 'prod'], true)) {
             throw new CoinsApiException('Coins.ph driver is missing api_base in config.');
         }
     }

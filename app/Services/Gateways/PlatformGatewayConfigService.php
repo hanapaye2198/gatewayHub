@@ -32,7 +32,7 @@ class PlatformGatewayConfigService
                 continue;
             }
 
-            $overrides[$key] = $value;
+            $overrides[$key] = is_string($value) ? trim($value) : $value;
         }
 
         if (in_array($code, ['qrph', 'payqrph'], true) && $overrides === []) {

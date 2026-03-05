@@ -113,6 +113,40 @@ class CoinsDriverCreatePaymentTest extends TestCase
         ]);
     }
 
+    public function test_create_payment_trims_credentials_and_uses_configured_source(): void
+    {
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/*' => function ($request) {
+                $this->assertSame('trimmed-client', $request->header('X-COINS-APIKEY')[0] ?? null);
+                $body = json_decode((string) $request->body(), true) ?? [];
+                $this->assertSame('SUREPAY-PROD', $body['source'] ?? null);
+                $this->assertNotEmpty($request->header('Signature'));
+                $this->assertNotEmpty($request->header('Timestamp'));
+
+                return Http::response([
+                    'status' => 0,
+                    'data' => ['orderId' => 'trimmed-ord', 'qrCode' => 'trimmed-qr'],
+                ], 200);
+            },
+        ]);
+
+        $driver = new CoinsDriver([
+            'client_id' => '  trimmed-client  ',
+            'client_secret' => '  trimmed-secret  ',
+            'api_base' => ' sandbox ',
+            'source' => '  SUREPAY-PROD  ',
+        ]);
+
+        $result = $driver->createPayment([
+            'amount' => 10,
+            'currency' => 'PHP',
+            'reference' => 'ref-trimmed',
+        ]);
+
+        $this->assertSame('trimmed-ord', $result['external_payment_id']);
+        $this->assertSame('trimmed-qr', $result['qr_data']);
+    }
+
     public function test_create_payment_throws_when_config_missing_credentials(): void
     {
         $this->expectException(CoinsApiException::class);
