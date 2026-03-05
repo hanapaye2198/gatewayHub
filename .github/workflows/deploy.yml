@@ -20,6 +20,7 @@ jobs:
         env:
           DO_HOST: ${{ secrets.DO_HOST }}
           DO_USERNAME: ${{ secrets.DO_USERNAME }}
+          DO_PORT: ${{ secrets.DO_PORT }}
           DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
           DO_SSH_KEY_B64: ${{ secrets.DO_SSH_KEY_B64 }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
@@ -29,10 +30,15 @@ jobs:
 
           DO_HOST="$(printf '%s' "${DO_HOST}" | tr -d '\r\n' | xargs)"
           DO_USERNAME="$(printf '%s' "${DO_USERNAME}" | tr -d '\r\n' | xargs)"
+          DO_PORT="$(printf '%s' "${DO_PORT:-}" | tr -d '\r\n' | xargs)"
 
-          if [ -z "${DO_HOST}" ] || [ -z "${DO_USERNAME}" ]; then
-            echo "Missing required deployment secrets: DO_HOST or DO_USERNAME."
+          if [ -z "${DO_HOST}" ]; then
+            echo "Missing required deployment secret: DO_HOST."
             exit 1
+          fi
+
+          if [ -z "${DO_PORT}" ]; then
+            DO_PORT="22"
           fi
 
           mkdir -p ~/.ssh
@@ -68,12 +74,28 @@ jobs:
 
           ssh-keyscan -H "${DO_HOST}" >> ~/.ssh/known_hosts 2> /dev/null
 
-          if ! ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes "${DO_USERNAME}@${DO_HOST}" "echo SSH_AUTH_OK" >/dev/null 2>&1; then
-            echo "SSH authentication failed for ${DO_USERNAME}@${DO_HOST}. Ensure this user's ~/.ssh/authorized_keys contains the public key for DO_SSH_KEY_B64."
+          AUTH_USER=""
+          CANDIDATE_USERS=()
+          if [ -n "${DO_USERNAME}" ]; then
+            CANDIDATE_USERS+=("${DO_USERNAME}")
+          fi
+          if [ "${DO_USERNAME}" != "root" ]; then
+            CANDIDATE_USERS+=("root")
+          fi
+
+          for CANDIDATE_USER in "${CANDIDATE_USERS[@]}"; do
+            if ssh -p "${DO_PORT}" -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes "${CANDIDATE_USER}@${DO_HOST}" "echo SSH_AUTH_OK" >/dev/null 2>&1; then
+              AUTH_USER="${CANDIDATE_USER}"
+              break
+            fi
+          done
+
+          if [ -z "${AUTH_USER}" ]; then
+            echo "SSH authentication failed for configured user and root fallback on ${DO_HOST}:${DO_PORT}. Ensure authorized_keys contains the public key for DO_SSH_KEY_B64."
             exit 1
           fi
 
-          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes "${DO_USERNAME}@${DO_HOST}" \
+          ssh -p "${DO_PORT}" -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes "${AUTH_USER}@${DO_HOST}" \
             "GITHUB_REF_NAME='${GITHUB_REF_NAME}' GITHUB_SHA='${GITHUB_SHA}' bash -se" <<'REMOTE_SCRIPT'
             set -euo pipefail
 
