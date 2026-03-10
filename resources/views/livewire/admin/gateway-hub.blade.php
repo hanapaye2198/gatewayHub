@@ -1,10 +1,6 @@
-@extends('layouts.admin')
-
-@section('content')
 <div class="flex h-full w-full flex-1 flex-col gap-6 px-4 sm:px-6 lg:px-8">
     {{-- Modern Header with Stats --}}
     <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900 via-zinc-800 to-indigo-900 px-8 py-8 shadow-xl">
-        {{-- Animated Background --}}
         <div class="absolute inset-0 opacity-10">
             <div class="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-white blur-3xl"></div>
             <div class="absolute -bottom-20 -left-20 h-60 w-60 rounded-full bg-indigo-500 blur-3xl"></div>
@@ -27,10 +23,10 @@
                         </span>
                     </div>
                     <p class="mt-1 text-base text-zinc-300">Centralized payment gateway management with real-time controls</p>
+                    <p class="mt-2 text-sm text-zinc-400">Current model: customer-facing options (GCash, Maya, PayPal, PayQRPH) are collected through Coins dynamic QR.</p>
                 </div>
             </div>
 
-            {{-- Quick Stats --}}
             <div class="flex flex-wrap gap-3">
                 <div class="rounded-xl bg-white/5 px-5 py-3 backdrop-blur-sm">
                     <p class="text-xs font-medium text-zinc-400">Global Gateways</p>
@@ -130,10 +126,10 @@
                     Configure Gateway: <span class="text-indigo-600 dark:text-indigo-400" x-text="$wire.editingGateway?.name"></span>
                 </h3>
             </div>
-            <form wire:submit.prevent="updateGatewayConfig($wire.editingGateway?.id)">
+            <form wire:submit.prevent="updateGatewayConfig">
                 <div class="max-h-[60vh] overflow-y-auto px-6 py-4">
                     <div class="space-y-4">
-                        @foreach ($credentialFields['coins'] ?? [] as $field)
+                        @foreach (($credentialFields[optional($editingGateway)->code ?? 'coins'] ?? []) as $field)
                             <div>
                                 <label class="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                                     {{ $field['label'] }}
@@ -159,13 +155,13 @@
                     </div>
                 </div>
                 <div class="flex justify-end gap-2 border-t border-zinc-100 px-6 py-4 dark:border-zinc-700">
-                    <button type="button" @click="show = false"
+                    <button type="button" wire:click="$set('showConfigModal', false)"
                             class="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700">
                         Cancel
                     </button>
                     <button type="submit"
                             class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700">
-                        Save Configuration
+                        Save Platform Credentials
                     </button>
                 </div>
             </form>
@@ -174,9 +170,7 @@
 
     {{-- Main Dashboard Grid --}}
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {{-- Global Gateways Section --}}
         <div class="lg:col-span-2 space-y-6">
-            {{-- Search and Filters Bar --}}
             <div class="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div class="relative flex-1">
@@ -200,13 +194,15 @@
                             <option value="all">All Types</option>
                             <option value="coins">Coins.ph</option>
                             <option value="gcash">GCash</option>
-                            <option value="paymaya">PayMaya</option>
+                            <option value="maya">Maya</option>
+                            <option value="paypal">PayPal</option>
+                            <option value="qrph">QRPH</option>
+                            <option value="payqrph">PayQRPH</option>
                         </select>
                     </div>
                 </div>
             </div>
 
-            {{-- Gateways Table --}}
             <div class="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
                 <div class="border-b border-zinc-100 px-6 py-4 dark:border-zinc-700">
                     <div class="flex items-center justify-between">
@@ -256,17 +252,12 @@
                                     </td>
                                     <td class="px-6 py-4">
                                         <button wire:click="toggleGatewayGlobal({{ $gateway->id }})"
-                                                class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium transition-all"
-                                                :class="$wire.gateways.find(g => g.id === {{ $gateway->id }})?.is_global_enabled
-                                                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400'">
+                                                class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium transition-all {{ $gateway->is_global_enabled ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400' }}">
                                             <span class="relative flex h-2 w-2">
-                                                <span class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
-                                                      :class="$wire.gateways.find(g => g.id === {{ $gateway->id }})?.is_global_enabled ? 'bg-emerald-400' : 'bg-zinc-400'"></span>
-                                                <span class="relative inline-flex h-2 w-2 rounded-full"
-                                                      :class="$wire.gateways.find(g => g.id === {{ $gateway->id }})?.is_global_enabled ? 'bg-emerald-500' : 'bg-zinc-500'"></span>
+                                                <span class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 {{ $gateway->is_global_enabled ? 'bg-emerald-400' : 'bg-zinc-400' }}"></span>
+                                                <span class="relative inline-flex h-2 w-2 rounded-full {{ $gateway->is_global_enabled ? 'bg-emerald-500' : 'bg-zinc-500' }}"></span>
                                             </span>
-                                            <span x-text="$wire.gateways.find(g => g.id === {{ $gateway->id }})?.is_global_enabled ? 'Enabled' : 'Disabled'"></span>
+                                            <span>{{ $gateway->is_global_enabled ? 'Enabled' : 'Disabled' }}</span>
                                         </button>
                                     </td>
                                     <td class="px-6 py-4">
@@ -288,7 +279,8 @@
                                     <td class="px-6 py-4 text-right">
                                         <div class="flex items-center justify-end gap-2">
                                             <button wire:click="editConfig({{ $gateway->id }})"
-                                                    class="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-700">
+                                                    class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-300">
+                                                <span>config</span>
                                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -302,7 +294,6 @@
                     </table>
                 </div>
 
-                {{-- Bulk Actions --}}
                 @if(!empty($selectedGateways))
                     <div class="border-t border-zinc-100 bg-zinc-50 px-6 py-4 dark:border-zinc-700 dark:bg-zinc-900/50">
                         <div class="flex flex-wrap items-center gap-3">
@@ -340,30 +331,43 @@
                 @endif
             </div>
 
-            {{-- Per-Merchant Access Table --}}
             <div class="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
                 <div class="border-b border-zinc-100 px-6 py-4 dark:border-zinc-700">
                     <h2 class="font-semibold text-zinc-900 dark:text-white">Merchant Gateway Access</h2>
+                    <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="relative flex-1 sm:max-w-xs">
+                            <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                            <input type="text"
+                                   wire:model.live.debounce.300ms="merchantAccessSearch"
+                                   placeholder="Search merchants..."
+                                   class="w-full rounded-lg border border-zinc-200 bg-white py-2 pl-9 pr-4 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900">
+                        </div>
+                        <select wire:model.live="merchantAccessStatusFilter"
+                                class="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900">
+                            <option value="all">All merchants</option>
+                            <option value="active">Active only</option>
+                            <option value="inactive">Inactive only</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead class="bg-zinc-50 dark:bg-zinc-900/50">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Merchant</th>
-                                @foreach($gateways->where('is_global_enabled', true) as $gateway)
+                                @foreach($gateways->where('is_global_enabled', true) as $g)
                                     <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-zinc-500">
                                         <div class="flex flex-col items-center">
-                                            <span>{{ $gateway->name }}</span>
-                                            @if(!$gateway->is_global_enabled)
-                                                <span class="mt-1 text-[10px] text-red-500">(global off)</span>
-                                            @endif
+                                            <span>{{ $g->name }}</span>
                                         </div>
                                     </th>
                                 @endforeach
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-zinc-100 dark:divide-zinc-700">
-                            @foreach($merchants->take(5) as $merchant)
+                            @foreach($merchantAccessMerchants as $merchant)
                                 <tr class="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                                     <td class="px-6 py-4">
                                         <div class="flex items-center gap-3">
@@ -386,13 +390,10 @@
                                         @endphp
                                         <td class="px-4 py-4 text-center">
                                             <button wire:click="toggleMerchantGateway({{ $gateway->id }}, {{ $merchant->id }})"
-                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all hover:scale-110"
-                                                    :class="$isEnabled
-                                                        ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                                        : 'bg-zinc-100 text-zinc-400 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-500'">
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all hover:scale-110 {{ $isEnabled ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-zinc-100 text-zinc-400 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-500' }}">
                                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                          d="M{{ $isEnabled ? '9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' : '5 13l4 4L19 7' }}"></path>
+                                                          d="{{ $isEnabled ? 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' : 'M5 13l4 4L19 7' }}"></path>
                                                 </svg>
                                             </button>
                                         </td>
@@ -401,20 +402,21 @@
                             @endforeach
                         </tbody>
                     </table>
-                    @if($merchants->count() > 5)
+                    @if($merchants->count() > 0)
                         <div class="border-t border-zinc-100 px-6 py-3 text-center dark:border-zinc-700">
-                            <a href="#" class="text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">
-                                View all {{ $merchants->count() }} merchants →
-                            </a>
+                            <span class="text-sm text-zinc-500 dark:text-zinc-400">
+                                Showing {{ $merchantAccessMerchants->count() }} of {{ $merchants->count() }} merchants
+                                @if($merchantAccessSearch !== '' || $merchantAccessStatusFilter !== 'all')
+                                    (filtered)
+                                @endif
+                            </span>
                         </div>
                     @endif
                 </div>
             </div>
         </div>
 
-        {{-- Right Sidebar - Activity & Quick Actions --}}
         <div class="space-y-6">
-            {{-- Quick Actions Card --}}
             <div class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
                 <h3 class="mb-3 font-semibold text-zinc-900 dark:text-white">Quick Actions</h3>
                 <div class="space-y-2">
@@ -445,7 +447,6 @@
                 </div>
             </div>
 
-            {{-- Activity Log Card --}}
             <div class="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
                 <div class="border-b border-zinc-100 px-5 py-4 dark:border-zinc-700">
                     <div class="flex items-center justify-between">
@@ -485,7 +486,7 @@
                                         {{ $log['action'] }}: {{ $log['subject'] }}
                                     </p>
                                     <p class="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400">
-                                        {{ $log['user'] }} • {{ $log['timestamp']->diffForHumans() }}
+                                        {{ $log['user'] }} • {{ is_object($log['timestamp'] ?? null) ? $log['timestamp']->diffForHumans() : \Carbon\Carbon::parse($log['timestamp'] ?? now())->diffForHumans() }}
                                     </p>
                                 </div>
                             </div>
@@ -501,7 +502,6 @@
                 </div>
             </div>
 
-            {{-- Gateway Health Card --}}
             <div class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
                 <h3 class="mb-3 font-semibold text-zinc-900 dark:text-white">Gateway Health</h3>
                 <div class="space-y-3">
@@ -534,4 +534,3 @@
     [x-cloak] { display: none !important; }
 </style>
 @endpush
-@endsection

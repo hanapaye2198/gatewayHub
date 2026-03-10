@@ -3,57 +3,51 @@
 @section('content')
 <div class="flex h-full w-full flex-1 flex-col gap-6">
 
-    {{-- Header Section with Gradient --}}
-    <div class="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700/60 dark:bg-zinc-900">
-        {{-- Animated Background Pattern --}}
-        <div class="absolute inset-0 bg-gradient-to-br from-blue-50/60 via-transparent to-transparent dark:from-blue-950/20 dark:via-transparent"></div>
-        <div class="absolute right-0 top-0 -mt-10 -mr-10 h-40 w-40 rounded-full bg-blue-500/5 blur-3xl"></div>
-        <div class="absolute bottom-0 left-0 -mb-10 -ml-10 h-40 w-40 rounded-full bg-emerald-500/5 blur-3xl"></div>
-
-        <div class="relative px-8 py-7">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex items-center gap-4">
-                    <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 shadow-lg shadow-blue-600/25">
-                        <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016 2.993 2.993 0 0 0 2.25-1.016 3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <div class="flex items-center gap-3">
-                            <h1 class="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">Merchants</h1>
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                                <span class="relative flex h-1.5 w-1.5">
-                                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
-                                    <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500"></span>
-                                </span>
-                                {{ $merchants->total() }} total
-                            </span>
-                        </div>
-                        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Manage merchant accounts, activate or deactivate access to the platform.</p>
-                    </div>
+    {{-- Header Section with Gradient (matches Gateway Hub: dark charcoal → deep purple-blue, left to right) --}}
+    <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-zinc-900 via-zinc-800 to-indigo-900 px-8 py-8 shadow-xl">
+        <div class="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex items-center gap-5">
+                <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm">
+                    <svg class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016 2.993 2.993 0 0 0 2.25-1.016 3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z" />
+                    </svg>
                 </div>
-
-                {{-- Quick Stats --}}
-                <div class="flex gap-2">
-                    <div class="rounded-lg bg-emerald-50 px-4 py-2 dark:bg-emerald-950/30">
-                        <span class="text-xs font-medium text-emerald-600 dark:text-emerald-400">Active</span>
-                        <p class="text-lg font-semibold text-emerald-700 dark:text-emerald-300">{{ $merchants->where('is_active', true)->count() }}</p>
+                <div>
+                    <div class="flex items-center gap-3">
+                        <h1 class="text-3xl font-bold text-white">Merchants</h1>
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-300 ring-1 ring-inset ring-emerald-500/30">
+                            <span class="relative flex h-1.5 w-1.5">
+                                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                                <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                            </span>
+                            {{ $merchants->total() }} total
+                        </span>
                     </div>
-                    <div class="rounded-lg bg-red-50 px-4 py-2 dark:bg-red-950/30">
-                        <span class="text-xs font-medium text-red-600 dark:text-red-400">Inactive</span>
-                        <p class="text-lg font-semibold text-red-700 dark:text-red-300">{{ $merchants->where('is_active', false)->count() }}</p>
-                    </div>
+                    <p class="mt-1 text-base text-zinc-300">Manage merchant accounts, activate or deactivate access to the platform.</p>
                 </div>
             </div>
 
+            {{-- Quick Stats --}}
+            <div class="flex flex-wrap gap-3">
+                <div class="rounded-xl bg-white/5 px-5 py-3 backdrop-blur-sm">
+                    <p class="text-xs font-medium text-zinc-400">Active</p>
+                    <p class="text-xl font-bold text-white">{{ $merchants->where('is_active', true)->count() }}</p>
+                </div>
+                <div class="rounded-xl bg-white/5 px-5 py-3 backdrop-blur-sm">
+                    <p class="text-xs font-medium text-zinc-400">Inactive</p>
+                    <p class="text-xl font-bold text-white">{{ $merchants->where('is_active', false)->count() }}</p>
+                </div>
+            </div>
+        </div>
+
             @if (session('status'))
                 <div class="relative mt-5 animate-slide-down">
-                    <div class="rounded-lg border-l-4 border-emerald-500 bg-emerald-50 px-4 py-3 dark:bg-emerald-950/30">
+                    <div class="rounded-lg border-l-4 border-emerald-500 bg-emerald-500/20 px-4 py-3 backdrop-blur-sm">
                         <div class="flex items-center gap-2">
-                            <svg class="h-5 w-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <svg class="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <p class="text-sm font-medium text-emerald-800 dark:text-emerald-200">{{ session('status') }}</p>
+                            <p class="text-sm font-medium text-emerald-200">{{ session('status') }}</p>
                         </div>
                     </div>
                 </div>
