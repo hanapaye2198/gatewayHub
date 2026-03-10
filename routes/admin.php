@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\GatewaysController;
 use App\Http\Controllers\Admin\MerchantsController;
 use App\Http\Controllers\Admin\PaymentsController;
 use App\Http\Controllers\Admin\TunnelWalletsController;
+use App\Livewire\Admin\MerchantList;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -12,7 +13,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', DashboardController::class)->name('admin.index');
-Route::get('/merchants', [MerchantsController::class, 'index'])->name('admin.merchants.index');
+Route::livewire('/merchants', MerchantList::class)->name('admin.merchants.index');
 Route::patch('/merchants/{user}', [MerchantsController::class, 'toggleActive'])->name('admin.merchants.toggle');
 Route::get('/gateways', [GatewaysController::class, 'index'])->name('admin.gateways.index');
 Route::patch('/gateways/{gateway}/merchants/{user}', [GatewaysController::class, 'updateMerchantGateway'])->name('admin.gateways.merchant-update');

@@ -61,7 +61,11 @@
         </flux:header>
 
         <flux:main class="p-4 lg:p-6 lg:p-8">
-            @yield('content')
+            @isset($slot)
+                {{ $slot }}
+            @else
+                @yield('content')
+            @endisset
         </flux:main>
 
         @fluxScripts
