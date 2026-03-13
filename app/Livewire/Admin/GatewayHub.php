@@ -171,6 +171,15 @@ class GatewayHub extends Component
 
         $gateway = Gateway::findOrFail($id);
         $fields = config('gateway_credentials.'.$gateway->code, []);
+        if (! is_array($fields) || $fields === []) {
+            $this->showConfigModal = false;
+            $this->editingGateway = null;
+            $this->config = [];
+            $this->showError('This payment option uses the shared Coins.ph platform configuration.');
+
+            return;
+        }
+
         $existingConfig = is_array($gateway->config_json) ? $gateway->config_json : [];
         $normalizedConfig = $this->normalizeConfig($this->config, $fields, $existingConfig);
 
@@ -364,6 +373,13 @@ class GatewayHub extends Component
     public function editConfig(int $gatewayId): void
     {
         $gateway = Gateway::findOrFail($gatewayId);
+        $fields = config('gateway_credentials.'.$gateway->code, []);
+        if (! is_array($fields) || $fields === []) {
+            $this->showError('This payment option uses the shared Coins.ph platform configuration.');
+
+            return;
+        }
+
         $this->editingGateway = $gateway;
         $this->config = is_array($gateway->config_json) ? $gateway->config_json : [];
         $this->showConfigModal = true;

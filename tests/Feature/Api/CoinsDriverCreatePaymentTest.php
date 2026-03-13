@@ -443,7 +443,7 @@ class CoinsDriverCreatePaymentTest extends TestCase
         $this->assertSame(4, $requestCount);
     }
 
-    public function test_create_payment_surfaces_provider_error_message_from_error_field(): void
+    public function test_create_payment_maps_qr_feature_not_enabled_error_to_actionable_message(): void
     {
         Http::fake([
             'api.9001.pl-qa.coinsxyz.me/*' => Http::response([
@@ -454,7 +454,7 @@ class CoinsDriverCreatePaymentTest extends TestCase
         ]);
 
         $this->expectException(CoinsApiException::class);
-        $this->expectExceptionMessage('You do not support this feature currently, please contact customer service.');
+        $this->expectExceptionMessage('Coins.ph account is not enabled for QR payment handling yet. Ask Coins support to enable QR integration for this account/API key.');
 
         $driver = new CoinsDriver([
             'client_id' => 'test-client',

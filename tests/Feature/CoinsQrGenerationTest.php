@@ -111,7 +111,7 @@ class CoinsQrGenerationTest extends TestCase
         $this->assertDatabaseCount('coins_transactions', 0);
     }
 
-    public function test_generate_qr_surfaces_provider_error_message_from_error_field(): void
+    public function test_generate_qr_maps_qr_feature_not_enabled_error_to_actionable_message(): void
     {
         config([
             'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
@@ -131,7 +131,7 @@ class CoinsQrGenerationTest extends TestCase
         $response->assertStatus(200);
         $response->assertJson([
             'success' => false,
-            'message' => 'Coins API error: You do not support this feature currently, please contact customer service.',
+            'message' => 'Coins API error: Coins.ph account is not enabled for QR payment handling yet. Ask Coins support to enable QR integration for this account/API key.',
         ]);
         $this->assertDatabaseCount('coins_transactions', 0);
     }

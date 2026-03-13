@@ -2,6 +2,7 @@
 
 namespace App\Services\Gateways\Drivers;
 
+use App\Services\Coins\CoinsApiErrorMessageResolver;
 use App\Services\Coins\CoinsGenerateQrRequestExecutor;
 use App\Services\Coins\CoinsSignatureService;
 use App\Services\Gateways\Contracts\GatewayInterface;
@@ -56,10 +57,13 @@ class CoinsDriver implements GatewayInterface
 
     protected CoinsSignatureService $signatureService;
 
+    protected CoinsApiErrorMessageResolver $errorMessageResolver;
+
     public function __construct(
         array $config = [],
         ?CoinsGenerateQrRequestExecutor $generateQrRequestExecutor = null,
-        ?CoinsSignatureService $signatureService = null
+        ?CoinsSignatureService $signatureService = null,
+        ?CoinsApiErrorMessageResolver $errorMessageResolver = null
     ) {
         $this->clientId = trim((string) ($config['client_id'] ?? $config['api_key'] ?? ''));
         $this->clientSecret = trim((string) ($config['client_secret'] ?? $config['api_secret'] ?? ''));
@@ -72,6 +76,7 @@ class CoinsDriver implements GatewayInterface
         $this->includeCanonicalForDebug = (bool) ($config['includeCanonicalForDebug'] ?? false);
         $this->generateQrRequestExecutor = $generateQrRequestExecutor ?? new CoinsGenerateQrRequestExecutor;
         $this->signatureService = $signatureService ?? new CoinsSignatureService;
+        $this->errorMessageResolver = $errorMessageResolver ?? new CoinsApiErrorMessageResolver;
     }
 
     /**
@@ -202,7 +207,7 @@ class CoinsDriver implements GatewayInterface
     {
         if (! $response->successful()) {
             throw new CoinsApiException(
-                'Coins.ph API error: '.$this->extractResponseMessage($body, $response),
+                'Coins.ph API error: '.$this->errorMessageResolver->resolve($body, $response),
                 $response->status(),
                 $body
             );
@@ -211,43 +216,11 @@ class CoinsDriver implements GatewayInterface
         $status = $body['status'] ?? $body['code'] ?? null;
         if ($status !== null && (int) $status !== 0) {
             throw new CoinsApiException(
-                'Coins.ph API error: '.$this->extractResponseMessage($body, $response, $status),
+                'Coins.ph API error: '.$this->errorMessageResolver->resolve($body, $response, $status),
                 $response->status(),
                 $body
             );
         }
-    }
-
-    /**
-     * @param  array<string, mixed>  $body
-     */
-    private function extractResponseMessage(array $body, Response $responseBodySource, mixed $status = null): string
-    {
-        $data = $body['data'] ?? null;
-        $candidates = [
-            $body['msg'] ?? null,
-            $body['message'] ?? null,
-            $body['error'] ?? null,
-            $body['errorMsg'] ?? null,
-            is_array($data) ? ($data['errorMsg'] ?? null) : null,
-        ];
-
-        foreach ($candidates as $candidate) {
-            if (is_array($candidate)) {
-                $candidate = json_encode($candidate);
-            }
-
-            if (is_string($candidate) && trim($candidate) !== '') {
-                return $candidate;
-            }
-        }
-        if ($status !== null) {
-            return 'API returned error status '.$status;
-        }
-
-        $responseBody = $responseBodySource->body();
-
-        return $responseBody !== '' ? $responseBody : 'Unknown error';
     }
 
     /**

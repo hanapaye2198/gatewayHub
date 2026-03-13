@@ -157,6 +157,38 @@ class CreatePaymentTest extends TestCase
         ]);
     }
 
+    public function test_store_shows_actionable_message_when_coins_qr_feature_is_not_enabled(): void
+    {
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/openapi/fiat/v1/generate_qr_code' => Http::response([
+                'status' => 88010063,
+                'error' => 'You do not support this feature currently, please contact customer service.',
+                'data' => null,
+            ], 200),
+        ]);
+
+        $user = User::factory()->create(['role' => 'merchant']);
+        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
+        MerchantGateway::query()->create([
+            'user_id' => $user->id,
+            'gateway_id' => $coinsGateway->id,
+            'is_enabled' => true,
+            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
+        ]);
+
+        $response = $this->from(route('dashboard.payments.create'))->actingAs($user)->post(route('dashboard.payments.store'), [
+            'amount' => 100,
+            'currency' => 'PHP',
+            'gateway' => 'coins',
+        ]);
+
+        $response->assertRedirect(route('dashboard.payments.create'));
+        $response->assertSessionHasErrors([
+            'gateway' => 'Coins.ph API error: Coins.ph account is not enabled for QR payment handling yet. Ask Coins support to enable QR integration for this account/API key.',
+        ]);
+        $this->assertDatabaseCount('payments', 0);
+    }
+
     public function test_create_payment_form_shows_payqrph_when_enabled_for_merchant(): void
     {
         Gateway::query()->updateOrCreate(['code' => 'payqrph'], [

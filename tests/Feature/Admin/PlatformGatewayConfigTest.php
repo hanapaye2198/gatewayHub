@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin;
 
 use App\Models\Gateway;
 use App\Models\User;
+use App\Services\Gateways\Drivers\MayaDriver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -122,6 +123,32 @@ class PlatformGatewayConfigTest extends TestCase
             'config.client_id',
             'config.client_secret',
         ]);
+
+        $gateway->refresh();
+        $this->assertSame([], $gateway->config_json ?? []);
+    }
+
+    public function test_non_coins_payment_option_does_not_accept_individual_platform_payment_credentials(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $gateway = Gateway::query()->create([
+            'code' => 'maya',
+            'name' => 'Maya',
+            'driver_class' => MayaDriver::class,
+            'is_global_enabled' => true,
+            'config_json' => [],
+        ]);
+
+        $response = $this->actingAs($admin)->patch(route('admin.gateways.platform-config', ['gateway' => $gateway]), [
+            'config' => [
+                'client_id' => 'maya-client-id',
+                'client_secret' => 'maya-client-secret',
+                'api_base' => 'sandbox',
+            ],
+        ]);
+
+        $response->assertRedirect(route('admin.gateways.index'));
+        $response->assertSessionHas('status', 'Gateway "Maya" does not require platform credential fields.');
 
         $gateway->refresh();
         $this->assertSame([], $gateway->config_json ?? []);

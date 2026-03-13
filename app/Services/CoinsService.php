@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Coins\CoinsApiErrorMessageResolver;
 use App\Services\Coins\CoinsGenerateQrRequestExecutor;
 use App\Services\Gateways\Exceptions\CoinsApiException;
 
@@ -18,13 +19,18 @@ class CoinsService
 
     private const DEFAULT_EXPIRATION_SECONDS = 1800;
 
-    public const ERROR_CODE_IP_NOT_WHITELISTED = 1006;
+    public const ERROR_CODE_IP_NOT_WHITELISTED = CoinsApiErrorMessageResolver::ERROR_CODE_IP_NOT_WHITELISTED;
 
     protected CoinsGenerateQrRequestExecutor $generateQrRequestExecutor;
 
-    public function __construct(?CoinsGenerateQrRequestExecutor $generateQrRequestExecutor = null)
-    {
+    protected CoinsApiErrorMessageResolver $errorMessageResolver;
+
+    public function __construct(
+        ?CoinsGenerateQrRequestExecutor $generateQrRequestExecutor = null,
+        ?CoinsApiErrorMessageResolver $errorMessageResolver = null
+    ) {
         $this->generateQrRequestExecutor = $generateQrRequestExecutor ?? new CoinsGenerateQrRequestExecutor;
+        $this->errorMessageResolver = $errorMessageResolver ?? new CoinsApiErrorMessageResolver;
     }
 
     /**
@@ -114,7 +120,7 @@ class CoinsService
     {
         if (! $response->successful()) {
             throw new CoinsApiException(
-                'Coins API error: '.$this->extractResponseMessage($body, $response),
+                'Coins API error: '.$this->errorMessageResolver->resolve($body, $response),
                 $response->status(),
                 $body
             );
@@ -131,45 +137,10 @@ class CoinsService
             }
 
             throw new CoinsApiException(
-                'Coins API error: '.$this->extractResponseMessage($body, $response, $status),
+                'Coins API error: '.$this->errorMessageResolver->resolve($body, $response, $status),
                 $response->status(),
                 $body
             );
         }
-    }
-
-    /**
-     * @param  array<string, mixed>  $body
-     */
-    private function extractResponseMessage(
-        array $body,
-        \Illuminate\Http\Client\Response $response,
-        mixed $status = null
-    ): string {
-        $data = $body['data'] ?? null;
-        $candidates = [
-            $body['msg'] ?? null,
-            $body['message'] ?? null,
-            $body['error'] ?? null,
-            $body['errorMsg'] ?? null,
-            is_array($data) ? ($data['errorMsg'] ?? null) : null,
-        ];
-
-        foreach ($candidates as $candidate) {
-            if (is_array($candidate)) {
-                $candidate = json_encode($candidate);
-            }
-
-            if (is_string($candidate) && trim($candidate) !== '') {
-                return $candidate;
-            }
-        }
-        if ($status !== null) {
-            return 'API returned error status '.$status;
-        }
-
-        $responseBody = $response->body();
-
-        return $responseBody !== '' ? $responseBody : 'Unknown error';
     }
 }
