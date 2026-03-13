@@ -462,10 +462,6 @@ class GatewayHub extends Component
             ->get();
 
         $credentialFields = config('gateway_credentials', []);
-        $coinsGateway = $gateways->firstWhere('code', 'coins');
-        $coinsPaymentOptions = $gateways
-            ->whereIn('code', ['coins', 'gcash', 'maya', 'paypal', 'qrph', 'payqrph'])
-            ->values();
 
         $merchantAccessMerchants = $merchants
             ->when($this->merchantAccessSearch !== '', function ($collection) {
@@ -486,8 +482,6 @@ class GatewayHub extends Component
             'merchants' => $merchants,
             'merchantAccessMerchants' => $merchantAccessMerchants,
             'credentialFields' => $credentialFields,
-            'coinsGateway' => $coinsGateway,
-            'coinsPaymentOptions' => $coinsPaymentOptions,
         ]);
     }
 }
