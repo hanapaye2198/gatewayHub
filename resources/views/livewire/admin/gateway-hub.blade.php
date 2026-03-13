@@ -226,7 +226,6 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Code</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Status</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Merchants</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-zinc-100 dark:divide-zinc-700">
@@ -243,7 +242,12 @@
                                             <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-bold text-white shadow-lg">
                                                 {{ strtoupper(substr($gateway->name, 0, 2)) }}
                                             </div>
-                                            <span class="font-medium text-zinc-900 dark:text-white">{{ $gateway->name }}</span>
+                                            <div>
+                                                <span class="font-medium text-zinc-900 dark:text-white">{{ $gateway->name }}</span>
+                                                <p class="mt-0.5 text-xs text-zinc-400">
+                                                    {{ $gateway->code === 'coins' ? 'Platform credentials are managed in the Coins.ph configuration card.' : 'Uses the shared Coins.ph payment configuration.' }}
+                                                </p>
+                                            </div>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4">
@@ -275,24 +279,6 @@
                                                     : 0;
                                             @endphp
                                             <div class="h-full rounded-full bg-indigo-500" style="width: {{ $percentage }}%"></div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <div class="flex items-center justify-end gap-2">
-                                            @if ($gateway->code === 'coins')
-                                                <button wire:click="editConfig({{ $gateway->id }})"
-                                                        class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-300">
-                                                    <span>config</span>
-                                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                                    </svg>
-                                                </button>
-                                            @else
-                                                <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
-                                                    Uses Coins config
-                                                </span>
-                                            @endif
                                         </div>
                                     </td>
                                 </tr>
@@ -425,33 +411,71 @@
 
         <div class="space-y-6">
             <div class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
-                <h3 class="mb-3 font-semibold text-zinc-900 dark:text-white">Quick Actions</h3>
-                <div class="space-y-2">
-                    <button class="flex w-full items-center gap-3 rounded-lg border border-zinc-100 p-3 transition hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-700/50">
-                        <div class="rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/30">
-                            <svg class="h-4 w-4 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                            </svg>
-                        </div>
-                        <span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Add New Gateway</span>
-                    </button>
-                    <button class="flex w-full items-center gap-3 rounded-lg border border-zinc-100 p-3 transition hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-700/50">
-                        <div class="rounded-lg bg-emerald-100 p-2 dark:bg-emerald-900/30">
-                            <svg class="h-4 w-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Enable All Gateways</span>
-                    </button>
-                    <button class="flex w-full items-center gap-3 rounded-lg border border-zinc-100 p-3 transition hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-700/50">
-                        <div class="rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30">
-                            <svg class="h-4 w-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Schedule Maintenance</span>
-                    </button>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h3 class="font-semibold text-zinc-900 dark:text-white">Coins.ph Platform Configuration</h3>
+                        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                            Single payment configuration used by the Coins.ph API and every customer-facing payment option.
+                        </p>
+                    </div>
+                    <div class="rounded-lg bg-emerald-100 p-2 dark:bg-emerald-900/30">
+                        <flux:icon name="shield-check" class="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                    </div>
                 </div>
+
+                @if($coinsGateway)
+                    @php
+                        $coinsConfig = is_array($coinsGateway->config_json) ? $coinsGateway->config_json : [];
+                    @endphp
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        @foreach($coinsPaymentOptions as $paymentOption)
+                            <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+                                {{ $paymentOption->name }}
+                            </span>
+                        @endforeach
+                    </div>
+
+                    <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/50">
+                            <p class="text-xs uppercase tracking-wider text-zinc-400">Client ID</p>
+                            <p class="mt-1 text-sm font-semibold text-zinc-900 dark:text-white">
+                                {{ filled($coinsConfig['client_id'] ?? null) ? 'Configured' : 'Missing' }}
+                            </p>
+                        </div>
+                        <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/50">
+                            <p class="text-xs uppercase tracking-wider text-zinc-400">Client Secret</p>
+                            <p class="mt-1 text-sm font-semibold text-zinc-900 dark:text-white">
+                                {{ filled($coinsConfig['client_secret'] ?? null) ? 'Configured' : 'Missing' }}
+                            </p>
+                        </div>
+                        <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/50">
+                            <p class="text-xs uppercase tracking-wider text-zinc-400">API Base</p>
+                            <p class="mt-1 text-sm font-semibold text-zinc-900 dark:text-white">
+                                {{ strtoupper((string) ($coinsConfig['api_base'] ?? 'missing')) }}
+                            </p>
+                        </div>
+                        <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/50">
+                            <p class="text-xs uppercase tracking-wider text-zinc-400">Webhook Secret</p>
+                            <p class="mt-1 text-sm font-semibold text-zinc-900 dark:text-white">
+                                {{ filled($coinsConfig['webhook_secret'] ?? null) ? 'Configured' : 'Missing' }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="mt-5 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-300">
+                        No individual platform credentials are used for GCash, Maya, PayPal, QRPH, or PayQRPH. They all route through this single Coins.ph setup.
+                    </div>
+
+                    <button wire:click="editConfig({{ $coinsGateway->id }})"
+                            class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700">
+                        <flux:icon name="cog" class="h-4 w-4" />
+                        <span>Edit Coins.ph Config</span>
+                    </button>
+                @else
+                    <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                        Coins.ph has not been registered as a platform gateway yet, so the shared payment configuration is unavailable.
+                    </div>
+                @endif
             </div>
 
             <div class="rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-800">

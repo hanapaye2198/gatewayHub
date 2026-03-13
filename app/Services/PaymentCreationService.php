@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\Gateways\Exceptions\GatewayException;
 use App\Services\Gateways\PaymentGatewayManager;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Single entry point for creating payments. Used by API and dashboard.
@@ -29,11 +30,12 @@ class PaymentCreationService
     public function create(User $merchant, string $gatewayCode, array $data): array
     {
         $driver = $this->gatewayManager->resolve($merchant, $gatewayCode);
+        $gatewayRequestReference = $this->buildGatewayRequestReference($merchant);
 
         $response = $driver->createPayment([
             'amount' => $data['amount'],
             'currency' => $data['currency'],
-            'reference' => $data['reference'],
+            'reference' => $gatewayRequestReference,
         ]);
 
         $externalPaymentId = $response['external_payment_id'] ?? $response['provider_reference'] ?? null;
@@ -41,6 +43,10 @@ class PaymentCreationService
         if (isset($response['expires_at']) && is_string($response['expires_at'])) {
             $rawToStore = array_merge(is_array($rawToStore) ? $rawToStore : [], ['expires_at' => $response['expires_at']]);
         }
+        $rawToStore = array_merge(is_array($rawToStore) ? $rawToStore : [], [
+            'gateway_request_reference' => $gatewayRequestReference,
+            'merchant_reference' => $data['reference'],
+        ]);
 
         $payment = DB::transaction(function () use ($merchant, $gatewayCode, $data, $externalPaymentId, $rawToStore) {
             return Payment::query()->create([
@@ -69,5 +75,10 @@ class PaymentCreationService
             'expires_at' => $expiresAt,
             'redirect_url' => $redirectUrl,
         ];
+    }
+
+    private function buildGatewayRequestReference(User $merchant): string
+    {
+        return sprintf('GH-%d-%s', $merchant->id, Str::upper((string) Str::ulid()));
     }
 }

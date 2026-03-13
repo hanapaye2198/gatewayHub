@@ -6,6 +6,7 @@ use App\Models\Payment;
 use App\Models\WebhookEvent;
 use App\Services\Webhooks\Contracts\WebhookNormalizerInterface;
 use App\Services\Webhooks\Contracts\WebhookReplayValidatorInterface;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -45,69 +46,63 @@ class WebhookProcessor
         $paymentReference = $normalized['payment_reference'];
         $provider = (string) ($normalized['provider'] ?? '');
         $verifiedMerchantIds = $this->extractVerifiedMerchantIds($context);
+        $event = $this->claimEvent($normalized['provider'], $eventId, $normalized['raw_payload'], $headers);
 
-        return DB::transaction(function () use ($request, $normalized, $eventId, $paymentReference, $providerName, $provider, $verifiedMerchantIds): JsonResponse {
-            $event = WebhookEvent::firstOrCreate(
-                ['provider' => $normalized['provider'], 'event_id' => $eventId],
-                [
-                    'received_at' => now(),
-                    'payload' => $normalized['raw_payload'],
-                    'headers' => $this->captureHeaders($request),
-                    'status' => 'received',
-                ]
-            );
+        if ($event->status === 'processed') {
+            Log::info("{$providerName} webhook: duplicate event ignored (idempotent)", [
+                'event_id' => $eventId,
+            ]);
 
-            if (! $event->wasRecentlyCreated) {
-                Log::info("{$providerName} webhook: duplicate event ignored (idempotent)", [
-                    'event_id' => $eventId,
-                ]);
+            return $this->acknowledge();
+        }
 
-                return response()->json(['received' => true], 200);
+        try {
+            if ($paymentReference === null || $paymentReference === '') {
+                $this->markEventProcessed($event);
+
+                return $this->acknowledge();
             }
 
-            try {
-                if ($paymentReference === null || $paymentReference === '') {
-                    $event->update(['status' => 'processed', 'processed_at' => now()]);
+            $resolution = $this->resolvePayment($provider, $paymentReference, $verifiedMerchantIds, $normalized);
+            if ($resolution['status'] === 'not_found') {
+                $this->markEventProcessed($event);
 
-                    return response()->json(['received' => true], 200);
-                }
+                return $this->acknowledge();
+            }
 
-                $payment = $this->resolvePayment($provider, $paymentReference, $verifiedMerchantIds);
-                if ($payment === null) {
-                    $event->update(['status' => 'processed', 'processed_at' => now()]);
+            if ($resolution['status'] === 'ambiguous') {
+                throw new \RuntimeException(sprintf(
+                    'Unable to uniquely resolve payment for webhook reference [%s].',
+                    $paymentReference
+                ));
+            }
 
-                    return response()->json(['received' => true], 200);
-                }
+            $payment = $resolution['payment'];
+            if ($payment->status === 'paid' && in_array($normalized['status'], ['paid', 'pending'], true)) {
+                $this->markEventProcessed($event, $payment->id);
 
-                $event->update(['payment_id' => $payment->id]);
+                return $this->acknowledge();
+            }
 
-                if ($payment->status === 'paid' && in_array($normalized['status'], ['paid', 'pending'], true)) {
-                    $event->update(['status' => 'processed', 'processed_at' => now()]);
-
-                    return response()->json(['received' => true], 200);
-                }
-
+            DB::transaction(function () use ($payment, $normalized): void {
                 $this->applyStatusFromNormalized($payment, $normalized);
                 $this->mergeRawResponse($payment, $normalized['raw_payload']);
-                $payment->save(); // PaymentObserver records platform fee when status transitions to paid
+                $payment->save();
+            });
 
-                $event->update(['status' => 'processed', 'processed_at' => now()]);
+            $this->markEventProcessed($event, $payment->id);
 
-                return response()->json(['received' => true], 200);
-            } catch (\Throwable $e) {
-                $event->update([
-                    'status' => 'failed',
-                    'error_message' => $e->getMessage(),
-                ]);
+            return $this->acknowledge();
+        } catch (\Throwable $e) {
+            $this->markEventFailed($event, $e->getMessage());
 
-                Log::warning("{$providerName} webhook: processing failed", [
-                    'event_id' => $eventId,
-                    'error' => $e->getMessage(),
-                ]);
+            Log::warning("{$providerName} webhook: processing failed", [
+                'event_id' => $eventId,
+                'error' => $e->getMessage(),
+            ]);
 
-                return response()->json(['received' => true], 200);
-            }
-        });
+            throw $e;
+        }
     }
 
     /**
@@ -188,6 +183,75 @@ class WebhookProcessor
         return self::captureHeadersForPayload($request);
     }
 
+    private function acknowledge(): JsonResponse
+    {
+        return response()->json(['received' => true], 200);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, list<string>>  $headers
+     */
+    private function claimEvent(string $provider, string $eventId, array $payload, array $headers): WebhookEvent
+    {
+        return DB::transaction(function () use ($provider, $eventId, $payload, $headers): WebhookEvent {
+            $event = WebhookEvent::query()
+                ->where('provider', $provider)
+                ->where('event_id', $eventId)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $event instanceof WebhookEvent) {
+                return WebhookEvent::query()->create([
+                    'provider' => $provider,
+                    'event_id' => $eventId,
+                    'received_at' => now(),
+                    'payload' => $payload,
+                    'headers' => $headers,
+                    'status' => 'received',
+                ]);
+            }
+
+            if ($event->status === 'processed') {
+                return $event;
+            }
+
+            $event->update([
+                'received_at' => now(),
+                'processed_at' => null,
+                'payload' => $payload,
+                'headers' => $headers,
+                'status' => 'received',
+                'error_message' => null,
+            ]);
+
+            return $event->fresh() ?? $event;
+        });
+    }
+
+    private function markEventProcessed(WebhookEvent $event, ?string $paymentId = null): void
+    {
+        $attributes = [
+            'status' => 'processed',
+            'processed_at' => now(),
+            'error_message' => null,
+        ];
+
+        if ($paymentId !== null) {
+            $attributes['payment_id'] = $paymentId;
+        }
+
+        $event->update($attributes);
+    }
+
+    private function markEventFailed(WebhookEvent $event, string $errorMessage): void
+    {
+        $event->update([
+            'status' => 'failed',
+            'error_message' => $errorMessage,
+        ]);
+    }
+
     /**
      * @param  array<string, mixed>  $context
      * @return list<int>
@@ -219,9 +283,9 @@ class WebhookProcessor
     /**
      * @param  list<int>  $verifiedMerchantIds
      */
-    private function resolvePayment(string $provider, string $paymentReference, array $verifiedMerchantIds): ?Payment
+    private function resolvePayment(string $provider, string $paymentReference, array $verifiedMerchantIds, array $normalized): array
     {
-        $query = Payment::query()->where(function ($gatewayQuery) use ($provider): void {
+        $baseQuery = Payment::query()->where(function ($gatewayQuery) use ($provider): void {
             if ($provider === 'coins') {
                 $gatewayQuery->whereIn('gateway_code', ['coins', 'gcash', 'maya', 'paypal', 'qrph', 'payqrph']);
 
@@ -229,21 +293,90 @@ class WebhookProcessor
             }
 
             $gatewayQuery->where('gateway_code', $provider);
-        })->where(function ($paymentQuery) use ($paymentReference): void {
-            $paymentQuery
-                ->where('provider_reference', $paymentReference)
-                ->orWhere('reference_id', $paymentReference);
         });
 
         if ($verifiedMerchantIds !== []) {
-            $query->whereIn('user_id', $verifiedMerchantIds);
+            $baseQuery->whereIn('user_id', $verifiedMerchantIds);
         }
 
+        if ($provider === 'coins') {
+            return $this->resolveCoinsPayment($baseQuery, $paymentReference, $normalized);
+        }
+
+        return $this->resolveSinglePayment(
+            (clone $baseQuery)->where(function (EloquentBuilder $paymentQuery) use ($paymentReference): void {
+                $paymentQuery
+                    ->where('provider_reference', $paymentReference)
+                    ->orWhere('reference_id', $paymentReference);
+            })
+        );
+    }
+
+    /**
+     * @param  EloquentBuilder<Payment>  $baseQuery
+     * @param  array<string, mixed>  $normalized
+     * @return array{status: 'matched', payment: Payment}|array{status: 'not_found'|'ambiguous'}
+     */
+    private function resolveCoinsPayment(EloquentBuilder $baseQuery, string $paymentReference, array $normalized): array
+    {
+        $exactQuery = (clone $baseQuery)->where(function (EloquentBuilder $paymentQuery) use ($paymentReference): void {
+            $paymentQuery
+                ->where('provider_reference', $paymentReference)
+                ->orWhere('raw_response->gateway_request_reference', $paymentReference);
+        });
+        $exactResolution = $this->resolveSinglePayment($exactQuery);
+        if ($exactResolution['status'] !== 'not_found') {
+            return $exactResolution;
+        }
+
+        $narrowedReferenceQuery = (clone $baseQuery)->where('reference_id', $paymentReference);
+        $narrowedReferenceQuery = $this->applyWebhookPayloadNarrowing($narrowedReferenceQuery, $normalized);
+        $narrowedResolution = $this->resolveSinglePayment($narrowedReferenceQuery);
+        if ($narrowedResolution['status'] !== 'not_found') {
+            return $narrowedResolution;
+        }
+
+        return $this->resolveSinglePayment((clone $baseQuery)->where('reference_id', $paymentReference));
+    }
+
+    /**
+     * @param  EloquentBuilder<Payment>  $query
+     * @param  array<string, mixed>  $normalized
+     * @return EloquentBuilder<Payment>
+     */
+    private function applyWebhookPayloadNarrowing(EloquentBuilder $query, array $normalized): EloquentBuilder
+    {
+        $amount = $normalized['amount'] ?? null;
+        if (is_numeric($amount)) {
+            $query->where('amount', number_format((float) $amount, 2, '.', ''));
+        }
+
+        $currency = $normalized['currency'] ?? null;
+        if (is_string($currency) && trim($currency) !== '') {
+            $query->where('currency', strtoupper(trim($currency)));
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param  EloquentBuilder<Payment>  $query
+     * @return array{status: 'matched', payment: Payment}|array{status: 'not_found'|'ambiguous'}
+     */
+    private function resolveSinglePayment(EloquentBuilder $query): array
+    {
         $matches = $query->limit(2)->get();
-        if ($matches->count() !== 1) {
-            return null;
+        if ($matches->isEmpty()) {
+            return ['status' => 'not_found'];
         }
 
-        return $matches->first();
+        if ($matches->count() > 1) {
+            return ['status' => 'ambiguous'];
+        }
+
+        return [
+            'status' => 'matched',
+            'payment' => $matches->first(),
+        ];
     }
 }

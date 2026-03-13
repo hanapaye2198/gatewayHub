@@ -18,7 +18,7 @@ class PayPalWebhookTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJson([
-            'message' => 'Coins webhook ingress only. Use ?provider=coins.',
+            'message' => 'Coins webhook ingress only. Use /api/webhooks/coins.',
         ]);
     }
 
@@ -33,7 +33,7 @@ class PayPalWebhookTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJson([
-            'message' => 'Coins webhook ingress only. Use ?provider=coins.',
+            'message' => 'Coins webhook ingress only. Use /api/webhooks/coins.',
         ]);
     }
 }

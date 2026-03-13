@@ -35,8 +35,12 @@ class GatewaysCoinsModelUiTest extends TestCase
         $response->assertOk();
         $response->assertSee('Current model: customer-facing options (GCash, Maya, PayPal, PayQRPH) are collected through Coins dynamic QR.');
         $response->assertSee('Only Coins.ph has platform payment credentials. All customer-facing payment options share that single Coins.ph payment configuration.');
-        $response->assertSee('Uses Coins config');
+        $response->assertSee('Coins.ph Platform Configuration');
+        $response->assertSee('Single payment configuration used by the Coins.ph API and every customer-facing payment option.');
+        $response->assertSee('Edit Coins.ph Config');
+        $response->assertSee('Uses the shared Coins.ph payment configuration.');
         $response->assertDontSee('Processed through Coins dynamic QR in current model. No direct platform credentials required.');
+        $response->assertDontSee('Uses Coins config');
 
         $html = $response->getContent();
         if (! is_string($html)) {
@@ -45,5 +49,6 @@ class GatewaysCoinsModelUiTest extends TestCase
 
         $this->assertSame(1, substr_count($html, 'Save Platform Credentials'));
         $this->assertSame(1, substr_count($html, 'wire:click="editConfig('));
+        $this->assertStringNotContainsString('>Actions</th>', $html);
     }
 }

@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Webhooks;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\ProcessWebhookJob;
 use App\Services\Coins\CoinsSignatureService;
 use App\Services\Coins\CoinsWebhookReplayValidator;
 use App\Services\Gateways\Exceptions\CoinsApiException;
 use App\Services\Gateways\PlatformGatewayConfigService;
+use App\Services\Webhooks\Normalizers\CoinsWebhookNormalizer;
 use App\Services\Webhooks\WebhookProcessor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,13 +17,15 @@ class CoinsWebhookController extends Controller
     public function __construct(
         protected CoinsSignatureService $signatureService,
         protected CoinsWebhookReplayValidator $replayValidator,
-        protected PlatformGatewayConfigService $platformGatewayConfigService
+        protected PlatformGatewayConfigService $platformGatewayConfigService,
+        protected CoinsWebhookNormalizer $coinsWebhookNormalizer,
+        protected WebhookProcessor $webhookProcessor
     ) {}
 
     /**
      * Handle Coins.ph webhook. Verifies signature using webhook secret, finds payment by
-     * external_payment_id (provider_reference), updates status (success/failed), stores full
-     * payload. Returns 200 OK. Processing is idempotent (duplicate events ignored).
+     * external payment identifiers, updates status (success/failed), stores full payload,
+     * and returns provider-retryable failures when processing cannot complete safely.
      */
     public function handle(Request $request): JsonResponse
     {
@@ -51,16 +53,16 @@ class CoinsWebhookController extends Controller
             return response()->json(['message' => 'Invalid signature.'], 401);
         }
 
-        ProcessWebhookJob::dispatch(
-            'Coins',
+        return $this->webhookProcessor->process(
+            $request,
             $payload,
-            WebhookProcessor::captureHeadersForPayload($request),
+            $this->replayValidator,
+            $this->coinsWebhookNormalizer,
+            'Coins',
             [
                 'skip_replay_validation' => true,
             ],
         );
-
-        return response()->json(['received' => true], 200);
     }
 
     /**

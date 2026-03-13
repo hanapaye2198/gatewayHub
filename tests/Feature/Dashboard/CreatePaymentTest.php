@@ -4,6 +4,7 @@ namespace Tests\Feature\Dashboard;
 
 use App\Models\Gateway;
 use App\Models\MerchantGateway;
+use App\Models\Payment;
 use App\Models\User;
 use App\Services\Gateways\Drivers\CoinsDriver;
 use App\Services\Gateways\Drivers\MayaDriver;
@@ -85,6 +86,13 @@ class CreatePaymentTest extends TestCase
             'currency' => 'PHP',
             'status' => 'pending',
         ]);
+
+        $payment = Payment::query()->where('user_id', $user->id)->firstOrFail();
+        $this->assertMatchesRegularExpression(
+            '/^GH-'.$user->id.'-[0-9A-HJKMNP-TV-Z]{26}$/',
+            (string) ($payment->raw_response['gateway_request_reference'] ?? '')
+        );
+        $this->assertSame($payment->reference_id, $payment->raw_response['merchant_reference'] ?? null);
     }
 
     public function test_store_validates_amount(): void

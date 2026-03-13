@@ -76,7 +76,7 @@ class RateLimitingTest extends TestCase
             RateLimiter::hit($key);
         }
 
-        $response = $this->postJson('/api/webhooks?provider=coins', [
+        $response = $this->postJson('/api/webhooks/coins', [
             'referenceId' => 'x',
             'status' => 'SUCCEEDED',
             'timestamp' => (string) (time() * 1000),

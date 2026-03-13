@@ -19,7 +19,7 @@ class GcashWebhookTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJson([
-            'message' => 'Coins webhook ingress only. Use ?provider=coins.',
+            'message' => 'Coins webhook ingress only. Use /api/webhooks/coins.',
         ]);
     }
 
@@ -35,7 +35,7 @@ class GcashWebhookTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJson([
-            'message' => 'Coins webhook ingress only. Use ?provider=coins.',
+            'message' => 'Coins webhook ingress only. Use /api/webhooks/coins.',
         ]);
     }
 }

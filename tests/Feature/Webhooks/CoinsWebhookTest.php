@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Webhooks;
 
+use App\Jobs\ProcessWebhookJob;
 use App\Models\Gateway;
 use App\Models\MerchantGateway;
 use App\Models\Payment;
@@ -9,6 +10,7 @@ use App\Models\User;
 use App\Models\WebhookEvent;
 use App\Services\Coins\CoinsSignatureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class CoinsWebhookTest extends TestCase
@@ -145,7 +147,143 @@ class CoinsWebhookTest extends TestCase
         $this->assertArrayHasKey('content-type', $event->headers ?? []);
     }
 
-    public function test_webhook_does_not_update_when_reference_collides_across_merchants(): void
+    public function test_dedicated_coins_webhook_route_processes_immediately_without_dispatching_webhook_job(): void
+    {
+        Queue::fake();
+
+        $payment = Payment::factory()->create([
+            'user_id' => $this->user->id,
+            'gateway_code' => 'coins',
+            'provider_reference' => 'ORDER-DEDICATED-001',
+            'status' => 'pending',
+            'paid_at' => null,
+        ]);
+
+        $payload = [
+            'referenceId' => 'ORDER-DEDICATED-001',
+            'status' => 'SUCCEEDED',
+            'settleDate' => 1707475200000,
+            'timestamp' => (string) (int) (microtime(true) * 1000),
+        ];
+        $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
+
+        $response = $this->postJson('/api/webhooks/coins', $payload, [
+            'Content-Type' => 'application/json',
+            'X-COINS-SIGNATURE' => $signed['signature'],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['received' => true]);
+
+        $payment->refresh();
+        $this->assertSame('paid', $payment->status);
+        Queue::assertNotPushed(ProcessWebhookJob::class);
+    }
+
+    public function test_webhook_can_retry_same_event_after_processing_failure(): void
+    {
+        $firstPayment = Payment::factory()->create([
+            'user_id' => $this->user->id,
+            'gateway_code' => 'coins',
+            'provider_reference' => 'ORDER-RETRY-001',
+            'status' => 'pending',
+        ]);
+
+        $secondPayment = Payment::factory()->create([
+            'user_id' => User::factory()->create()->id,
+            'gateway_code' => 'coins',
+            'provider_reference' => 'ORDER-RETRY-001',
+            'status' => 'pending',
+        ]);
+
+        $payload = [
+            'referenceId' => 'ORDER-RETRY-001',
+            'status' => 'SUCCEEDED',
+            'settleDate' => 1707475200000,
+            'timestamp' => (string) (int) (microtime(true) * 1000),
+        ];
+        $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
+
+        $failureResponse = $this->postJson('/api/webhooks/coins', $payload, [
+            'Content-Type' => 'application/json',
+            'X-COINS-SIGNATURE' => $signed['signature'],
+        ]);
+
+        $failureResponse->assertStatus(500);
+        $failureResponse->assertJson(['message' => 'Webhook processing failed. Please retry.']);
+
+        $event = WebhookEvent::query()->where('event_id', 'like', 'ORDER-RETRY-001:%')->first();
+        $this->assertNotNull($event);
+        $this->assertSame('failed', $event->status);
+
+        $secondPayment->delete();
+
+        $successResponse = $this->postJson('/api/webhooks/coins', $payload, [
+            'Content-Type' => 'application/json',
+            'X-COINS-SIGNATURE' => $signed['signature'],
+        ]);
+
+        $successResponse->assertStatus(200);
+        $successResponse->assertJson(['received' => true]);
+
+        $firstPayment->refresh();
+        $this->assertSame('paid', $firstPayment->status);
+
+        $event->refresh();
+        $this->assertSame('processed', $event->status);
+        $this->assertNotNull($event->processed_at);
+    }
+
+    public function test_webhook_uses_gateway_request_reference_to_resolve_duplicate_merchant_references(): void
+    {
+        $firstPayment = Payment::factory()->create([
+            'user_id' => $this->user->id,
+            'gateway_code' => 'coins',
+            'reference_id' => 'MERCHANT-REF-001',
+            'provider_reference' => 'coins-order-merchant-1',
+            'status' => 'pending',
+            'raw_response' => [
+                'gateway_request_reference' => 'GH-1-REQUEST-REF',
+                'merchant_reference' => 'MERCHANT-REF-001',
+            ],
+        ]);
+
+        $secondPayment = Payment::factory()->create([
+            'user_id' => User::factory()->create()->id,
+            'gateway_code' => 'coins',
+            'reference_id' => 'MERCHANT-REF-001',
+            'provider_reference' => 'coins-order-merchant-2',
+            'status' => 'pending',
+            'raw_response' => [
+                'gateway_request_reference' => 'GH-2-REQUEST-REF',
+                'merchant_reference' => 'MERCHANT-REF-001',
+            ],
+        ]);
+
+        $payload = [
+            'referenceId' => 'GH-2-REQUEST-REF',
+            'status' => 'SUCCEEDED',
+            'amount' => '200.00',
+            'currency' => 'PHP',
+            'settleDate' => 1707475200000,
+            'timestamp' => (string) (int) (microtime(true) * 1000),
+        ];
+        $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
+
+        $response = $this->postJson('/api/webhooks/coins', $payload, [
+            'Content-Type' => 'application/json',
+            'X-COINS-SIGNATURE' => $signed['signature'],
+        ]);
+
+        $response->assertStatus(200);
+
+        $firstPayment->refresh();
+        $secondPayment->refresh();
+        $this->assertSame('pending', $firstPayment->status);
+        $this->assertSame('paid', $secondPayment->status);
+    }
+
+    public function test_webhook_returns_retryable_error_when_legacy_reference_collides_across_merchants(): void
     {
         $otherMerchant = User::factory()->create();
         MerchantGateway::query()->create([
@@ -186,18 +324,22 @@ class CoinsWebhookTest extends TestCase
         ];
 
         $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
-        $response = $this->postJson('/api/webhooks?provider=coins', $payload, [
+        $response = $this->postJson('/api/webhooks/coins', $payload, [
             'Content-Type' => 'application/json',
             'X-COINS-SIGNATURE' => $signed['signature'],
         ]);
 
-        $response->assertStatus(200);
-        $response->assertJson(['received' => true]);
+        $response->assertStatus(500);
+        $response->assertJson(['message' => 'Webhook processing failed. Please retry.']);
 
         $merchantOnePayment->refresh();
         $merchantTwoPayment->refresh();
         $this->assertSame('pending', $merchantOnePayment->status);
         $this->assertSame('pending', $merchantTwoPayment->status);
+
+        $event = WebhookEvent::query()->where('event_id', 'like', 'ORDER-COLLISION-001:%')->first();
+        $this->assertNotNull($event);
+        $this->assertSame('failed', $event->status);
     }
 
     public function test_webhook_idempotent_when_already_paid(): void

@@ -16,7 +16,7 @@ class WebhookIngressController extends Controller
         $provider = $this->resolveProvider($request);
         if ($provider !== 'coins') {
             return response()->json([
-                'message' => 'Coins webhook ingress only. Use ?provider=coins.',
+                'message' => 'Coins webhook ingress only. Use /api/webhooks/coins.',
             ], 422);
         }
 
