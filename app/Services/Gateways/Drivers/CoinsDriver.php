@@ -205,22 +205,45 @@ class CoinsDriver implements GatewayInterface
      */
     private function throwIfResponseHasError(Response $response, array $body): void
     {
+        $normalizedBody = $this->augmentErrorBody($response, $body);
+
         if (! $response->successful()) {
             throw new CoinsApiException(
-                'Coins.ph API error: '.$this->errorMessageResolver->resolve($body, $response),
+                'Coins.ph API error: '.$this->errorMessageResolver->resolve($normalizedBody, $response),
                 $response->status(),
-                $body
+                $normalizedBody
             );
         }
 
-        $status = $body['status'] ?? $body['code'] ?? null;
-        if ($status !== null && (int) $status !== 0) {
+        $status = $this->errorMessageResolver->extractStatusCode($normalizedBody, null, $response);
+        if ($status !== null && $status !== 0) {
             throw new CoinsApiException(
-                'Coins.ph API error: '.$this->errorMessageResolver->resolve($body, $response, $status),
+                'Coins.ph API error: '.$this->errorMessageResolver->resolve($normalizedBody, $response, $status),
                 $response->status(),
-                $body
+                $normalizedBody
             );
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    private function augmentErrorBody(Response $response, array $body): array
+    {
+        if ($body !== []) {
+            return $body;
+        }
+
+        $status = $this->errorMessageResolver->extractStatusCode($body, null, $response);
+        if ($status === null) {
+            return $body;
+        }
+
+        return [
+            'status' => $status,
+            'message' => trim($response->body()),
+        ];
     }
 
     /**

@@ -469,6 +469,28 @@ class CoinsDriverCreatePaymentTest extends TestCase
         ]);
     }
 
+    public function test_create_payment_maps_plain_text_ip_whitelist_error_to_actionable_message(): void
+    {
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/*' => Http::response('error code: 1006', 403),
+        ]);
+
+        $this->expectException(CoinsApiException::class);
+        $this->expectExceptionMessage('IP not whitelisted. Please contact Coins to whitelist server IP.');
+
+        $driver = new CoinsDriver([
+            'client_id' => 'test-client',
+            'client_secret' => 'test-secret',
+            'api_base' => 'sandbox',
+        ]);
+
+        $driver->createPayment([
+            'amount' => 100,
+            'currency' => 'PHP',
+            'reference' => 'ref-ip-whitelist',
+        ]);
+    }
+
     public function test_create_payment_does_not_fallback_when_strategy_is_not_auto(): void
     {
         config([

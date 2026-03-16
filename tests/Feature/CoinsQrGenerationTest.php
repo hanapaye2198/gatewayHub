@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\CoinsTransaction;
+use App\Models\Gateway;
 use App\Services\Coins\CoinsGenerateQrSigner;
+use App\Services\Gateways\Drivers\CoinsDriver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -347,6 +349,83 @@ class CoinsQrGenerationTest extends TestCase
                 'code' => 1006,
                 'msg' => 'IP not allowed',
             ], 200),
+        ]);
+
+        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 10]);
+
+        $response->assertStatus(403);
+        $response->assertJson([
+            'error' => 'IP not whitelisted. Please contact Coins to whitelist server IP.',
+        ]);
+        $this->assertDatabaseCount('coins_transactions', 0);
+    }
+
+    public function test_generate_qr_uses_shared_platform_gateway_credentials_when_legacy_env_values_are_missing(): void
+    {
+        config([
+            'coins.base_url' => '',
+            'coins.api_key' => '',
+            'coins.secret_key' => '',
+        ]);
+
+        Gateway::query()->create([
+            'code' => 'coins',
+            'name' => 'Coins.ph',
+            'driver_class' => CoinsDriver::class,
+            'is_global_enabled' => true,
+            'config_json' => [
+                'client_id' => 'db-client-id',
+                'client_secret' => 'db-client-secret',
+                'api_base' => 'sandbox',
+                'source' => 'PLATFORM-SOURCE',
+            ],
+        ]);
+
+        $signer = new CoinsGenerateQrSigner;
+
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/*' => function ($request) use ($signer) {
+                $timestamp = (string) ($request->header('Timestamp')[0] ?? '');
+                $signature = (string) ($request->header('Signature')[0] ?? '');
+                $apiKey = (string) ($request->header('X-COINS-APIKEY')[0] ?? '');
+                $body = json_decode((string) $request->body(), true) ?? [];
+
+                $this->assertSame('db-client-id', $apiKey);
+                $this->assertSame('PLATFORM-SOURCE', $body['source'] ?? null);
+
+                $expected = $signer->sign($body, 'db-client-secret', $timestamp, CoinsGenerateQrSigner::STRATEGY_RAW_JSON);
+                $this->assertSame($expected['signature'], $signature);
+
+                return Http::response([
+                    'status' => 0,
+                    'data' => [
+                        'orderId' => 'db-config-order-123',
+                        'qrCode' => 'db-config-qr-payload',
+                    ],
+                ], 200);
+            },
+        ]);
+
+        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 25]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'reference_id' => 'db-config-order-123',
+            'qr_code_string' => 'db-config-qr-payload',
+        ]);
+    }
+
+    public function test_generate_qr_returns_error_key_when_plain_text_response_code_1006_is_returned(): void
+    {
+        config([
+            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
+            'coins.api_key' => 'test-key',
+            'coins.secret_key' => 'test-secret',
+        ]);
+
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/*' => Http::response('error code: 1006', 403),
         ]);
 
         $response = $this->postJson(route('coins.generate-qr'), ['amount' => 10]);

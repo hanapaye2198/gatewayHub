@@ -15,7 +15,11 @@ class CoinsApiErrorMessageResolver
      */
     public function resolve(array $body, Response $response, mixed $status = null): string
     {
-        $resolvedStatus = $this->extractStatusCode($body, $status);
+        $resolvedStatus = $this->extractStatusCode($body, $status, $response);
+
+        if ($resolvedStatus === self::ERROR_CODE_IP_NOT_WHITELISTED) {
+            return 'IP not whitelisted. Please contact Coins to whitelist server IP.';
+        }
 
         if ($resolvedStatus === self::ERROR_CODE_QR_PAYMENT_HANDLING_NOT_ENABLED) {
             return 'Coins.ph account is not enabled for QR payment handling yet. Ask Coins support to enable QR integration for this account/API key.';
@@ -38,11 +42,19 @@ class CoinsApiErrorMessageResolver
     /**
      * @param  array<string, mixed>  $body
      */
-    public function extractStatusCode(array $body, mixed $status = null): ?int
+    public function extractStatusCode(array $body, mixed $status = null, ?Response $response = null): ?int
     {
         $candidate = $status ?? $body['status'] ?? $body['code'] ?? null;
         if (! is_numeric($candidate)) {
-            return null;
+            $responseBody = $response?->body() ?? '';
+            if (preg_match('/error code:\s*(-?\d+)/i', $responseBody, $matches) !== 1) {
+                return null;
+            }
+
+            $candidate = $matches[1] ?? null;
+            if (! is_numeric($candidate)) {
+                return null;
+            }
         }
 
         return (int) $candidate;
