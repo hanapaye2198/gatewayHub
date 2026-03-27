@@ -58,6 +58,10 @@ class WebhookProcessor
 
         try {
             if ($paymentReference === null || $paymentReference === '') {
+                Log::warning("{$providerName} webhook: payment reference missing", [
+                    'event_id' => $eventId,
+                    'status' => $normalized['status'],
+                ]);
                 $this->markEventProcessed($event);
 
                 return $this->acknowledge();
@@ -65,6 +69,11 @@ class WebhookProcessor
 
             $resolution = $this->resolvePayment($provider, $paymentReference, $verifiedMerchantIds, $normalized);
             if ($resolution['status'] === 'not_found') {
+                Log::warning("{$providerName} webhook: payment not found", [
+                    'event_id' => $eventId,
+                    'payment_reference' => $paymentReference,
+                    'status' => $normalized['status'],
+                ]);
                 $this->markEventProcessed($event);
 
                 return $this->acknowledge();
@@ -322,7 +331,19 @@ class WebhookProcessor
         $exactQuery = (clone $baseQuery)->where(function (EloquentBuilder $paymentQuery) use ($paymentReference): void {
             $paymentQuery
                 ->where('provider_reference', $paymentReference)
-                ->orWhere('raw_response->gateway_request_reference', $paymentReference);
+                ->orWhere('raw_response->gateway_request_reference', $paymentReference)
+                ->orWhere('raw_response->requestId', $paymentReference)
+                ->orWhere('raw_response->data->requestId', $paymentReference)
+                ->orWhere('raw_response->referenceId', $paymentReference)
+                ->orWhere('raw_response->data->referenceId', $paymentReference)
+                ->orWhere('raw_response->orderId', $paymentReference)
+                ->orWhere('raw_response->data->orderId', $paymentReference)
+                ->orWhere('raw_response->internalOrderId', $paymentReference)
+                ->orWhere('raw_response->data->internalOrderId', $paymentReference)
+                ->orWhere('raw_response->externalOrderId', $paymentReference)
+                ->orWhere('raw_response->data->externalOrderId', $paymentReference)
+                ->orWhere('raw_response->id', $paymentReference)
+                ->orWhere('raw_response->data->id', $paymentReference);
         });
         $exactResolution = $this->resolveSinglePayment($exactQuery);
         if ($exactResolution['status'] !== 'not_found') {

@@ -283,6 +283,86 @@ class CoinsWebhookTest extends TestCase
         $this->assertSame('paid', $secondPayment->status);
     }
 
+    public function test_webhook_updates_payment_when_callback_uses_nested_qrcode_status_and_request_id(): void
+    {
+        $payment = Payment::factory()->create([
+            'user_id' => $this->user->id,
+            'gateway_code' => 'coins',
+            'provider_reference' => 'coins-order-merchant-3',
+            'status' => 'pending',
+            'paid_at' => null,
+            'raw_response' => [
+                'gateway_request_reference' => 'GH-REQUEST-REF-003',
+                'merchant_reference' => 'MERCHANT-REF-003',
+            ],
+        ]);
+
+        $payload = [
+            'timestamp' => (string) (int) (microtime(true) * 1000),
+            'data' => [
+                'requestId' => 'GH-REQUEST-REF-003',
+                'referenceId' => 'COINS-REFERENCE-003',
+                'qrcodeStatus' => 'SUCCEEDED',
+                'fiatAmount' => '275.00',
+                'fiatCurrency' => 'PHP',
+                'updatedTime' => '1707475200000',
+            ],
+        ];
+        $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
+
+        $response = $this->postJson('/api/webhooks/coins', $payload, [
+            'Content-Type' => 'application/json',
+            'X-COINS-SIGNATURE' => $signed['signature'],
+        ]);
+
+        $response->assertStatus(200);
+
+        $payment->refresh();
+        $this->assertSame('paid', $payment->status);
+        $this->assertNotNull($payment->paid_at);
+        $this->assertSame(1707475200, $payment->paid_at->timestamp);
+    }
+
+    public function test_webhook_updates_payment_when_callback_reference_matches_stored_raw_response_identifier(): void
+    {
+        $payment = Payment::factory()->create([
+            'user_id' => $this->user->id,
+            'gateway_code' => 'coins',
+            'provider_reference' => 'coins-order-merchant-4',
+            'status' => 'pending',
+            'paid_at' => null,
+            'raw_response' => [
+                'data' => [
+                    'referenceId' => 'COINS-REFERENCE-004',
+                ],
+            ],
+        ]);
+
+        $payload = [
+            'timestamp' => (string) (int) (microtime(true) * 1000),
+            'data' => [
+                'referenceId' => 'COINS-REFERENCE-004',
+                'qrcodeStatus' => 'SUCCEEDED',
+                'fiatAmount' => '150.00',
+                'fiatCurrency' => 'PHP',
+                'completionTime' => '2024-02-09T00:00:00.000+00:00',
+            ],
+        ];
+        $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
+
+        $response = $this->postJson('/api/webhooks/coins', $payload, [
+            'Content-Type' => 'application/json',
+            'X-COINS-SIGNATURE' => $signed['signature'],
+        ]);
+
+        $response->assertStatus(200);
+
+        $payment->refresh();
+        $this->assertSame('paid', $payment->status);
+        $this->assertNotNull($payment->paid_at);
+        $this->assertSame(1707436800, $payment->paid_at->timestamp);
+    }
+
     public function test_webhook_returns_retryable_error_when_legacy_reference_collides_across_merchants(): void
     {
         $otherMerchant = User::factory()->create();
