@@ -100,6 +100,42 @@ class CoinsSignatureServiceTest extends TestCase
         $this->service->verify(['amount' => '100'], 'secret', 'some-sig');
     }
 
+    public function test_sign_webhook_returns_signature_without_injecting_timestamp(): void
+    {
+        $payload = [
+            'cashInBank' => 'gcash',
+            'channelInvoiceNo' => '304270',
+            'errorMsg' => '',
+            'referenceId' => '2007398545514304270',
+            'requestId' => 'C0000000000001107',
+            'settleDate' => '1754038804000',
+            'status' => 'SUCCEEDED',
+        ];
+
+        $result = $this->service->signWebhook($payload, 'secret', true);
+
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $result['signature']);
+        $this->assertSame(
+            'cashInBank=gcash&channelInvoiceNo=304270&errorMsg=&referenceId=2007398545514304270&requestId=C0000000000001107&settleDate=1754038804000&status=SUCCEEDED',
+            $result['canonical_string']
+        );
+    }
+
+    public function test_verify_webhook_returns_true_when_signature_matches_without_timestamp(): void
+    {
+        $payload = [
+            'referenceId' => '2007398545514304270',
+            'requestId' => 'C0000000000001107',
+            'status' => 'SUCCEEDED',
+            'settleDate' => '1754038804000',
+        ];
+        $signed = $this->service->signWebhook($payload, 'webhook-secret');
+
+        $this->assertTrue(
+            $this->service->verifyWebhook($payload, 'webhook-secret', $signed['signature'])
+        );
+    }
+
     public function test_sign_stringifies_values(): void
     {
         $params = ['amount' => 100, 'flag' => true, 'timestamp' => '1700000000000'];

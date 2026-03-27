@@ -34,9 +34,15 @@ class WebhookIngressController extends Controller
             return null;
         }
 
-        $coinsSignatureHeader = (string) config('coins.webhook.signature_header', 'X-COINS-SIGNATURE');
-        if ($coinsSignatureHeader !== '' && $request->headers->has($coinsSignatureHeader)) {
-            return 'coins';
+        $coinsSignatureHeaders = array_values(array_unique(array_filter([
+            trim((string) config('coins.webhook.signature_header', 'X-COINS-SIGNATURE')),
+            'Signature',
+            'X-COINS-SIGNATURE',
+        ])));
+        foreach ($coinsSignatureHeaders as $coinsSignatureHeader) {
+            if ($request->headers->has($coinsSignatureHeader)) {
+                return 'coins';
+            }
         }
 
         $payload = $request->json()->all();

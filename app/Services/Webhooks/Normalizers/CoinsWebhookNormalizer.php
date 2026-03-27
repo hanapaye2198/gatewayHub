@@ -35,7 +35,7 @@ class CoinsWebhookNormalizer implements WebhookNormalizerInterface
      */
     private function extractEventId(array $payload, array $data, string $status): ?string
     {
-        $candidates = ['eventId', 'event_id', 'webhookId', 'webhook_id', 'id'];
+        $candidates = ['eventId', 'event_id', 'webhookId', 'webhook_id', 'checkoutId', 'id'];
         foreach ($candidates as $key) {
             $value = $payload[$key] ?? $data[$key] ?? null;
             if (is_string($value) && $value !== '') {
@@ -69,6 +69,8 @@ class CoinsWebhookNormalizer implements WebhookNormalizerInterface
             $data['requestId'] ?? null,
             $payload['referenceId'] ?? null,
             $data['referenceId'] ?? null,
+            $payload['checkoutId'] ?? null,
+            $data['checkoutId'] ?? null,
             $payload['internalOrderId'] ?? null,
             $data['internalOrderId'] ?? null,
             $payload['externalOrderId'] ?? null,
@@ -151,6 +153,8 @@ class CoinsWebhookNormalizer implements WebhookNormalizerInterface
         $candidates = [
             $payload['amount'] ?? null,
             $data['amount'] ?? null,
+            $payload['totalAmount'] ?? null,
+            $data['totalAmount'] ?? null,
             $payload['fiatAmount'] ?? null,
             $data['fiatAmount'] ?? null,
         ];
@@ -199,6 +203,8 @@ class CoinsWebhookNormalizer implements WebhookNormalizerInterface
             $data['settleDate'] ?? null,
             $payload['completionTime'] ?? null,
             $data['completionTime'] ?? null,
+            $payload['completedAt'] ?? null,
+            $data['completedAt'] ?? null,
             $payload['updatedTime'] ?? null,
             $data['updatedTime'] ?? null,
             $payload['timestamp'] ?? null,
@@ -229,6 +235,8 @@ class CoinsWebhookNormalizer implements WebhookNormalizerInterface
             $data['updatedTime'] ?? null,
             $payload['completionTime'] ?? null,
             $data['completionTime'] ?? null,
+            $payload['completedAt'] ?? null,
+            $data['completedAt'] ?? null,
             $payload['settleDate'] ?? null,
             $data['settleDate'] ?? null,
             $payload['createdTime'] ?? null,

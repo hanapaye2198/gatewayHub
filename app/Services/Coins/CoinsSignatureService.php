@@ -66,7 +66,7 @@ class CoinsSignatureService
     }
 
     /**
-     * Sign parameters for Coins.ph API or webhook payload.
+     * Sign parameters for Coins.ph API payloads that require a timestamp.
      *
      * Auto-injects timestamp (milliseconds since epoch) if not present.
      * Timestamp can be injected for deterministic testing.
@@ -116,7 +116,7 @@ class CoinsSignatureService
     }
 
     /**
-     * Verify a webhook or response payload signature.
+     * Verify a timestamped Coins payload signature.
      *
      * Computes expected signature from payload and compares with received value using timing-safe comparison.
      *
@@ -148,7 +148,74 @@ class CoinsSignatureService
         $canonical = $this->buildCanonicalString($normalized);
         $expectedSignature = hash_hmac('sha256', $canonical, $apiSecret);
 
-        if (! hash_equals($expectedSignature, $receivedSignature)) {
+        if (! hash_equals($expectedSignature, trim($receivedSignature))) {
+            throw new CoinsApiException('Coins signature verification failed: signature mismatch.');
+        }
+
+        return true;
+    }
+
+    /**
+     * Sign a Coins webhook payload exactly as documented in the partner guide.
+     *
+     * Webhook payloads are signed over the JSON body parameters only, sorted
+     * lexicographically, without injecting a timestamp parameter.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{signature: string, canonical_string?: string}
+     */
+    public function signWebhook(
+        array $payload,
+        string $apiSecret,
+        bool $includeCanonicalForDebug = false
+    ): array {
+        if ($apiSecret === '') {
+            throw new CoinsApiException('Coins signature requires a non-empty API secret.');
+        }
+
+        $normalized = $this->normalizeParams($payload);
+        if ($normalized === []) {
+            throw new CoinsApiException('Coins webhook signature requires a non-empty payload.');
+        }
+
+        $canonical = $this->buildCanonicalString($normalized);
+        $result = [
+            'signature' => hash_hmac('sha256', $canonical, $apiSecret),
+        ];
+
+        if ($includeCanonicalForDebug) {
+            $result['canonical_string'] = $canonical;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Verify a Coins webhook payload signature.
+     *
+     * The guide documents webhook signing over the callback body parameters
+     * themselves, sorted lexicographically, without a required timestamp field.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function verifyWebhook(
+        array $payload,
+        string $apiSecret,
+        string $receivedSignature
+    ): bool {
+        if ($apiSecret === '') {
+            throw new CoinsApiException('Coins signature verification requires a non-empty API secret.');
+        }
+
+        $normalized = $this->normalizeParams($payload);
+        if ($normalized === []) {
+            throw new CoinsApiException('Coins signature verification requires a non-empty payload.');
+        }
+
+        $canonical = $this->buildCanonicalString($normalized);
+        $expectedSignature = hash_hmac('sha256', $canonical, $apiSecret);
+
+        if (! hash_equals($expectedSignature, trim($receivedSignature))) {
             throw new CoinsApiException('Coins signature verification failed: signature mismatch.');
         }
 

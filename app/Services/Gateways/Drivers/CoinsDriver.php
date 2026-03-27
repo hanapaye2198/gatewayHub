@@ -163,18 +163,21 @@ class CoinsDriver implements GatewayInterface
             return false;
         }
 
-        $signature = $request->header('X-COINS-SIGNATURE') ?? $request->input('signature');
+        $signature = $request->header('X-COINS-SIGNATURE')
+            ?? $request->header('Signature')
+            ?? $request->header('signature')
+            ?? $request->input('signature');
         if (! is_string($signature) || $signature === '') {
             return false;
         }
 
-        $payload = array_merge($request->query(), $request->all());
-        if (! array_key_exists('timestamp', $payload)) {
-            return false;
+        $payload = $request->json()->all();
+        if (! is_array($payload) || $payload === []) {
+            $payload = array_merge($request->query(), $request->all());
         }
 
         try {
-            return $this->signatureService->verify($payload, $this->webhookSecret, $signature);
+            return $this->signatureService->verifyWebhook($payload, $this->webhookSecret, $signature);
         } catch (CoinsApiException) {
             return false;
         }

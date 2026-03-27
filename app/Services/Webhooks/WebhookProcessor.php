@@ -336,6 +336,8 @@ class WebhookProcessor
                 ->orWhere('raw_response->data->requestId', $paymentReference)
                 ->orWhere('raw_response->referenceId', $paymentReference)
                 ->orWhere('raw_response->data->referenceId', $paymentReference)
+                ->orWhere('raw_response->checkoutId', $paymentReference)
+                ->orWhere('raw_response->data->checkoutId', $paymentReference)
                 ->orWhere('raw_response->orderId', $paymentReference)
                 ->orWhere('raw_response->data->orderId', $paymentReference)
                 ->orWhere('raw_response->internalOrderId', $paymentReference)

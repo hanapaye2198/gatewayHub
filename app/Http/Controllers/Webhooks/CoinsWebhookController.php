@@ -43,7 +43,7 @@ class CoinsWebhookController extends Controller
             }
 
             try {
-                $this->signatureService->verify($payload, $secret, $signature);
+                $this->signatureService->verifyWebhook($payload, $secret, $signature);
             } catch (CoinsApiException) {
                 return response()->json(['message' => 'Invalid signature.'], 401);
             }
@@ -82,9 +82,19 @@ class CoinsWebhookController extends Controller
 
     private function getSignature(Request $request): ?string
     {
-        $headerName = config('coins.webhook.signature_header', 'X-COINS-SIGNATURE');
-        $value = $request->header($headerName);
+        $headerNames = array_values(array_unique(array_filter([
+            trim((string) config('coins.webhook.signature_header', 'X-COINS-SIGNATURE')),
+            'Signature',
+            'X-COINS-SIGNATURE',
+        ])));
 
-        return is_string($value) ? $value : null;
+        foreach ($headerNames as $headerName) {
+            $value = $request->header($headerName);
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        return null;
     }
 }

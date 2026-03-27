@@ -180,6 +180,41 @@ class CoinsWebhookTest extends TestCase
         Queue::assertNotPushed(ProcessWebhookJob::class);
     }
 
+    public function test_webhook_accepts_guide_compliant_signature_header_without_timestamp(): void
+    {
+        $payment = Payment::factory()->create([
+            'user_id' => $this->user->id,
+            'gateway_code' => 'gcash',
+            'provider_reference' => 'GUIDE-WEBHOOK-001',
+            'status' => 'pending',
+            'paid_at' => null,
+        ]);
+
+        $payload = [
+            'requestId' => 'GUIDE-WEBHOOK-001',
+            'referenceId' => '2007398545514304270',
+            'cashInBank' => 'gcash',
+            'channelInvoiceNo' => '304270',
+            'errorMsg' => '',
+            'settleDate' => '1754038804000',
+            'status' => 'SUCCEEDED',
+        ];
+        $signed = $this->signatureService->signWebhook($payload, self::WEBHOOK_SECRET);
+
+        $response = $this->postJson('/api/webhooks', $payload, [
+            'Content-Type' => 'application/json',
+            'Signature' => $signed['signature'],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['received' => true]);
+
+        $payment->refresh();
+        $this->assertSame('paid', $payment->status);
+        $this->assertNotNull($payment->paid_at);
+        $this->assertSame(1754038804, $payment->paid_at->timestamp);
+    }
+
     public function test_webhook_can_retry_same_event_after_processing_failure(): void
     {
         $firstPayment = Payment::factory()->create([
@@ -361,6 +396,51 @@ class CoinsWebhookTest extends TestCase
         $this->assertSame('paid', $payment->status);
         $this->assertNotNull($payment->paid_at);
         $this->assertSame(1707436800, $payment->paid_at->timestamp);
+    }
+
+    public function test_webhook_updates_payment_when_checkout_callback_uses_completed_at_and_checkout_id(): void
+    {
+        $payment = Payment::factory()->create([
+            'user_id' => $this->user->id,
+            'gateway_code' => 'coins',
+            'provider_reference' => 'MERCHANT_ORDER_20250102_001234567890',
+            'status' => 'pending',
+            'paid_at' => null,
+            'raw_response' => [
+                'checkoutId' => '123456789',
+            ],
+        ]);
+
+        $payload = [
+            'checkoutId' => '123456789',
+            'requestId' => 'MERCHANT_ORDER_20250102_001234567890',
+            'subMerchantId' => 'SUB_MERCHANT_001',
+            'merchantName' => 'demo merchant name',
+            'subMerchantReqRefNo' => 'SUB_REF_20250102_001',
+            'totalAmount' => '101.14',
+            'feeAmount' => '1.02',
+            'status' => 'SUCCEEDED',
+            'completedAt' => '1735801456',
+            'errorCode' => null,
+            'errorMsg' => null,
+        ];
+        $signed = $this->signatureService->signWebhook($payload, self::WEBHOOK_SECRET);
+
+        $response = $this->postJson('/api/webhooks/coins', $payload, [
+            'Content-Type' => 'application/json',
+            'Signature' => $signed['signature'],
+        ]);
+
+        $response->assertStatus(200);
+
+        $payment->refresh();
+        $this->assertSame('paid', $payment->status);
+        $this->assertNotNull($payment->paid_at);
+        $this->assertSame(1735801456, $payment->paid_at->timestamp);
+
+        $event = WebhookEvent::query()->where('provider', 'coins')->where('event_id', '123456789')->first();
+        $this->assertNotNull($event);
+        $this->assertSame('processed', $event->status);
     }
 
     public function test_webhook_returns_retryable_error_when_legacy_reference_collides_across_merchants(): void
