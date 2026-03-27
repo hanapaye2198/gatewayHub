@@ -28,6 +28,7 @@ class ValidateProductionEnvironment
             $errors[] = 'APP_KEY must be set. Run: php artisan key:generate';
         }
 
+        $this->validateAppUrl($errors);
         $this->validateDatabase($errors);
         $this->validatePayPal($errors);
         $this->validateCoinsGateway($errors);
@@ -37,6 +38,24 @@ class ValidateProductionEnvironment
             throw new RuntimeException(
                 'Production environment validation failed: '.implode(' ', $errors)
             );
+        }
+    }
+
+    /**
+     * @param  list<string>  $errors
+     */
+    private function validateAppUrl(array &$errors): void
+    {
+        $appUrl = trim((string) config('app.url', ''));
+        if ($appUrl === '') {
+            $errors[] = 'APP_URL must be set in production.';
+
+            return;
+        }
+
+        $host = strtolower((string) parse_url($appUrl, PHP_URL_HOST));
+        if ($host === '' || in_array($host, ['localhost', '127.0.0.1', '0.0.0.0', '::1'], true)) {
+            $errors[] = 'APP_URL must be a public HTTP(S) URL in production; localhost/loopback breaks callback configuration.';
         }
     }
 
