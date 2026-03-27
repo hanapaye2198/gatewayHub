@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
+use App\Services\PaymentStatusSyncService;
 use App\Services\QrCodeGenerator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -48,16 +49,21 @@ class PaymentDetailController extends Controller
      * Return payment status for polling. Same format as API; uses session auth.
      * Marks expired pending payments as failed.
      */
-    public function status(Payment $payment): JsonResponse
+    public function status(Payment $payment, PaymentStatusSyncService $paymentStatusSyncService): JsonResponse
     {
         if ($payment->user_id !== auth()->id()) {
             abort(404);
         }
 
         if ($payment->status === 'pending') {
-            $expiresAt = $payment->getExpiresAt();
-            if ($expiresAt !== null && now()->isAfter($expiresAt)) {
-                $payment->update(['status' => 'failed']);
+            $paymentStatusSyncService->syncPendingPayment($payment);
+            $payment->refresh();
+
+            if ($payment->status === 'pending') {
+                $expiresAt = $payment->getExpiresAt();
+                if ($expiresAt !== null && now()->isAfter($expiresAt)) {
+                    $payment->update(['status' => 'failed']);
+                }
             }
         }
 

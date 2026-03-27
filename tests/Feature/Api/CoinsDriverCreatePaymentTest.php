@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api;
 
 use App\Services\Coins\CoinsGenerateQrSigner;
+use App\Services\Coins\CoinsSignatureService;
 use App\Services\Gateways\Drivers\CoinsDriver;
 use App\Services\Gateways\Exceptions\CoinsApiException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -88,6 +89,45 @@ class CoinsDriverCreatePaymentTest extends TestCase
         $this->assertSame('portal-order-456', $result['external_payment_id']);
         $this->assertSame('portal-qr...', $result['qr_data']);
         $this->assertSame('portal-order-456', $result['provider_reference']);
+    }
+
+    public function test_get_payment_status_returns_provider_status_payload(): void
+    {
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/openapi/fiat/v1/get_qr_code*' => function ($request) {
+                $query = [];
+                parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+                $this->assertSame('portal-request-456', $query['requestId'] ?? null);
+                $this->assertSame(
+                    (new CoinsSignatureService)->signWebhook(['requestId' => 'portal-request-456'], 'portal-api-secret')['signature'],
+                    $query['signature'] ?? null
+                );
+                $this->assertSame('portal-api-key', $request->header('X-COINS-APIKEY')[0] ?? null);
+
+                return Http::response([
+                    'status' => 0,
+                    'error' => 'OK',
+                    'data' => [
+                        'requestId' => 'portal-request-456',
+                        'referenceId' => '2179969337375674286',
+                        'status' => 'SUCCEEDED',
+                        'settleDate' => '1774608656000',
+                    ],
+                ], 200);
+            },
+        ]);
+
+        $driver = new CoinsDriver([
+            'api_key' => 'portal-api-key',
+            'api_secret' => 'portal-api-secret',
+            'api_base' => 'sandbox',
+        ]);
+
+        $status = $driver->getPaymentStatus('portal-request-456');
+
+        $this->assertSame(0, $status['status']);
+        $this->assertSame('SUCCEEDED', $status['data']['status'] ?? null);
     }
 
     public function test_create_payment_prefers_client_id_over_api_key_when_both_present(): void

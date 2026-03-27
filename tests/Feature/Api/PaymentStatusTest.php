@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Services\Gateways\Drivers\CoinsDriver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class PaymentStatusTest extends TestCase
@@ -64,6 +65,67 @@ class PaymentStatusTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.status', 'pending');
+    }
+
+    public function test_status_reconciles_pending_coins_payment_from_provider_status(): void
+    {
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/openapi/fiat/v1/get_qr_code*' => Http::response([
+                'status' => 0,
+                'error' => 'OK',
+                'data' => [
+                    'requestId' => 'GH-API-STATUS-001',
+                    'referenceId' => '2179969337375674286',
+                    'status' => 'SUCCEEDED',
+                    'settleDate' => '1774608656000',
+                    'cashInBank' => 'GCash',
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create(['api_key' => 'key-sync']);
+        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
+        $coinsGateway->update([
+            'config_json' => [
+                'client_id' => 'sync-client',
+                'client_secret' => 'sync-secret',
+                'api_base' => 'sandbox',
+            ],
+        ]);
+
+        MerchantGateway::query()->create([
+            'user_id' => $user->id,
+            'gateway_id' => $coinsGateway->id,
+            'is_enabled' => true,
+            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
+        ]);
+
+        $payment = Payment::factory()->create([
+            'user_id' => $user->id,
+            'gateway_code' => 'gcash',
+            'provider_reference' => 'GH-API-STATUS-001',
+            'status' => 'pending',
+            'paid_at' => null,
+            'raw_response' => [
+                'gateway_request_reference' => 'GH-API-STATUS-001',
+                'data' => [
+                    'requestId' => 'GH-API-STATUS-001',
+                    'status' => 'PENDING',
+                ],
+            ],
+        ]);
+
+        $response = $this->getJson('/api/payments/'.$payment->id.'/status', [
+            'Authorization' => 'Bearer key-sync',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.status', 'success');
+
+        $payment->refresh();
+        $this->assertSame('paid', $payment->status);
+        $this->assertNotNull($payment->paid_at);
+        $this->assertSame(1774608656, $payment->paid_at->timestamp);
     }
 
     public function test_status_returns_failed_for_failed_payment(): void

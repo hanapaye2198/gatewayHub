@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\Payment;
+use App\Services\PaymentStatusSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -13,7 +14,7 @@ class PaymentStatusController extends Controller
     /**
      * Return payment status. Lightweight, no joins. Checks merchant ownership.
      */
-    public function __invoke(Request $request, string $id): JsonResponse
+    public function __invoke(Request $request, string $id, PaymentStatusSyncService $paymentStatusSyncService): JsonResponse
     {
         $merchant = $request->attributes->get('merchant');
         if ($merchant === null) {
@@ -30,9 +31,14 @@ class PaymentStatusController extends Controller
         }
 
         if ($payment->status === 'pending') {
-            $expiresAt = $payment->getExpiresAt();
-            if ($expiresAt !== null && now()->isAfter($expiresAt)) {
-                $payment->update(['status' => 'failed']);
+            $paymentStatusSyncService->syncPendingPayment($payment);
+            $payment->refresh();
+
+            if ($payment->status === 'pending') {
+                $expiresAt = $payment->getExpiresAt();
+                if ($expiresAt !== null && now()->isAfter($expiresAt)) {
+                    $payment->update(['status' => 'failed']);
+                }
             }
         }
 

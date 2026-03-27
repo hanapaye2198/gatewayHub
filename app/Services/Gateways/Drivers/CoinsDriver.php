@@ -7,8 +7,10 @@ use App\Services\Coins\CoinsGenerateQrRequestExecutor;
 use App\Services\Coins\CoinsSignatureService;
 use App\Services\Gateways\Contracts\GatewayInterface;
 use App\Services\Gateways\Exceptions\CoinsApiException;
+use Illuminate\Http\Client\HttpClientException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 
 /**
  * Coins.ph gateway driver.
@@ -36,6 +38,8 @@ class CoinsDriver implements GatewayInterface
     private const PROD_BASE_URL = 'https://api.pro.coins.ph';
 
     private const GENERATE_QR_PATH = '/openapi/fiat/v1/generate_qr_code';
+
+    private const GET_QR_STATUS_PATH = '/openapi/fiat/v1/get_qr_code';
 
     private const DEFAULT_EXPIRATION_SECONDS = 1800;
 
@@ -185,7 +189,35 @@ class CoinsDriver implements GatewayInterface
 
     public function getPaymentStatus(string $reference): array
     {
-        return [];
+        $this->ensureConfigValid();
+
+        $requestId = trim($reference);
+        if ($requestId === '') {
+            throw new CoinsApiException('Coins.ph status request requires a non-empty requestId.');
+        }
+
+        $query = ['requestId' => $requestId];
+        $signed = $this->signatureService->signWebhook($query, $this->clientSecret);
+        $query['signature'] = $signed['signature'];
+
+        try {
+            /** @var Response $response */
+            $response = Http::withHeaders([
+                'X-COINS-APIKEY' => $this->clientId,
+                'Content-Type' => 'application/json; charset=utf-8',
+            ])->acceptJson()->get($this->getBaseUrl().self::GET_QR_STATUS_PATH, $query);
+        } catch (HttpClientException $e) {
+            throw new CoinsApiException('Coins.ph status request failed: '.$e->getMessage(), null, null, $e);
+        }
+
+        $body = $response->json();
+        if (! is_array($body)) {
+            $body = [];
+        }
+
+        $this->throwIfResponseHasError($response, $body);
+
+        return $body;
     }
 
     private function ensureConfigValid(): void
