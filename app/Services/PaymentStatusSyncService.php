@@ -14,7 +14,7 @@ class PaymentStatusSyncService
     /**
      * @var list<string>
      */
-    private const COINS_ORCHESTRATED_GATEWAYS = ['coins', 'gcash', 'maya', 'paypal', 'qrph', 'payqrph'];
+    private const COINS_ORCHESTRATED_GATEWAYS = ['coins', 'gcash', 'maya', 'paypal', 'qrph'];
 
     public function __construct(
         protected PlatformGatewayConfigService $platformGatewayConfigService,

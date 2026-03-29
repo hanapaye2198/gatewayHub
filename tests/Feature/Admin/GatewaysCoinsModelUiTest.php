@@ -33,7 +33,7 @@ class GatewaysCoinsModelUiTest extends TestCase
 
         $response = $this->actingAs($admin)->get(route('admin.gateways.index'));
         $response->assertOk();
-        $response->assertSee('Current model: customer-facing options (GCash, Maya, PayPal, PayQRPH) are collected through Coins dynamic QR.');
+        $response->assertSee('Current model: customer-facing options (GCash, Maya, PayPal, QRPH) are collected through Coins dynamic QR.');
         $response->assertSee('Only Coins.ph has platform payment credentials. All customer-facing payment options share that single Coins.ph payment configuration.');
         $response->assertSee('Uses Coins config');
         $response->assertDontSee('Processed through Coins dynamic QR in current model. No direct platform credentials required.');

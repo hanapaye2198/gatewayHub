@@ -23,7 +23,7 @@
                         </span>
                     </div>
                     <p class="mt-1 text-base text-zinc-300">Centralized payment gateway management with real-time controls</p>
-                    <p class="mt-2 text-sm text-zinc-400">Current model: customer-facing options (GCash, Maya, PayPal, PayQRPH) are collected through Coins dynamic QR.</p>
+                    <p class="mt-2 text-sm text-zinc-400">Current model: customer-facing options (GCash, Maya, PayPal, QRPH) are collected through Coins dynamic QR.</p>
                     <p class="mt-1 text-sm text-zinc-400">Only Coins.ph has platform payment credentials. All customer-facing payment options share that single Coins.ph payment configuration.</p>
                 </div>
             </div>
@@ -198,7 +198,6 @@
                             <option value="maya">Maya</option>
                             <option value="paypal">PayPal</option>
                             <option value="qrph">QRPH</option>
-                            <option value="payqrph">PayQRPH</option>
                         </select>
                     </div>
                 </div>

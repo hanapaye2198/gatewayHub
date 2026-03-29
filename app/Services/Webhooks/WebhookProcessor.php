@@ -296,7 +296,7 @@ class WebhookProcessor
     {
         $baseQuery = Payment::query()->where(function ($gatewayQuery) use ($provider): void {
             if ($provider === 'coins') {
-                $gatewayQuery->whereIn('gateway_code', ['coins', 'gcash', 'maya', 'paypal', 'qrph', 'payqrph']);
+                $gatewayQuery->whereIn('gateway_code', ['coins', 'gcash', 'maya', 'paypal', 'qrph']);
 
                 return;
             }

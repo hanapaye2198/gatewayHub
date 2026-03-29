@@ -6,7 +6,7 @@ return [
     |--------------------------------------------------------------------------
     | Platform payment credential field definitions.
     | Only Coins.ph owns payment-processing credentials in the current model.
-    | Customer-facing options like GCash, Maya, PayPal, QRPH, and PayQRPH are
+    | Customer-facing options like GCash, Maya, PayPal, and QRPH are
     | routed through Coins dynamic QR and do not have separate payment configs.
     |--------------------------------------------------------------------------
     */
@@ -22,6 +22,5 @@ return [
     'maya' => [],
     'paypal' => [],
     'qrph' => [],
-    'payqrph' => [],
 
 ];

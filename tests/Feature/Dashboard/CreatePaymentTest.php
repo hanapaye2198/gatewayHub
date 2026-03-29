@@ -197,31 +197,6 @@ class CreatePaymentTest extends TestCase
         $this->assertDatabaseCount('payments', 0);
     }
 
-    public function test_create_payment_form_shows_payqrph_when_enabled_for_merchant(): void
-    {
-        Gateway::query()->updateOrCreate(['code' => 'payqrph'], [
-            'code' => 'payqrph',
-            'name' => 'PayQRPH',
-            'driver_class' => QrphDriver::class,
-            'is_global_enabled' => true,
-        ]);
-
-        $user = User::factory()->create();
-        $payQrphGateway = Gateway::query()->where('code', 'payqrph')->firstOrFail();
-        MerchantGateway::query()->create([
-            'merchant_id' => $user->id,
-            'gateway_id' => $payQrphGateway->id,
-            'is_enabled' => true,
-            'config_json' => [],
-        ]);
-
-        $response = $this->actingAs($user)->get(route('dashboard.payments.create'));
-
-        $response->assertOk();
-        $response->assertSee('PayQRPH');
-        $response->assertSee('value="payqrph"', false);
-    }
-
     public function test_create_payment_form_shows_qrph_when_enabled_for_merchant(): void
     {
         Gateway::query()->updateOrCreate(['code' => 'qrph'], [

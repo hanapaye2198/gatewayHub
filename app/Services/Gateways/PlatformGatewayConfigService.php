@@ -40,7 +40,7 @@ class PlatformGatewayConfigService
 
         $overrides = $this->normalizeConfig($stored);
 
-        if (in_array($code, ['qrph', 'payqrph'], true) && $overrides === []) {
+        if ($code === 'qrph' && $overrides === []) {
             return $this->forGatewayCodeWithMeta('coins');
         }
 
@@ -56,7 +56,7 @@ class PlatformGatewayConfigService
     public function defaultsForGatewayCode(string $code): array
     {
         return match ($code) {
-            'coins', 'qrph', 'payqrph' => [
+            'coins', 'qrph' => [
                 'client_id' => (string) config('coins.gateway.client_id', config('coins.api_key', '')),
                 'client_secret' => (string) config('coins.gateway.client_secret', config('coins.secret_key', '')),
                 'api_base' => (string) config('coins.gateway.api_base', 'sandbox'),
