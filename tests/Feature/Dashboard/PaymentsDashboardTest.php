@@ -24,7 +24,7 @@ class PaymentsDashboardTest extends TestCase
     public function test_authenticated_merchant_sees_own_payments(): void
     {
         $user = User::factory()->create();
-        $payment = Payment::factory()->for($user)->create([
+        $payment = Payment::factory()->for($user->merchant)->create([
             'reference_id' => 'ORDER-123',
             'gateway_code' => 'coins',
             'amount' => 500.00,
@@ -46,7 +46,7 @@ class PaymentsDashboardTest extends TestCase
     {
         $merchant = User::factory()->create();
         $otherUser = User::factory()->create();
-        $otherPayment = Payment::factory()->for($otherUser)->create([
+        $otherPayment = Payment::factory()->for($otherUser->merchant)->create([
             'reference_id' => 'OTHER-REF',
             'status' => 'paid',
         ]);
@@ -61,9 +61,9 @@ class PaymentsDashboardTest extends TestCase
     public function test_status_badges_display_correctly(): void
     {
         $user = User::factory()->create();
-        Payment::factory()->for($user)->create(['status' => 'pending', 'reference_id' => 'PENDING-1']);
-        Payment::factory()->for($user)->paid()->create(['reference_id' => 'PAID-1']);
-        Payment::factory()->for($user)->failed()->create(['reference_id' => 'FAILED-1']);
+        Payment::factory()->for($user->merchant)->create(['status' => 'pending', 'reference_id' => 'PENDING-1']);
+        Payment::factory()->for($user->merchant)->paid()->create(['reference_id' => 'PAID-1']);
+        Payment::factory()->for($user->merchant)->failed()->create(['reference_id' => 'FAILED-1']);
 
         $this->actingAs($user);
         $response = $this->get(route('dashboard.payments'));
@@ -97,15 +97,14 @@ class PaymentsDashboardTest extends TestCase
             'is_global_enabled' => true,
         ]);
         $user = User::factory()->create();
-        $payment = Payment::factory()->for($user)->create([
+        $payment = Payment::factory()->for($user->merchant)->create([
             'reference_id' => 'QR-ORDER',
             'gateway_code' => 'coins',
             'status' => 'pending',
             'raw_response' => ['data' => ['qrCode' => '00020126...']],
         ]);
 
-        $this->actingAs($user);
-        $response = Livewire::test('pages::dashboard.payments')
+        $response = Livewire::actingAs($user)->test('pages::dashboard.payments')
             ->call('selectPayment', $payment->id);
 
         $response->assertSet('showPaymentDetail', true);
@@ -127,15 +126,14 @@ class PaymentsDashboardTest extends TestCase
             'is_global_enabled' => true,
         ]);
         $user = User::factory()->create();
-        $payment = Payment::factory()->for($user)->create([
+        $payment = Payment::factory()->for($user->merchant)->create([
             'reference_id' => 'MAYA-QR-ORDER',
             'gateway_code' => 'maya',
             'status' => 'pending',
             'raw_response' => ['data' => ['qrCode' => '000201010212...']],
         ]);
 
-        $this->actingAs($user);
-        $response = Livewire::test('pages::dashboard.payments')
+        $response = Livewire::actingAs($user)->test('pages::dashboard.payments')
             ->call('selectPayment', $payment->id);
 
         $response->assertSet('showPaymentDetail', true);
@@ -158,7 +156,7 @@ class PaymentsDashboardTest extends TestCase
             'is_global_enabled' => true,
         ]);
         $user = User::factory()->create();
-        $payment = Payment::factory()->for($user)->paid()->create([
+        $payment = Payment::factory()->for($user->merchant)->paid()->create([
             'reference_id' => 'QR-PAID',
             'gateway_code' => 'coins',
             'raw_response' => ['data' => ['qrCode' => '00020126...']],
@@ -175,7 +173,7 @@ class PaymentsDashboardTest extends TestCase
     public function test_payment_detail_page_displays_payment_info_for_pending_payment(): void
     {
         $user = User::factory()->create();
-        $payment = Payment::factory()->for($user)->create([
+        $payment = Payment::factory()->for($user->merchant)->create([
             'reference_id' => 'DETAIL-REF',
             'gateway_code' => 'coins',
             'amount' => 100.50,
@@ -199,7 +197,7 @@ class PaymentsDashboardTest extends TestCase
     public function test_payment_detail_page_redirects_to_dashboard_for_paid_payment(): void
     {
         $user = User::factory()->create();
-        $payment = Payment::factory()->for($user)->paid()->create([
+        $payment = Payment::factory()->for($user->merchant)->paid()->create([
             'reference_id' => 'DETAIL-PAID-REF',
             'gateway_code' => 'paypal',
         ]);
@@ -214,7 +212,7 @@ class PaymentsDashboardTest extends TestCase
     {
         $merchant = User::factory()->create();
         $otherUser = User::factory()->create();
-        $payment = Payment::factory()->for($otherUser)->create(['reference_id' => 'OTHER-REF']);
+        $payment = Payment::factory()->for($otherUser->merchant)->create(['reference_id' => 'OTHER-REF']);
 
         $this->actingAs($merchant);
         $response = $this->get(route('dashboard.payments.show', $payment));
@@ -225,7 +223,7 @@ class PaymentsDashboardTest extends TestCase
     public function test_payment_detail_hides_webhook_and_tunnel_logs_for_merchant(): void
     {
         $user = User::factory()->create();
-        $payment = Payment::factory()->for($user)->create([
+        $payment = Payment::factory()->for($user->merchant)->create([
             'reference_id' => 'AUDIT-REF',
             'gateway_code' => 'coins',
             'status' => 'pending',
@@ -251,7 +249,7 @@ class PaymentsDashboardTest extends TestCase
     public function test_payment_detail_client_script_redirects_to_payments_dashboard_on_success(): void
     {
         $user = User::factory()->create();
-        $payment = Payment::factory()->for($user)->create([
+        $payment = Payment::factory()->for($user->merchant)->create([
             'reference_id' => 'REDIRECT-REF',
             'gateway_code' => 'paypal',
             'status' => 'pending',
@@ -271,7 +269,7 @@ class PaymentsDashboardTest extends TestCase
 
         $merchant = User::factory()->create();
         $payment = Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_code' => 'paypal',
             'provider_reference' => 'PAYPAL-ORDER-LIST-1',
             'status' => 'pending',
@@ -293,7 +291,7 @@ class PaymentsDashboardTest extends TestCase
         $merchant = User::factory()->create();
 
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'M-FILTER-MATCH-001',
             'provider_reference' => 'M-PROV-MATCH-001',
             'status' => 'paid',
@@ -301,7 +299,7 @@ class PaymentsDashboardTest extends TestCase
             'updated_at' => Carbon::parse('2026-02-12 10:00:00'),
         ]);
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'M-FILTER-PENDING-002',
             'provider_reference' => 'M-PROV-PENDING-002',
             'status' => 'pending',
@@ -309,7 +307,7 @@ class PaymentsDashboardTest extends TestCase
             'updated_at' => Carbon::parse('2026-02-12 10:00:00'),
         ]);
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'M-FILTER-OLD-003',
             'provider_reference' => 'M-PROV-OLD-003',
             'status' => 'paid',
@@ -335,19 +333,19 @@ class PaymentsDashboardTest extends TestCase
         $merchant = User::factory()->create();
 
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'M-SUMMARY-PAID-001',
             'status' => 'paid',
             'amount' => 111.11,
         ]);
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'M-SUMMARY-PAID-002',
             'status' => 'paid',
             'amount' => 322.22,
         ]);
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'M-SUMMARY-PENDING-003',
             'status' => 'pending',
             'amount' => 50,
@@ -371,7 +369,7 @@ class PaymentsDashboardTest extends TestCase
         $otherMerchant = User::factory()->create();
 
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'M-EXPORT-PAID-001',
             'provider_reference' => 'M-EXPORT-PROV-001',
             'status' => 'paid',
@@ -380,7 +378,7 @@ class PaymentsDashboardTest extends TestCase
             'updated_at' => Carbon::parse('2026-02-14 10:00:00'),
         ]);
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'M-EXPORT-PENDING-002',
             'provider_reference' => 'M-EXPORT-PROV-002',
             'status' => 'pending',
@@ -389,7 +387,7 @@ class PaymentsDashboardTest extends TestCase
             'updated_at' => Carbon::parse('2026-02-14 10:00:00'),
         ]);
         Payment::factory()->create([
-            'user_id' => $otherMerchant->id,
+            'merchant_id' => $otherMerchant->id,
             'reference_id' => 'OTHER-EXPORT-PAID-003',
             'provider_reference' => 'OTHER-EXPORT-PROV-003',
             'status' => 'paid',
@@ -448,7 +446,7 @@ class PaymentsDashboardTest extends TestCase
         $merchant = User::factory()->create();
 
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => '=INJECT-001',
             'provider_reference' => '@RAW-002',
             'status' => 'paid',
@@ -479,7 +477,7 @@ class PaymentsDashboardTest extends TestCase
 
         $merchant = User::factory()->create();
         $targetPayment = Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_code' => 'paypal',
             'provider_reference' => 'PAYPAL-RETURN-TOKEN-1',
             'status' => 'pending',

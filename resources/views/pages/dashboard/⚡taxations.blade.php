@@ -10,11 +10,23 @@ use Livewire\Component;
 new class extends Component {
     #[Layout('layouts.app', ['title' => 'Taxations'])]
 
+    private function merchantId(): ?int
+    {
+        $id = auth()->user()?->merchant_id;
+
+        return $id === null || $id === '' ? null : (int) $id;
+    }
+
     #[Computed]
     public function totalGross(): float
     {
+        $mid = $this->merchantId();
+        if ($mid === null) {
+            return 0.0;
+        }
+
         return (float) Payment::query()
-            ->where('user_id', auth()->id())
+            ->where('merchant_id', $mid)
             ->whereHas('walletTransactions', function ($query): void {
                 $query->whereIn('entry_type', [
                     WalletTransaction::ENTRY_REAL_WALLET_NET_CREDIT,
@@ -35,12 +47,17 @@ new class extends Component {
     #[Computed]
     public function totalNetSettled(): float
     {
+        $mid = $this->merchantId();
+        if ($mid === null) {
+            return 0.0;
+        }
+
         return (float) WalletTransaction::query()
             ->whereIn('entry_type', [
                 WalletTransaction::ENTRY_REAL_WALLET_NET_CREDIT,
                 WalletTransaction::ENTRY_REAL_WALLET_NET_CREDIT_DIRECT,
             ])
-            ->whereHas('payment', fn ($query) => $query->where('user_id', auth()->id()))
+            ->whereHas('payment', fn ($query) => $query->where('merchant_id', $mid))
             ->sum('amount');
     }
 
@@ -63,9 +80,14 @@ new class extends Component {
     #[Computed]
     public function recentTaxWalletEntries()
     {
+        $mid = $this->merchantId();
+        if ($mid === null) {
+            return collect();
+        }
+
         return WalletTransaction::query()
             ->where('entry_type', 'surepay_tax_collected')
-            ->whereHas('payment', fn ($query) => $query->where('user_id', auth()->id()))
+            ->whereHas('payment', fn ($query) => $query->where('merchant_id', $mid))
             ->with('payment')
             ->latest('created_at')
             ->limit(8)

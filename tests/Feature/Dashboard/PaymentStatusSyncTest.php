@@ -20,7 +20,7 @@ class PaymentStatusSyncTest extends TestCase
 
         $merchant = User::factory()->create();
         $payment = Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_code' => 'paypal',
             'provider_reference' => 'PAYPAL-ORDER-123',
             'status' => 'pending',
@@ -43,7 +43,7 @@ class PaymentStatusSyncTest extends TestCase
 
         $merchant = User::factory()->create();
         $payment = Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_code' => 'coins',
             'status' => 'pending',
             'raw_response' => [
@@ -91,7 +91,7 @@ class PaymentStatusSyncTest extends TestCase
 
         $merchant = User::factory()->create();
         $payment = Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_code' => 'gcash',
             'provider_reference' => 'GH-STATUS-001',
             'status' => 'pending',
@@ -122,7 +122,7 @@ class PaymentStatusSyncTest extends TestCase
 
         $merchant = User::factory()->create();
         $payment = Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_code' => 'paypal',
             'provider_reference' => 'PAYPAL-ORDER-125',
             'status' => 'pending',

@@ -2,7 +2,7 @@
 
 namespace App\Services\Billing;
 
-use App\Models\User;
+use App\Models\Merchant;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use Carbon\CarbonImmutable;
@@ -20,19 +20,19 @@ class WalletBalanceQueryService
      *   as_of: string
      * }
      */
-    public function forMerchant(User $merchant, string $currency): array
+    public function forMerchant(Merchant $merchant, string $currency): array
     {
         $normalizedCurrency = strtoupper(trim($currency));
         $today = CarbonImmutable::now()->startOfDay();
 
         $tunnelBalance = (float) Wallet::query()
-            ->where('user_id', $merchant->id)
+            ->where('merchant_id', $merchant->id)
             ->where('wallet_type', Wallet::TYPE_MERCHANT_CLEARING)
             ->where('currency', $normalizedCurrency)
             ->sum('balance');
 
         $realBalance = (float) Wallet::query()
-            ->where('user_id', $merchant->id)
+            ->where('merchant_id', $merchant->id)
             ->where('wallet_type', Wallet::TYPE_MERCHANT_REAL)
             ->where('currency', $normalizedCurrency)
             ->sum('balance');
@@ -41,14 +41,14 @@ class WalletBalanceQueryService
             ->where('entry_type', WalletTransaction::ENTRY_TUNNEL_NET_AVAILABLE)
             ->where('is_settled', false)
             ->where('currency', $normalizedCurrency)
-            ->whereHas('payment', fn ($paymentQuery) => $paymentQuery->where('user_id', $merchant->id))
+            ->whereHas('payment', fn ($paymentQuery) => $paymentQuery->where('merchant_id', $merchant->id))
             ->sum('amount');
 
         $todayGross = (float) WalletTransaction::query()
             ->where('entry_type', WalletTransaction::ENTRY_PAYMENT_RECEIVED_GROSS)
             ->where('currency', $normalizedCurrency)
             ->where('created_at', '>=', $today)
-            ->whereHas('payment', fn ($paymentQuery) => $paymentQuery->where('user_id', $merchant->id))
+            ->whereHas('payment', fn ($paymentQuery) => $paymentQuery->where('merchant_id', $merchant->id))
             ->sum('amount');
 
         $todayNetSettled = (float) WalletTransaction::query()
@@ -58,7 +58,7 @@ class WalletBalanceQueryService
             ])
             ->where('currency', $normalizedCurrency)
             ->where('created_at', '>=', $today)
-            ->whereHas('payment', fn ($paymentQuery) => $paymentQuery->where('user_id', $merchant->id))
+            ->whereHas('payment', fn ($paymentQuery) => $paymentQuery->where('merchant_id', $merchant->id))
             ->sum('amount');
 
         return [

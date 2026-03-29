@@ -19,7 +19,12 @@ class PaymentsExportController extends Controller
         }
 
         $filters = $request->validated();
-        $payments = $this->buildFilteredPaymentsQuery($merchant->id, $filters)
+        $mid = $merchant->merchant_id;
+        if ($mid === null) {
+            abort(403);
+        }
+
+        $payments = $this->buildFilteredPaymentsQuery($mid, $filters)
             ->with(['gateway:code,name', 'platformFee:id,payment_id,fee_amount,net_amount'])
             ->latest('created_at')
             ->get();
@@ -74,7 +79,7 @@ class PaymentsExportController extends Controller
     private function buildFilteredPaymentsQuery(int $merchantId, array $filters): Builder
     {
         return Payment::query()
-            ->where('user_id', $merchantId)
+            ->where('merchant_id', $merchantId)
             ->when(isset($filters['gateway_code']), static function (Builder $query) use ($filters): void {
                 $query->where('gateway_code', (string) $filters['gateway_code']);
             })

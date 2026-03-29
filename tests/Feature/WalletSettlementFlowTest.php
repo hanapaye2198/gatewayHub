@@ -44,7 +44,7 @@ class WalletSettlementFlowTest extends TestCase
         $user = User::factory()->create();
 
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
             'config_json' => [
@@ -56,7 +56,7 @@ class WalletSettlementFlowTest extends TestCase
         ]);
 
         $payment = Payment::factory()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'WALLET-ORD-001',
             'amount' => 1000,
@@ -90,17 +90,17 @@ class WalletSettlementFlowTest extends TestCase
         $this->assertSame('980.00', (string) $payment->net_amount);
 
         $clearingWallet = Wallet::query()
-            ->where('user_id', $user->id)
+            ->where('merchant_id', $user->id)
             ->where('wallet_type', Wallet::TYPE_MERCHANT_CLEARING)
             ->where('currency', 'PHP')
             ->first();
         $realWallet = Wallet::query()
-            ->where('user_id', $user->id)
+            ->where('merchant_id', $user->id)
             ->where('wallet_type', Wallet::TYPE_MERCHANT_REAL)
             ->where('currency', 'PHP')
             ->first();
         $taxWallet = Wallet::query()
-            ->whereNull('user_id')
+            ->whereNull('merchant_id')
             ->where('wallet_type', Wallet::TYPE_SYSTEM_TAX)
             ->where('currency', 'PHP')
             ->first();
@@ -148,7 +148,7 @@ class WalletSettlementFlowTest extends TestCase
     {
         $user = User::factory()->create();
         $payment = Payment::factory()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'amount' => 500,
             'currency' => 'PHP',
             'status' => 'paid',
@@ -177,7 +177,7 @@ class WalletSettlementFlowTest extends TestCase
         $user = User::factory()->create();
 
         MerchantWalletSetting::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'tunnel_wallet_enabled' => false,
             'auto_settle_to_real_wallet' => true,
             'default_currency' => 'PHP',
@@ -185,7 +185,7 @@ class WalletSettlementFlowTest extends TestCase
         ]);
 
         $payment = Payment::factory()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'amount' => 200,
             'currency' => 'PHP',
             'status' => 'paid',
@@ -219,7 +219,7 @@ class WalletSettlementFlowTest extends TestCase
         $user = User::factory()->create();
 
         $payment = Payment::factory()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'amount' => 100,
             'currency' => 'PHP',
             'status' => 'paid',
@@ -231,12 +231,12 @@ class WalletSettlementFlowTest extends TestCase
         app(WalletSettlementService::class)->recordPaidPayment($payment);
 
         $tunnelWallet = Wallet::query()
-            ->where('user_id', $user->id)
+            ->where('merchant_id', $user->id)
             ->where('wallet_type', Wallet::TYPE_MERCHANT_CLEARING)
             ->where('currency', 'PHP')
             ->first();
         $taxWallet = Wallet::query()
-            ->whereNull('user_id')
+            ->whereNull('merchant_id')
             ->where('wallet_type', Wallet::TYPE_SYSTEM_TAX)
             ->where('currency', 'PHP')
             ->first();
@@ -272,7 +272,7 @@ class WalletSettlementFlowTest extends TestCase
         ]);
 
         MerchantWalletSetting::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'tunnel_wallet_enabled' => true,
             'auto_settle_to_real_wallet' => true,
             'default_currency' => 'PHP',
@@ -280,7 +280,7 @@ class WalletSettlementFlowTest extends TestCase
         ]);
 
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
             'config_json' => [
@@ -290,7 +290,7 @@ class WalletSettlementFlowTest extends TestCase
         ]);
 
         $payment = Payment::factory()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_code' => 'coins',
             'amount' => 300,
             'currency' => 'PHP',
@@ -324,14 +324,14 @@ class WalletSettlementFlowTest extends TestCase
         ]);
 
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
             'config_json' => ['tunnel_wallet_enabled' => true],
         ]);
 
         $payment = Payment::factory()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_code' => 'coins',
             'amount' => 1000,
             'currency' => 'PHP',
@@ -347,8 +347,8 @@ class WalletSettlementFlowTest extends TestCase
         $settled = $service->settlePendingNetBatch((int) $user->id, 10);
         $this->assertSame(1, $settled);
 
-        $tunnel = Wallet::query()->where('user_id', $user->id)->where('wallet_type', Wallet::TYPE_MERCHANT_CLEARING)->first();
-        $real = Wallet::query()->where('user_id', $user->id)->where('wallet_type', Wallet::TYPE_MERCHANT_REAL)->first();
+        $tunnel = Wallet::query()->where('merchant_id', $user->id)->where('wallet_type', Wallet::TYPE_MERCHANT_CLEARING)->first();
+        $real = Wallet::query()->where('merchant_id', $user->id)->where('wallet_type', Wallet::TYPE_MERCHANT_REAL)->first();
 
         $this->assertNotNull($tunnel);
         $this->assertNotNull($real);
@@ -395,7 +395,7 @@ class WalletSettlementFlowTest extends TestCase
         ]);
 
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
             'config_json' => [
@@ -406,7 +406,7 @@ class WalletSettlementFlowTest extends TestCase
         ]);
 
         MerchantWalletSetting::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'tunnel_wallet_enabled' => true,
             'auto_settle_to_real_wallet' => true,
             'default_currency' => 'PHP',
@@ -417,7 +417,7 @@ class WalletSettlementFlowTest extends TestCase
         ]);
 
         $payment = Payment::factory()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_code' => 'paypal',
             'amount' => 1000,
             'currency' => 'PHP',
@@ -453,7 +453,7 @@ class WalletSettlementFlowTest extends TestCase
         ]);
 
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
             'config_json' => [
@@ -464,7 +464,7 @@ class WalletSettlementFlowTest extends TestCase
         ]);
 
         MerchantWalletSetting::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'tunnel_wallet_enabled' => true,
             'auto_settle_to_real_wallet' => true,
             'default_currency' => 'PHP',
@@ -475,7 +475,7 @@ class WalletSettlementFlowTest extends TestCase
         ]);
 
         $payment = Payment::factory()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_code' => 'paypal',
             'amount' => 500,
             'currency' => 'PHP',

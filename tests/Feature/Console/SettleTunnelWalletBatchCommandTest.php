@@ -24,8 +24,8 @@ class SettleTunnelWalletBatchCommandTest extends TestCase
 
     public function test_scheduled_settlement_runs_when_interval_is_due(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
-        $payment = Payment::factory()->for($merchant)->paid()->create([
+        $merchant = User::factory()->create();
+        $payment = Payment::factory()->for($merchant->merchant)->paid()->create([
             'gateway_code' => 'coins',
             'currency' => 'PHP',
             'amount' => 1000,
@@ -52,8 +52,8 @@ class SettleTunnelWalletBatchCommandTest extends TestCase
 
     public function test_scheduled_settlement_skips_when_interval_has_not_elapsed(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
-        $payment = Payment::factory()->for($merchant)->paid()->create([
+        $merchant = User::factory()->create();
+        $payment = Payment::factory()->for($merchant->merchant)->paid()->create([
             'gateway_code' => 'coins',
             'currency' => 'PHP',
             'amount' => 1000,
@@ -90,8 +90,8 @@ class SettleTunnelWalletBatchCommandTest extends TestCase
 
     public function test_manual_settlement_ignores_interval_gate(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
-        $payment = Payment::factory()->for($merchant)->paid()->create([
+        $merchant = User::factory()->create();
+        $payment = Payment::factory()->for($merchant->merchant)->paid()->create([
             'gateway_code' => 'coins',
             'currency' => 'PHP',
             'amount' => 1000,
@@ -123,8 +123,8 @@ class SettleTunnelWalletBatchCommandTest extends TestCase
 
     public function test_manual_settlement_skips_merchants_with_auto_settle_disabled(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
-        $payment = Payment::factory()->for($merchant)->paid()->create([
+        $merchant = User::factory()->create();
+        $payment = Payment::factory()->for($merchant->merchant)->paid()->create([
             'gateway_code' => 'coins',
             'currency' => 'PHP',
             'amount' => 1000,
@@ -135,7 +135,7 @@ class SettleTunnelWalletBatchCommandTest extends TestCase
         app(WalletSettlementService::class)->recordPaidPayment($payment);
 
         MerchantWalletSetting::query()->updateOrCreate(
-            ['user_id' => $merchant->id],
+            ['merchant_id' => $merchant->id],
             [
                 'tunnel_wallet_enabled' => true,
                 'auto_settle_to_real_wallet' => false,

@@ -43,7 +43,7 @@ class PlatformFeeService
 
             $paymentDate = $locked->paid_at ?? $locked->created_at ?? now();
             $rule = app(FeeRuleResolver::class)->resolve(
-                (int) $locked->user_id,
+                (int) $locked->merchant_id,
                 $locked->gateway_code,
                 $paymentDate
             );
@@ -54,7 +54,7 @@ class PlatformFeeService
 
             PlatformFee::query()->create([
                 'payment_id' => $locked->id,
-                'merchant_id' => $locked->user_id,
+                'merchant_id' => $locked->merchant_id,
                 'gateway_code' => $locked->gateway_code,
                 'gross_amount' => $gross,
                 'fee_rate' => $calculated['fee_rate'],

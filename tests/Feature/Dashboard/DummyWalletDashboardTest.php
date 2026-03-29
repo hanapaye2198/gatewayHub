@@ -35,7 +35,7 @@ class DummyWalletDashboardTest extends TestCase
 
     public function test_merchant_cannot_open_admin_tunnel_wallet_dashboard_page(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
 
         $response = $this->actingAs($merchant)->get(route('admin.surepay-wallets.dashboard'));
 
@@ -45,20 +45,20 @@ class DummyWalletDashboardTest extends TestCase
     public function test_tunnel_wallet_dashboard_reads_merchant_data_from_database(): void
     {
         $admin = User::factory()->admin()->create();
-        $merchant = User::factory()->create(['role' => 'merchant', 'name' => 'Demo Merchant']);
-        $payment = Payment::factory()->for($merchant)->create([
+        $merchant = User::factory()->create(['name' => 'Demo Merchant']);
+        $payment = Payment::factory()->for($merchant->merchant)->create([
             'reference_id' => 'TW-REF-001',
             'status' => 'paid',
         ]);
 
         $clearingWallet = Wallet::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'wallet_type' => Wallet::TYPE_MERCHANT_CLEARING,
             'currency' => 'PHP',
             'balance' => 900,
         ]);
         Wallet::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'wallet_type' => Wallet::TYPE_MERCHANT_REAL,
             'currency' => 'PHP',
             'balance' => 450,
@@ -106,9 +106,9 @@ class DummyWalletDashboardTest extends TestCase
     public function test_tunnel_wallet_dashboard_displays_separated_flow_logs(): void
     {
         $admin = User::factory()->admin()->create();
-        $merchant = User::factory()->create(['role' => 'merchant', 'name' => 'Flow Merchant']);
+        $merchant = User::factory()->create(['name' => 'Flow Merchant']);
 
-        Payment::factory()->for($merchant)->create([
+        Payment::factory()->for($merchant->merchant)->create([
             'reference_id' => 'FLOW-REF-001',
             'status' => 'paid',
             'raw_response' => [
@@ -144,10 +144,10 @@ class DummyWalletDashboardTest extends TestCase
     public function test_admin_can_search_filter_and_paginate_flow_logs(): void
     {
         $admin = User::factory()->admin()->create();
-        $merchantA = User::factory()->create(['role' => 'merchant', 'name' => 'Alpha Merchant']);
-        $merchantB = User::factory()->create(['role' => 'merchant', 'name' => 'Beta Merchant']);
+        $merchantA = User::factory()->create(['name' => 'Alpha Merchant']);
+        $merchantB = User::factory()->create(['name' => 'Beta Merchant']);
 
-        Payment::factory()->for($merchantA)->create([
+        Payment::factory()->for($merchantA->merchant)->create([
             'reference_id' => 'FLOW-ALPHA-001',
             'status' => 'paid',
             'raw_response' => [
@@ -177,7 +177,7 @@ class DummyWalletDashboardTest extends TestCase
             ],
         ]);
 
-        Payment::factory()->for($merchantB)->create([
+        Payment::factory()->for($merchantB->merchant)->create([
             'reference_id' => 'FLOW-BETA-001',
             'status' => 'paid',
             'raw_response' => [
@@ -222,7 +222,7 @@ class DummyWalletDashboardTest extends TestCase
 
     public function test_merchant_livewire_access_is_forbidden(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
         $this->actingAs($merchant);
 
         Livewire::test('pages::dashboard.tunnel-wallet')->assertForbidden();

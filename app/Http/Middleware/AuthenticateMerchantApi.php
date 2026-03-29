@@ -3,7 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Http\Responses\ApiResponse;
-use App\Models\User;
+use App\Models\Merchant;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
 class AuthenticateMerchantApi
 {
     /**
-     * Handle an incoming request. Find user by Authorization Bearer token hash.
+     * Resolve {@see Merchant} from Authorization Bearer token (api_key hash on merchants table).
      * Returns 401 for invalid/missing key, 403 for inactive merchant.
      */
     public function handle(Request $request, Closure $next): Response
@@ -23,19 +23,19 @@ class AuthenticateMerchantApi
         }
 
         $tokenHash = hash('sha256', $token);
-        $user = User::query()
+        $merchant = Merchant::query()
             ->where('api_key_hash', $tokenHash)
             ->first();
 
-        if ($user === null) {
+        if ($merchant === null) {
             return ApiResponse::error('Invalid API key.', 401);
         }
 
-        if (! $user->is_active) {
+        if (! $merchant->is_active) {
             return ApiResponse::error('Merchant account is inactive.', 403);
         }
 
-        $request->attributes->set('merchant', $user);
+        $request->attributes->set('merchant', $merchant);
 
         return $next($request);
     }

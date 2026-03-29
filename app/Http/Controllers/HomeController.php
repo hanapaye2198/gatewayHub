@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Gateway;
+use App\Models\Merchant;
 use App\Models\Payment;
-use App\Models\User;
 use Illuminate\Contracts\View\View;
 
 class HomeController extends Controller
@@ -17,9 +17,7 @@ class HomeController extends Controller
 
         $gatewayTotal = $gateways->count();
         $enabledGatewayTotal = $gateways->where('is_global_enabled', true)->count();
-        $merchantTotal = User::query()
-            ->where('role', 'merchant')
-            ->count();
+        $merchantTotal = Merchant::query()->count();
         $paidCollections = (float) Payment::query()
             ->where('status', 'paid')
             ->sum('amount');

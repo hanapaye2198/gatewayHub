@@ -15,7 +15,7 @@ class MerchantGatewayToggleTest extends TestCase
     public function test_admin_can_enable_gateway_for_merchant(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
         $gateway = Gateway::query()->create([
             'code' => 'coins',
             'name' => 'Coins.ph',
@@ -25,14 +25,14 @@ class MerchantGatewayToggleTest extends TestCase
 
         $response = $this->actingAs($admin)->patch(route('admin.gateways.merchant-update', [
             'gateway' => $gateway,
-            'user' => $merchant,
+            'merchant' => $merchant->merchant,
         ]), [
             'is_enabled' => true,
         ]);
 
         $response->assertRedirect(route('admin.gateways.index'));
         $this->assertDatabaseHas('merchant_gateways', [
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
         ]);
@@ -41,7 +41,7 @@ class MerchantGatewayToggleTest extends TestCase
     public function test_admin_cannot_enable_gateway_for_merchant_when_gateway_is_globally_disabled(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
         $gateway = Gateway::query()->create([
             'code' => 'maya',
             'name' => 'Maya',
@@ -51,7 +51,7 @@ class MerchantGatewayToggleTest extends TestCase
 
         $response = $this->actingAs($admin)->patch(route('admin.gateways.merchant-update', [
             'gateway' => $gateway,
-            'user' => $merchant,
+            'merchant' => $merchant->merchant,
         ]), [
             'is_enabled' => true,
         ]);
@@ -59,7 +59,7 @@ class MerchantGatewayToggleTest extends TestCase
         $response->assertRedirect(route('admin.gateways.index'));
         $response->assertSessionHas('error');
         $this->assertDatabaseMissing('merchant_gateways', [
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
         ]);
@@ -67,8 +67,8 @@ class MerchantGatewayToggleTest extends TestCase
 
     public function test_merchant_cannot_update_other_merchant_gateway_access(): void
     {
-        $merchantActor = User::factory()->create(['role' => 'merchant']);
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchantActor = User::factory()->create();
+        $merchant = User::factory()->create();
         $gateway = Gateway::query()->create([
             'code' => 'paypal',
             'name' => 'PayPal',
@@ -76,7 +76,7 @@ class MerchantGatewayToggleTest extends TestCase
             'is_global_enabled' => true,
         ]);
         MerchantGateway::query()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => false,
             'config_json' => [],
@@ -84,14 +84,14 @@ class MerchantGatewayToggleTest extends TestCase
 
         $response = $this->actingAs($merchantActor)->patch(route('admin.gateways.merchant-update', [
             'gateway' => $gateway,
-            'user' => $merchant,
+            'merchant' => $merchant->merchant,
         ]), [
             'is_enabled' => true,
         ]);
 
         $response->assertForbidden();
         $this->assertDatabaseHas('merchant_gateways', [
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => false,
         ]);

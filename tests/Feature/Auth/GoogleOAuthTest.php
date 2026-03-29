@@ -32,7 +32,7 @@ class GoogleOAuthTest extends TestCase
         $response->assertRedirect('https://accounts.google.com/o/oauth2/auth');
     }
 
-    public function test_google_callback_creates_new_user_and_redirects_to_dashboard(): void
+    public function test_google_callback_creates_new_user_and_redirects_to_onboarding(): void
     {
         $googleId = 'google-'.fake()->uuid();
         $email = fake()->unique()->safeEmail();
@@ -43,14 +43,15 @@ class GoogleOAuthTest extends TestCase
 
         $response = $this->get(route('google.callback'));
 
-        $response->assertRedirect(url('/dashboard'));
+        $response->assertRedirect(route('onboarding.business'));
         $this->assertAuthenticated();
 
         $user = User::query()->where('email', $email)->first();
         $this->assertNotNull($user);
         $this->assertSame($name, $user->name);
         $this->assertSame($googleId, $user->google_id);
-        $this->assertSame('merchant', $user->role);
+        $this->assertSame('merchant_user', $user->role);
+        $this->assertNull($user->merchant_id);
         $this->assertNotNull($user->password);
     }
 
@@ -58,7 +59,6 @@ class GoogleOAuthTest extends TestCase
     {
         $existingUser = User::factory()->create([
             'email' => 'existing@example.com',
-            'role' => 'merchant',
             'google_id' => null,
         ]);
 
@@ -96,7 +96,7 @@ class GoogleOAuthTest extends TestCase
 
         $response->assertOk();
         $response->assertSee(route('google.redirect'));
-        $response->assertSee('Login with Google', false);
+        $response->assertSee('Continue with Google', false);
     }
 
     /**

@@ -55,7 +55,7 @@ class BackfillTunnelWalletLedger extends Command
 
         $query = Payment::query()
             ->where('status', 'paid')
-            ->when($merchantId !== null, fn ($q) => $q->where('user_id', (int) $merchantId))
+            ->when($merchantId !== null, fn ($q) => $q->where('merchant_id', (int) $merchantId))
             ->whereDoesntHave('walletTransactions', fn ($q) => $q->whereIn('entry_type', $missingEntryTypes))
             ->orderByDesc('paid_at')
             ->orderByDesc('created_at')

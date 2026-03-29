@@ -392,7 +392,7 @@
                                     @foreach($gateways->where('is_global_enabled', true) as $gateway)
                                         @php
                                             $isEnabled = $gateway->merchantGateways
-                                                ->where('user_id', $merchant->id)
+                                                ->where('merchant_id', $merchant->id)
                                                 ->first()?->is_enabled ?? false;
                                         @endphp
                                         <td class="px-4 py-4 text-center">

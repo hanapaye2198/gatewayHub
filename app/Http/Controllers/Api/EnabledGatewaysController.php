@@ -18,15 +18,11 @@ class EnabledGatewaysController extends Controller
             return ApiResponse::error('Unauthenticated.', 401);
         }
 
-        if ($merchant->role !== 'merchant') {
-            return ApiResponse::error('Forbidden.', 403);
-        }
-
         $gateways = Gateway::query()
             ->where('is_global_enabled', true)
             ->whereHas('merchantGateways', function (Builder $query) use ($merchant): void {
                 $query
-                    ->where('user_id', $merchant->id)
+                    ->where('merchant_id', $merchant->id)
                     ->where('is_enabled', true);
             })
             ->orderBy('name')

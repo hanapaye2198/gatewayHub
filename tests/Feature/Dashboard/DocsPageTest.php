@@ -13,7 +13,6 @@ class DocsPageTest extends TestCase
     public function test_merchant_can_access_docs_page_and_see_core_sections(): void
     {
         $merchant = User::factory()->create([
-            'role' => 'merchant',
         ]);
 
         $response = $this->actingAs($merchant)->get(route('dashboard.docs'));
@@ -36,7 +35,6 @@ class DocsPageTest extends TestCase
     public function test_merchant_sidebar_shows_docs_navigation_item(): void
     {
         $merchant = User::factory()->create([
-            'role' => 'merchant',
         ]);
 
         $response = $this->actingAs($merchant)->get(route('dashboard'));

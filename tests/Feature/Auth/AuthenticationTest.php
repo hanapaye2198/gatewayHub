@@ -20,7 +20,7 @@ class AuthenticationTest extends TestCase
 
     public function test_merchant_redirects_to_dashboard_after_login(): void
     {
-        $user = User::factory()->create(['role' => 'merchant']);
+        $user = User::factory()->create();
 
         $response = $this->post(route('login.store'), [
             'email' => $user->email,

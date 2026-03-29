@@ -43,13 +43,10 @@ class QrphGatewayFlowTest extends TestCase
             'is_global_enabled' => true,
         ]);
 
-        $merchant = User::factory()->create([
-            'role' => 'merchant',
-            'api_key' => 'qrph-api-key',
-        ]);
+        $merchant = User::factory()->withMerchantApiKey('qrph-api-key')->create();
 
         MerchantGateway::query()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
             'config_json' => [],
@@ -67,7 +64,7 @@ class QrphGatewayFlowTest extends TestCase
         $response->assertStatus(201);
         $response->assertJsonPath('data.gateway', 'qrph');
         $this->assertDatabaseHas('payments', [
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_code' => 'qrph',
             'status' => 'pending',
         ]);
@@ -134,13 +131,10 @@ class QrphGatewayFlowTest extends TestCase
             'is_global_enabled' => true,
         ]);
 
-        $merchant = User::factory()->create([
-            'role' => 'merchant',
-            'api_key' => 'payqrph-api-key',
-        ]);
+        $merchant = User::factory()->withMerchantApiKey('payqrph-api-key')->create();
 
         MerchantGateway::query()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
             'config_json' => [],
@@ -158,7 +152,7 @@ class QrphGatewayFlowTest extends TestCase
         $response->assertStatus(201);
         $response->assertJsonPath('data.gateway', 'payqrph');
         $this->assertDatabaseHas('payments', [
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_code' => 'payqrph',
             'status' => 'pending',
         ]);

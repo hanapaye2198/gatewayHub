@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -17,6 +18,12 @@ class User extends Authenticatable
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
 
+    public const ROLE_ADMIN = 'admin';
+
+    public const ROLE_MERCHANT_USER = 'merchant_user';
+
+    public const ROLE_STAFF = 'staff';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -28,6 +35,9 @@ class User extends Authenticatable
         'password',
         'role',
         'google_id',
+        'merchant_id',
+        'onboarding_gateways_at',
+        'onboarding_completed_at',
         'api_key',
         'api_key_hash',
         'api_key_last_four',
@@ -59,18 +69,58 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'api_key_generated_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'onboarding_gateways_at' => 'datetime',
+            'onboarding_completed_at' => 'datetime',
         ];
     }
 
+    public function isMerchantUser(): bool
+    {
+        return $this->role === self::ROLE_MERCHANT_USER;
+    }
+
     /**
+     * Web URL for the next merchant onboarding step, or the dashboard when onboarding is finished.
+     */
+    public function merchantOnboardingOrDashboardUrl(): string
+    {
+        if (! $this->isMerchantUser()) {
+            return url('/dashboard');
+        }
+
+        if ($this->merchant_id === null) {
+            return route('onboarding.business', absolute: false);
+        }
+
+        if ($this->onboarding_completed_at === null) {
+            if ($this->onboarding_gateways_at === null) {
+                return route('onboarding.gateways', absolute: false);
+            }
+
+            return route('onboarding.api-keys', absolute: false);
+        }
+
+        return url('/dashboard');
+    }
+
+    /**
+     * @return BelongsTo<Merchant, $this>
+     */
+    public function merchant(): BelongsTo
+    {
+        return $this->belongsTo(Merchant::class);
+    }
+
+    /**
+     * Payments belonging to this user's merchant (same merchant_id on users and payments).
+     *
      * @return HasMany<Payment, $this>
      */
     public function payments(): HasMany
     {
-        return $this->hasMany(Payment::class);
+        return $this->hasMany(Payment::class, 'merchant_id', 'merchant_id');
     }
 
     /**
@@ -78,8 +128,8 @@ class User extends Authenticatable
      */
     public function gateways(): BelongsToMany
     {
-        return $this->belongsToMany(Gateway::class, 'merchant_gateways')
-            ->withPivot(['is_enabled', 'config_json'])
+        return $this->belongsToMany(Gateway::class, 'merchant_gateways', 'merchant_id', 'gateway_id', 'merchant_id', 'id')
+            ->withPivot(['is_enabled', 'config_json', 'last_tested_at', 'last_test_status'])
             ->withTimestamps();
     }
 
@@ -88,7 +138,7 @@ class User extends Authenticatable
      */
     public function merchantGateways(): HasMany
     {
-        return $this->hasMany(MerchantGateway::class);
+        return $this->hasMany(MerchantGateway::class, 'merchant_id', 'merchant_id');
     }
 
     /**
@@ -96,7 +146,7 @@ class User extends Authenticatable
      */
     public function wallets(): HasMany
     {
-        return $this->hasMany(Wallet::class);
+        return $this->hasMany(Wallet::class, 'merchant_id', 'merchant_id');
     }
 
     /**
@@ -104,7 +154,7 @@ class User extends Authenticatable
      */
     public function merchantWalletSettings(): HasMany
     {
-        return $this->hasMany(MerchantWalletSetting::class);
+        return $this->hasMany(MerchantWalletSetting::class, 'merchant_id', 'merchant_id');
     }
 
     /**
@@ -112,7 +162,7 @@ class User extends Authenticatable
      */
     public function merchantWalletSetting(): HasOne
     {
-        return $this->hasOne(MerchantWalletSetting::class);
+        return $this->hasOne(MerchantWalletSetting::class, 'merchant_id', 'merchant_id');
     }
 
     /**
@@ -128,57 +178,30 @@ class User extends Authenticatable
     }
 
     /**
-     * Regenerate API key. Old key is invalidated immediately.
-     * Returns the new key once; caller must not log or persist it.
+     * Regenerate API key on the linked {@see Merchant} (not on the user row).
      */
     public function regenerateApiKey(): string
     {
-        $newKey = Str::random(64);
-        $this->forceFill([
-            'api_key' => null,
-            'api_key_hash' => hash('sha256', $newKey),
-            'api_key_last_four' => substr($newKey, -4),
-            'api_key_generated_at' => now(),
-        ])->save();
-
-        return $newKey;
-    }
-
-    /**
-     * Store API tokens as hash + last-four only (never plaintext).
-     */
-    public function setApiKeyAttribute(?string $value): void
-    {
-        $apiKey = is_string($value) ? trim($value) : '';
-
-        if ($apiKey === '') {
-            $this->attributes['api_key'] = null;
-            $this->attributes['api_key_hash'] = null;
-            $this->attributes['api_key_last_four'] = null;
-
-            return;
+        $m = $this->merchant;
+        if ($m === null) {
+            throw new \RuntimeException('User has no merchant; cannot regenerate API key.');
         }
 
-        $this->attributes['api_key'] = null;
-        $this->attributes['api_key_hash'] = hash('sha256', $apiKey);
-        $this->attributes['api_key_last_four'] = substr($apiKey, -4);
+        return $m->regenerateApiKey();
     }
 
     public function hasApiKey(): bool
     {
-        return is_string($this->api_key_hash) && $this->api_key_hash !== '';
+        return $this->merchant?->hasApiKey() ?? false;
     }
 
-    /**
-     * Mask API key for display (last 4 characters visible).
-     */
     public function getMaskedApiKeyAttribute(): ?string
     {
-        $lastFour = $this->api_key_last_four;
-        if (is_string($lastFour) && $lastFour !== '') {
-            return '****'.$lastFour;
-        }
+        return $this->merchant?->masked_api_key;
+    }
 
-        return null;
+    public function getApiKeyGeneratedAtAttribute(): mixed
+    {
+        return $this->merchant?->api_key_generated_at ?? $this->attributes['api_key_generated_at'] ?? null;
     }
 }

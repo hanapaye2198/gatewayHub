@@ -47,7 +47,8 @@ class AppServiceProvider extends ServiceProvider
         $webhooksMax = config('rate-limiting.webhooks.max_attempts', 200);
 
         RateLimiter::for('api', function (Request $request) use ($apiMax) {
-            $key = $request->merchant()?->id ?? $request->ip();
+            $merchant = $request->attributes->get('merchant');
+            $key = $merchant instanceof \App\Models\Merchant ? $merchant->id : $request->ip();
 
             return Limit::perMinute($apiMax)
                 ->by((string) $key)
@@ -55,7 +56,7 @@ class AppServiceProvider extends ServiceProvider
                     Log::warning('API rate limit exceeded', [
                         'limiter' => 'api',
                         'limit' => $apiMax,
-                        'key_type' => $req->merchant() !== null ? 'merchant' : 'ip',
+                        'key_type' => $req->attributes->get('merchant') instanceof \App\Models\Merchant ? 'merchant' : 'ip',
                     ]);
 
                     return ApiResponse::error('Too many requests. Please try again later.', 429)
@@ -81,8 +82,10 @@ class AppServiceProvider extends ServiceProvider
 
     protected function registerRequestMacros(): void
     {
-        Request::macro('merchant', function (): ?\App\Models\User {
-            return $this->attributes->get('merchant');
+        Request::macro('merchant', function (): ?\App\Models\Merchant {
+            $m = $this->attributes->get('merchant');
+
+            return $m instanceof \App\Models\Merchant ? $m : null;
         });
     }
 

@@ -11,8 +11,13 @@ new class extends Component {
     #[Computed]
     public function logRows()
     {
+        $mid = auth()->user()?->merchant_id;
+        if ($mid === null || $mid === '') {
+            return collect();
+        }
+
         $payments = Payment::query()
-            ->where('user_id', auth()->id())
+            ->where('merchant_id', (int) $mid)
             ->select(['id', 'reference_id', 'gateway_code', 'raw_response', 'created_at'])
             ->latest('created_at')
             ->limit(250)

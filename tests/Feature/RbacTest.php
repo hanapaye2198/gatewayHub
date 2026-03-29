@@ -14,7 +14,7 @@ class RbacTest extends TestCase
 
     public function test_merchant_can_access_dashboard_routes(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
 
         $this->actingAs($merchant);
 
@@ -26,7 +26,7 @@ class RbacTest extends TestCase
         $this->assertFalse(Route::has('dashboard.taxations'));
         $this->assertFalse(Route::has('dashboard.tunnel-wallet-logs'));
 
-        $payment = Payment::factory()->for($merchant)->create();
+        $payment = Payment::factory()->for($merchant->merchant)->create();
         $this->get(route('dashboard.payments.show', $payment))->assertOk();
     }
 
@@ -42,13 +42,14 @@ class RbacTest extends TestCase
         $this->get(route('dashboard.gateways'))->assertForbidden();
         $this->get(route('admin.surepay-wallets.dashboard'))->assertNotFound();
 
-        $payment = Payment::factory()->for(User::factory()->create())->create();
+        $other = User::factory()->create();
+        $payment = Payment::factory()->for($other->merchant)->create();
         $this->get(route('dashboard.payments.show', $payment))->assertForbidden();
     }
 
     public function test_deactivated_merchant_cannot_access_dashboard(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant', 'is_active' => false]);
+        $merchant = User::factory()->create(['is_active' => false]);
 
         $this->actingAs($merchant);
 
@@ -72,7 +73,7 @@ class RbacTest extends TestCase
 
     public function test_merchant_cannot_access_admin_routes(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
 
         $this->actingAs($merchant);
 
@@ -83,9 +84,9 @@ class RbacTest extends TestCase
         $this->get(route('admin.surepay-wallets.dashboard'))->assertForbidden();
     }
 
-    public function test_new_users_default_to_merchant_role(): void
+    public function test_new_users_default_to_merchant_user_role(): void
     {
         $user = User::factory()->create();
-        $this->assertSame('merchant', $user->role);
+        $this->assertSame(User::ROLE_MERCHANT_USER, $user->role);
     }
 }

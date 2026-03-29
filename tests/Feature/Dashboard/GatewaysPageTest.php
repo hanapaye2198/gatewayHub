@@ -30,7 +30,7 @@ class GatewaysPageTest extends TestCase
 
     public function test_merchant_sees_gateways_page_with_self_service_message(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
 
         $this->actingAs($merchant);
         $response = $this->get(route('dashboard.gateways'));
@@ -38,16 +38,16 @@ class GatewaysPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('Gateways');
         $response->assertSee('Coins.ph');
-        $response->assertSee('Turn payment gateways on or off for your account');
+        $response->assertSee('Enable or disable payment gateways for your merchant account');
     }
 
     public function test_enabled_gateway_shows_as_on_for_merchant(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
         $gateway = Gateway::query()->where('code', 'coins')->firstOrFail();
 
         MerchantGateway::query()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
             'config_json' => [],
@@ -56,9 +56,9 @@ class GatewaysPageTest extends TestCase
         $response = $this->actingAs($merchant)->get(route('dashboard.gateways'));
 
         $response->assertOk();
-        $response->assertSee('Enabled');
-        $response->assertSee('On');
-        $response->assertSee('Turn Off');
+        $response->assertSee('Active');
+        $response->assertSee('Accepting payments');
+        $response->assertSee('Disable');
     }
 
     public function test_merchant_sees_qrph_gateway_option_when_present(): void
@@ -70,7 +70,7 @@ class GatewaysPageTest extends TestCase
             'is_global_enabled' => true,
         ]);
 
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
 
         $response = $this->actingAs($merchant)->get(route('dashboard.gateways'));
 
@@ -80,11 +80,11 @@ class GatewaysPageTest extends TestCase
 
     public function test_merchant_can_toggle_gateway_from_dashboard(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
         $gateway = Gateway::query()->where('code', 'coins')->firstOrFail();
 
         MerchantGateway::query()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => false,
             'config_json' => [],
@@ -97,7 +97,7 @@ class GatewaysPageTest extends TestCase
             ->assertHasNoErrors();
 
         $this->assertDatabaseHas('merchant_gateways', [
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
         ]);
@@ -105,11 +105,11 @@ class GatewaysPageTest extends TestCase
 
     public function test_merchant_can_toggle_gateway_using_button_action(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
         $gateway = Gateway::query()->where('code', 'coins')->firstOrFail();
 
         MerchantGateway::query()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => false,
             'config_json' => [],
@@ -121,7 +121,7 @@ class GatewaysPageTest extends TestCase
             ->assertHasNoErrors();
 
         $this->assertDatabaseHas('merchant_gateways', [
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
         ]);
@@ -129,12 +129,12 @@ class GatewaysPageTest extends TestCase
 
     public function test_merchant_cannot_enable_gateway_when_globally_disabled(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
         $gateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         $gateway->update(['is_global_enabled' => false]);
 
         MerchantGateway::query()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => false,
             'config_json' => [],
@@ -147,7 +147,7 @@ class GatewaysPageTest extends TestCase
             ->assertHasErrors('gateway.'.$gateway->id);
 
         $this->assertDatabaseHas('merchant_gateways', [
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => false,
         ]);
@@ -155,7 +155,7 @@ class GatewaysPageTest extends TestCase
 
     public function test_gateways_page_does_not_show_credential_forms_or_tunnel_controls(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
 
         $response = $this->actingAs($merchant)->get(route('dashboard.gateways'));
 
@@ -167,7 +167,7 @@ class GatewaysPageTest extends TestCase
 
     public function test_merchant_can_ping_coins_public_api_from_gateways_header(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
 
         config()->set('coins.gateway.api_base', 'sandbox');
 

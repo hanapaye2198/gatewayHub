@@ -1,9 +1,9 @@
 <?php
 
+use App\Models\Merchant;
 use App\Models\MerchantWalletSetting;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
-use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
@@ -41,7 +41,7 @@ new class extends Component {
         return (float) Wallet::query()
             ->where('wallet_type', Wallet::TYPE_MERCHANT_CLEARING)
             ->where('currency', $this->displayCurrency)
-            ->whereHas('user', fn ($query) => $query->where('role', 'merchant'))
+            ->whereHas('merchant')
             ->sum('balance');
     }
 
@@ -51,7 +51,7 @@ new class extends Component {
         return (float) Wallet::query()
             ->where('wallet_type', Wallet::TYPE_MERCHANT_REAL)
             ->where('currency', $this->displayCurrency)
-            ->whereHas('user', fn ($query) => $query->where('role', 'merchant'))
+            ->whereHas('merchant')
             ->sum('balance');
     }
 
@@ -63,7 +63,7 @@ new class extends Component {
         return (float) WalletTransaction::query()
             ->where('entry_type', WalletTransaction::ENTRY_PAYMENT_RECEIVED_GROSS)
             ->where('created_at', '>=', $today)
-            ->whereHas('payment.user', fn ($query) => $query->where('role', 'merchant'))
+            ->whereHas('payment.merchant')
             ->sum('amount');
     }
 
@@ -78,7 +78,7 @@ new class extends Component {
                 WalletTransaction::ENTRY_REAL_WALLET_NET_CREDIT_DIRECT,
             ])
             ->where('created_at', '>=', $today)
-            ->whereHas('payment.user', fn ($query) => $query->where('role', 'merchant'))
+            ->whereHas('payment.merchant')
             ->sum('amount');
     }
 
@@ -88,7 +88,7 @@ new class extends Component {
         return WalletTransaction::query()
             ->where('entry_type', WalletTransaction::ENTRY_TUNNEL_NET_AVAILABLE)
             ->where('is_settled', false)
-            ->whereHas('payment.user', fn ($query) => $query->where('role', 'merchant'))
+            ->whereHas('payment.merchant')
             ->count();
     }
 
@@ -97,7 +97,7 @@ new class extends Component {
     {
         return WalletTransaction::query()
             ->where('entry_type', WalletTransaction::ENTRY_TUNNEL_FAILURE)
-            ->whereHas('payment.user', fn ($query) => $query->where('role', 'merchant'))
+            ->whereHas('payment.merchant')
             ->count();
     }
 
@@ -105,7 +105,7 @@ new class extends Component {
     public function configuredMerchantsCount(): int
     {
         return MerchantWalletSetting::query()
-            ->whereHas('user', fn ($query) => $query->where('role', 'merchant'))
+            ->whereHas('merchant')
             ->count();
     }
 
@@ -114,7 +114,7 @@ new class extends Component {
     {
         return MerchantWalletSetting::query()
             ->where('tunnel_wallet_enabled', true)
-            ->whereHas('user', fn ($query) => $query->where('role', 'merchant'))
+            ->whereHas('merchant')
             ->count();
     }
 
@@ -123,8 +123,7 @@ new class extends Component {
     {
         $today = CarbonImmutable::now()->startOfDay();
 
-        $merchants = User::query()
-            ->where('role', 'merchant')
+        $merchants = Merchant::query()
             ->select(['id', 'name'])
             ->orderBy('name')
             ->get();
@@ -132,36 +131,36 @@ new class extends Component {
         $tunnelBalances = Wallet::query()
             ->where('wallet_type', Wallet::TYPE_MERCHANT_CLEARING)
             ->where('currency', $this->displayCurrency)
-            ->whereIn('user_id', $merchants->pluck('id'))
-            ->selectRaw('user_id, SUM(balance) as total_balance')
-            ->groupBy('user_id')
-            ->pluck('total_balance', 'user_id');
+            ->whereIn('merchant_id', $merchants->pluck('id'))
+            ->selectRaw('merchant_id, SUM(balance) as total_balance')
+            ->groupBy('merchant_id')
+            ->pluck('total_balance', 'merchant_id');
 
         $realBalances = Wallet::query()
             ->where('wallet_type', Wallet::TYPE_MERCHANT_REAL)
             ->where('currency', $this->displayCurrency)
-            ->whereIn('user_id', $merchants->pluck('id'))
-            ->selectRaw('user_id, SUM(balance) as total_balance')
-            ->groupBy('user_id')
-            ->pluck('total_balance', 'user_id');
+            ->whereIn('merchant_id', $merchants->pluck('id'))
+            ->selectRaw('merchant_id, SUM(balance) as total_balance')
+            ->groupBy('merchant_id')
+            ->pluck('total_balance', 'merchant_id');
 
         $pendingNetAmounts = WalletTransaction::query()
             ->join('payments', 'payments.id', '=', 'wallet_transactions.payment_id')
             ->where('wallet_transactions.entry_type', WalletTransaction::ENTRY_TUNNEL_NET_AVAILABLE)
             ->where('wallet_transactions.is_settled', false)
-            ->whereIn('payments.user_id', $merchants->pluck('id'))
-            ->selectRaw('payments.user_id as user_id, SUM(wallet_transactions.amount) as total_amount')
-            ->groupBy('payments.user_id')
-            ->pluck('total_amount', 'user_id');
+            ->whereIn('payments.merchant_id', $merchants->pluck('id'))
+            ->selectRaw('payments.merchant_id as merchant_id, SUM(wallet_transactions.amount) as total_amount')
+            ->groupBy('payments.merchant_id')
+            ->pluck('total_amount', 'merchant_id');
 
         $todayGrossAmounts = WalletTransaction::query()
             ->join('payments', 'payments.id', '=', 'wallet_transactions.payment_id')
             ->where('wallet_transactions.entry_type', WalletTransaction::ENTRY_PAYMENT_RECEIVED_GROSS)
             ->where('wallet_transactions.created_at', '>=', $today)
-            ->whereIn('payments.user_id', $merchants->pluck('id'))
-            ->selectRaw('payments.user_id as user_id, SUM(wallet_transactions.amount) as total_amount')
-            ->groupBy('payments.user_id')
-            ->pluck('total_amount', 'user_id');
+            ->whereIn('payments.merchant_id', $merchants->pluck('id'))
+            ->selectRaw('payments.merchant_id as merchant_id, SUM(wallet_transactions.amount) as total_amount')
+            ->groupBy('payments.merchant_id')
+            ->pluck('total_amount', 'merchant_id');
 
         $todayNetAmounts = WalletTransaction::query()
             ->join('payments', 'payments.id', '=', 'wallet_transactions.payment_id')
@@ -170,12 +169,12 @@ new class extends Component {
                 WalletTransaction::ENTRY_REAL_WALLET_NET_CREDIT_DIRECT,
             ])
             ->where('wallet_transactions.created_at', '>=', $today)
-            ->whereIn('payments.user_id', $merchants->pluck('id'))
-            ->selectRaw('payments.user_id as user_id, SUM(wallet_transactions.amount) as total_amount')
-            ->groupBy('payments.user_id')
-            ->pluck('total_amount', 'user_id');
+            ->whereIn('payments.merchant_id', $merchants->pluck('id'))
+            ->selectRaw('payments.merchant_id as merchant_id, SUM(wallet_transactions.amount) as total_amount')
+            ->groupBy('payments.merchant_id')
+            ->pluck('total_amount', 'merchant_id');
 
-        return $merchants->map(function (User $merchant) use (
+        return $merchants->map(function (Merchant $merchant) use (
             $tunnelBalances,
             $realBalances,
             $pendingNetAmounts,
@@ -205,8 +204,8 @@ new class extends Component {
                 WalletTransaction::ENTRY_REAL_WALLET_NET_CREDIT,
                 WalletTransaction::ENTRY_TUNNEL_FAILURE,
             ])
-            ->whereHas('payment.user', fn ($query) => $query->where('role', 'merchant'))
-            ->with(['payment.user'])
+            ->whereHas('payment.merchant')
+            ->with(['payment.merchant'])
             ->latest('created_at')
             ->limit(15)
             ->get();
@@ -220,12 +219,12 @@ new class extends Component {
         ];
 
         $payments = \App\Models\Payment::query()
-            ->whereHas('user', fn ($query) => $query->where('role', 'merchant'))
+            ->whereHas('merchant')
             ->whereNotNull('raw_response')
-            ->with('user:id,name')
+            ->with('merchant:id,name')
             ->latest('updated_at')
             ->limit(150)
-            ->get(['id', 'user_id', 'reference_id', 'raw_response', 'updated_at']);
+            ->get(['id', 'merchant_id', 'reference_id', 'raw_response', 'updated_at']);
 
         foreach ($payments as $payment) {
             $raw = $payment->raw_response;
@@ -246,7 +245,7 @@ new class extends Component {
                         }
 
                         $channels['user_to_surepay_wallet'][] = [
-                            'merchant' => $payment->user?->name ?? 'N/A',
+                            'merchant' => $payment->merchant?->name ?? 'N/A',
                             'reference' => $payment->reference_id,
                             'status' => (string) ($entry['status'] ?? 'info'),
                             'stage' => (string) ($entry['stage'] ?? ''),
@@ -276,7 +275,7 @@ new class extends Component {
                     }
 
                     $channels['user_to_surepay_wallet'][] = [
-                        'merchant' => $payment->user?->name ?? 'N/A',
+                        'merchant' => $payment->merchant?->name ?? 'N/A',
                         'reference' => $payment->reference_id,
                         'status' => 'failed',
                         'stage' => 'error',
@@ -494,7 +493,7 @@ new class extends Component {
             <flux:table.rows>
                 @forelse ($this->recentTunnelEntries as $entry)
                     <flux:table.row>
-                        <flux:table.cell>{{ $entry->payment?->user?->name ?? 'N/A' }}</flux:table.cell>
+                        <flux:table.cell>{{ $entry->payment?->merchant?->name ?? 'N/A' }}</flux:table.cell>
                         <flux:table.cell>{{ $entry->payment?->reference_id ?? 'N/A' }}</flux:table.cell>
                         <flux:table.cell>{{ $entry->entry_type }}</flux:table.cell>
                         <flux:table.cell align="end" class="font-mono tabular-nums">{{ number_format($entry->amount, 2) }} {{ $entry->currency }}</flux:table.cell>

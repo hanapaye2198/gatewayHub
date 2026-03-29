@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\User;
+use App\Models\Merchant;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -45,8 +45,7 @@ class MerchantList extends Component
 
     public function render()
     {
-        $query = User::query()
-            ->where('role', 'merchant');
+        $query = Merchant::query();
 
         if ($this->search !== '') {
             $query->where(function ($q): void {
@@ -61,9 +60,9 @@ class MerchantList extends Component
 
         $query->orderBy($this->sortField, $this->sortDirection);
 
-        $merchants = $query->paginate(10);
+        $merchants = $query->with('users')->paginate(10);
 
-        $baseQuery = User::query()->where('role', 'merchant');
+        $baseQuery = Merchant::query();
 
         return view('livewire.admin.merchant-list', [
             'merchants' => $merchants,

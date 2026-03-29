@@ -41,22 +41,22 @@ class DashboardTest extends TestCase
         $otherMerchant = User::factory()->create();
 
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'status' => 'paid',
             'amount' => 120.50,
         ]);
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'status' => 'paid',
             'amount' => 30.25,
         ]);
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'status' => 'pending',
             'amount' => 999.99,
         ]);
         Payment::factory()->create([
-            'user_id' => $otherMerchant->id,
+            'merchant_id' => $otherMerchant->id,
             'status' => 'paid',
             'amount' => 500,
         ]);

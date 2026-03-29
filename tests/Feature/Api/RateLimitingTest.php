@@ -31,9 +31,9 @@ class RateLimitingTest extends TestCase
     {
         Http::fake(['*' => Http::response(['code' => 0, 'data' => ['orderId' => 'x', 'qrCode' => 'y']], 200)]);
 
-        $user = User::factory()->create(['api_key' => 'test-api-key']);
+        $user = User::factory()->withMerchantApiKey('test-api-key')->create();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => Gateway::query()->where('code', 'coins')->firstOrFail()->id,
             'is_enabled' => true,
             'config_json' => [

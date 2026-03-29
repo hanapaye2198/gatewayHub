@@ -3,7 +3,7 @@
 namespace App\Services\Gateways;
 
 use App\Models\Gateway;
-use App\Models\User;
+use App\Models\Merchant;
 use App\Services\Gateways\Contracts\GatewayInterface;
 use App\Services\Gateways\Exceptions\GatewayException;
 use Illuminate\Contracts\Container\Container;
@@ -29,7 +29,7 @@ class PaymentGatewayManager
      *
      * @throws GatewayException
      */
-    public function resolve(User $merchant, string $gatewayCode): GatewayInterface
+    public function resolve(Merchant $merchant, string $gatewayCode): GatewayInterface
     {
         $gateway = $this->gateway->newQuery()->where('code', $gatewayCode)->first();
 
@@ -42,7 +42,7 @@ class PaymentGatewayManager
         }
 
         $merchantGateway = $gateway->merchantGateways()
-            ->where('user_id', $merchant->id)
+            ->where('merchant_id', $merchant->id)
             ->where('is_enabled', true)
             ->first();
 

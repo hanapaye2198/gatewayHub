@@ -47,7 +47,7 @@ class WalletSettlementService
                 $maxAllowedNetAmount = max(0.0, round($grossAmount - $taxAmount, 2));
                 $netAmount = min($configuredNetAmount, $maxAllowedNetAmount);
 
-                $settings = $this->resolveSettings((int) $lockedPayment->user_id);
+                $settings = $this->resolveSettings((int) $lockedPayment->merchant_id);
 
                 $currency = $lockedPayment->currency;
                 $metadata = [
@@ -55,7 +55,7 @@ class WalletSettlementService
                     'reference_id' => $lockedPayment->reference_id,
                 ];
 
-                $tunnelWallet = $this->resolveMerchantWallet((int) $lockedPayment->user_id, Wallet::TYPE_MERCHANT_CLEARING, $currency);
+                $tunnelWallet = $this->resolveMerchantWallet((int) $lockedPayment->merchant_id, Wallet::TYPE_MERCHANT_CLEARING, $currency);
                 $taxWallet = $this->resolveSystemWallet(Wallet::TYPE_SYSTEM_TAX, $currency);
 
                 $this->post($tunnelWallet, $lockedPayment, 'credit', $grossAmount, WalletTransaction::ENTRY_PAYMENT_RECEIVED_GROSS, $metadata, true);
@@ -104,7 +104,7 @@ class WalletSettlementService
             ->limit($limit);
 
         if ($merchantId !== null) {
-            $query->whereHas('payment', fn ($paymentQuery) => $paymentQuery->where('user_id', $merchantId));
+            $query->whereHas('payment', fn ($paymentQuery) => $paymentQuery->where('merchant_id', $merchantId));
         }
 
         $pendingEntries = $query->get();
@@ -132,13 +132,13 @@ class WalletSettlementService
                         return;
                     }
 
-                    $settings = $this->resolveSettings((int) $payment->user_id);
+                    $settings = $this->resolveSettings((int) $payment->merchant_id);
                     if (! $settings->auto_settle_to_real_wallet) {
                         return;
                     }
 
-                    $tunnelWallet = $this->resolveMerchantWallet((int) $payment->user_id, Wallet::TYPE_MERCHANT_CLEARING, $lockedEntry->currency);
-                    $realWallet = $this->resolveMerchantWallet((int) $payment->user_id, Wallet::TYPE_MERCHANT_REAL, $lockedEntry->currency);
+                    $tunnelWallet = $this->resolveMerchantWallet((int) $payment->merchant_id, Wallet::TYPE_MERCHANT_CLEARING, $lockedEntry->currency);
+                    $realWallet = $this->resolveMerchantWallet((int) $payment->merchant_id, Wallet::TYPE_MERCHANT_REAL, $lockedEntry->currency);
 
                     if ((float) $tunnelWallet->balance < $amount) {
                         throw new \RuntimeException('SurePay wallet insufficient balance for settlement.');
@@ -217,7 +217,7 @@ class WalletSettlementService
                     return;
                 }
 
-                $tunnelWallet = $this->resolveMerchantWallet((int) $lockedPayment->user_id, Wallet::TYPE_MERCHANT_CLEARING, $lockedPayment->currency);
+                $tunnelWallet = $this->resolveMerchantWallet((int) $lockedPayment->merchant_id, Wallet::TYPE_MERCHANT_CLEARING, $lockedPayment->currency);
                 if ((float) $tunnelWallet->balance < $amount) {
                     throw new \RuntimeException('SurePay wallet insufficient balance for reversal: '.$reason);
                 }
@@ -245,10 +245,10 @@ class WalletSettlementService
             ->exists();
     }
 
-    private function resolveSettings(int $userId): MerchantWalletSetting
+    private function resolveSettings(int $merchantId): MerchantWalletSetting
     {
         $settings = MerchantWalletSetting::query()
-            ->where('user_id', $userId)
+            ->where('merchant_id', $merchantId)
             ->lockForUpdate()
             ->first();
 
@@ -262,7 +262,7 @@ class WalletSettlementService
         }
 
         return MerchantWalletSetting::query()->create([
-            'user_id' => $userId,
+            'merchant_id' => $merchantId,
             'tunnel_wallet_enabled' => true,
             'auto_settle_to_real_wallet' => true,
             'default_currency' => 'PHP',
@@ -270,10 +270,10 @@ class WalletSettlementService
         ]);
     }
 
-    private function resolveMerchantWallet(int $userId, string $walletType, string $currency): Wallet
+    private function resolveMerchantWallet(int $merchantId, string $walletType, string $currency): Wallet
     {
         $wallet = Wallet::query()
-            ->where('user_id', $userId)
+            ->where('merchant_id', $merchantId)
             ->where('wallet_type', $walletType)
             ->where('currency', $currency)
             ->lockForUpdate()
@@ -284,7 +284,7 @@ class WalletSettlementService
         }
 
         return Wallet::query()->create([
-            'user_id' => $userId,
+            'merchant_id' => $merchantId,
             'wallet_type' => $walletType,
             'currency' => $currency,
             'balance' => 0,
@@ -294,7 +294,7 @@ class WalletSettlementService
     private function resolveSystemWallet(string $walletType, string $currency): Wallet
     {
         $wallet = Wallet::query()
-            ->whereNull('user_id')
+            ->whereNull('merchant_id')
             ->where('wallet_type', $walletType)
             ->where('currency', $currency)
             ->lockForUpdate()
@@ -305,7 +305,7 @@ class WalletSettlementService
         }
 
         return Wallet::query()->create([
-            'user_id' => null,
+            'merchant_id' => null,
             'wallet_type' => $walletType,
             'currency' => $currency,
             'balance' => 0,

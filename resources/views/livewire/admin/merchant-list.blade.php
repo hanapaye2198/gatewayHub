@@ -250,7 +250,7 @@
                                     </div>
                                     <div>
                                         <span class="font-medium text-zinc-800 dark:text-zinc-200">{{ $merchant->name }}</span>
-                                        @if($merchant->email_verified_at)
+                                        @if($merchant->users->first()?->email_verified_at)
                                             <span class="ml-2 inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
                                                 <flux:icon name="check-circle" class="size-3" />
                                                 Verified
@@ -282,7 +282,7 @@
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-right">
-                                <form action="{{ route('admin.merchants.toggle', ['user' => $merchant]) }}" method="POST" class="inline">
+                                <form action="{{ route('admin.merchants.toggle', ['merchant' => $merchant]) }}" method="POST" class="inline">
                                     @csrf
                                     @method('PATCH')
                                     @if ($merchant->is_active)

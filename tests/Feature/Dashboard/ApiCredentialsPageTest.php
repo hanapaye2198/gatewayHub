@@ -19,7 +19,8 @@ class ApiCredentialsPageTest extends TestCase
 
     public function test_merchant_can_access_api_credentials_page(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant', 'api_key' => 'test-key-1234']);
+        $merchant = User::factory()->create();
+        $merchant->merchant->forceFill(['api_key' => 'test-key-1234'])->save();
 
         $this->actingAs($merchant);
         $response = $this->get(route('dashboard.api-credentials'));
@@ -41,11 +42,11 @@ class ApiCredentialsPageTest extends TestCase
 
     public function test_merchant_can_regenerate_api_key(): void
     {
-        $merchant = User::factory()->create([
-            'role' => 'merchant',
+        $merchant = User::factory()->create();
+        $merchant->merchant->forceFill([
             'api_key' => 'old-key',
             'api_key_generated_at' => null,
-        ]);
+        ])->save();
 
         $this->actingAs($merchant);
 
@@ -56,32 +57,37 @@ class ApiCredentialsPageTest extends TestCase
             ->assertRedirect(route('dashboard.api-credentials'));
 
         $merchant->refresh();
-        $this->assertNull($merchant->api_key);
-        $this->assertNotNull($merchant->api_key_hash);
-        $this->assertSame(64, strlen($merchant->api_key_hash));
-        $this->assertNotNull($merchant->api_key_last_four);
-        $this->assertSame(4, strlen($merchant->api_key_last_four));
-        $this->assertNotNull($merchant->api_key_generated_at);
+        $m = $merchant->merchant;
+        $this->assertNotNull($m);
+        $this->assertNull($m->api_key);
+        $this->assertNotNull($m->api_key_hash);
+        $this->assertSame(64, strlen($m->api_key_hash));
+        $this->assertNotNull($m->api_key_last_four);
+        $this->assertSame(4, strlen($m->api_key_last_four));
+        $this->assertNotNull($m->api_key_generated_at);
     }
 
     public function test_after_regenerate_key_is_new_and_masked_on_page(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant', 'api_key' => 'previous']);
+        $merchant = User::factory()->create();
+        $merchant->merchant->forceFill(['api_key' => 'previous'])->save();
 
         $this->actingAs($merchant);
 
         Livewire::test('pages::dashboard.api-credentials')->call('regenerateApiKey');
 
         $merchant->refresh();
-        $this->assertNull($merchant->api_key);
-        $this->assertNotNull($merchant->api_key_hash);
-        $this->assertSame(64, strlen($merchant->api_key_hash));
-        $this->assertNotNull($merchant->api_key_last_four);
-        $this->assertSame(4, strlen($merchant->api_key_last_four));
+        $m = $merchant->merchant;
+        $this->assertNotNull($m);
+        $this->assertNull($m->api_key);
+        $this->assertNotNull($m->api_key_hash);
+        $this->assertSame(64, strlen($m->api_key_hash));
+        $this->assertNotNull($m->api_key_last_four);
+        $this->assertSame(4, strlen($m->api_key_last_four));
 
         $response = $this->get(route('dashboard.api-credentials'));
         $response->assertOk();
         $response->assertDontSee('previous');
-        $response->assertSee('****'.$merchant->api_key_last_four);
+        $response->assertSee('****'.$m->api_key_last_four);
     }
 }

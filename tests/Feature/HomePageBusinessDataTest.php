@@ -17,10 +17,8 @@ class HomePageBusinessDataTest extends TestCase
         Gateway::query()->delete();
 
         $merchantA = User::factory()->create([
-            'role' => 'merchant',
         ]);
         $merchantB = User::factory()->create([
-            'role' => 'merchant',
         ]);
         User::factory()->admin()->create();
 
@@ -44,17 +42,17 @@ class HomePageBusinessDataTest extends TestCase
         ]);
 
         Payment::factory()->paid()->create([
-            'user_id' => $merchantA->id,
+            'merchant_id' => $merchantA->id,
             'gateway_code' => 'alpha',
             'amount' => 100.00,
         ]);
         Payment::factory()->paid()->create([
-            'user_id' => $merchantB->id,
+            'merchant_id' => $merchantB->id,
             'gateway_code' => 'beta',
             'amount' => 250.50,
         ]);
         Payment::factory()->create([
-            'user_id' => $merchantA->id,
+            'merchant_id' => $merchantA->id,
             'gateway_code' => 'gamma',
             'amount' => 999.99,
             'status' => 'pending',

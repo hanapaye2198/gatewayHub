@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\Merchant;
 use App\Models\Payment;
-use App\Models\User;
 use App\Services\Gateways\Exceptions\GatewayException;
 use App\Services\Gateways\PaymentGatewayManager;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +27,7 @@ class PaymentCreationService
      *
      * @throws GatewayException
      */
-    public function create(User $merchant, string $gatewayCode, array $data): array
+    public function create(Merchant $merchant, string $gatewayCode, array $data): array
     {
         $driver = $this->gatewayManager->resolve($merchant, $gatewayCode);
         $gatewayRequestReference = $this->buildGatewayRequestReference($merchant);
@@ -50,7 +50,7 @@ class PaymentCreationService
 
         $payment = DB::transaction(function () use ($merchant, $gatewayCode, $data, $externalPaymentId, $rawToStore) {
             return Payment::query()->create([
-                'user_id' => $merchant->id,
+                'merchant_id' => $merchant->id,
                 'gateway_code' => $gatewayCode,
                 'amount' => $data['amount'],
                 'currency' => $data['currency'],
@@ -77,7 +77,7 @@ class PaymentCreationService
         ];
     }
 
-    private function buildGatewayRequestReference(User $merchant): string
+    private function buildGatewayRequestReference(Merchant $merchant): string
     {
         return sprintf('GH-%d-%s', $merchant->id, Str::upper((string) Str::ulid()));
     }

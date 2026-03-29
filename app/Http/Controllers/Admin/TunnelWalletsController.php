@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdateSurepayBatchSettingRequest;
 use App\Http\Requests\Admin\UpdateTunnelWalletSettingRequest;
+use App\Models\Merchant;
 use App\Models\MerchantWalletSetting;
 use App\Models\SurepayBatchSetting;
-use App\Models\User;
 use App\Models\WalletTransaction;
 use App\Services\Billing\WalletSettlementService;
 use Illuminate\Contracts\View\View;
@@ -19,8 +19,7 @@ class TunnelWalletsController extends Controller
     {
         $this->ensureWalletSettlementEnabled();
 
-        $merchants = User::query()
-            ->where('role', 'merchant')
+        $merchants = Merchant::query()
             ->with('merchantWalletSetting')
             ->orderBy('name')
             ->get();
@@ -51,16 +50,12 @@ class TunnelWalletsController extends Controller
         ]);
     }
 
-    public function updateSetting(UpdateTunnelWalletSettingRequest $request, User $user): RedirectResponse
+    public function updateSetting(UpdateTunnelWalletSettingRequest $request, Merchant $merchant): RedirectResponse
     {
         $this->ensureWalletSettlementEnabled();
 
-        if ($user->role !== 'merchant') {
-            abort(404);
-        }
-
         $setting = MerchantWalletSetting::query()->firstOrCreate(
-            ['user_id' => $user->id],
+            ['merchant_id' => $merchant->id],
             [
                 'tunnel_wallet_enabled' => true,
                 'auto_settle_to_real_wallet' => true,
@@ -89,7 +84,7 @@ class TunnelWalletsController extends Controller
 
         return redirect()
             ->route('admin.surepay-wallets.index')
-            ->with('status', "SurePay settlement configuration updated for {$user->name}.");
+            ->with('status', "SurePay settlement configuration updated for {$merchant->name}.");
     }
 
     public function settleBatch(WalletSettlementService $service): RedirectResponse

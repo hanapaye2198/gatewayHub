@@ -4,36 +4,103 @@
         @include('partials.head')
     </head>
     <body class="min-h-screen bg-white antialiased dark:bg-linear-to-b dark:from-neutral-950 dark:to-neutral-900">
-        <div class="relative grid h-dvh flex-col items-center justify-center px-8 sm:px-0 lg:max-w-none lg:grid-cols-2 lg:px-0">
-            <div class="bg-muted relative hidden h-full flex-col p-10 text-white lg:flex dark:border-e dark:border-neutral-800">
-                <div class="absolute inset-0 bg-neutral-900"></div>
-                <a href="{{ route('home') }}" class="relative z-20 flex items-center text-lg font-medium" wire:navigate>
-                    <span class="flex h-10 w-10 items-center justify-center rounded-md">
-                        <x-app-logo-icon class="me-2 h-7 fill-current text-white" />
+        <div class="grid min-h-svh w-full grid-cols-1 lg:grid-cols-2">
+            {{-- Left: product details (50% on large screens; hidden on small to prioritize the form) --}}
+            <aside
+                class="relative hidden min-h-svh flex-col justify-between overflow-hidden bg-linear-to-br from-zinc-900 via-zinc-900 to-emerald-950 px-8 py-10 text-white sm:px-12 lg:flex"
+            >
+                <div
+                    class="pointer-events-none absolute inset-0 opacity-[0.07]"
+                    style="background-image: url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"
+                    aria-hidden="true"
+                ></div>
+
+                <div class="relative z-10 flex flex-col gap-10">
+                    <a href="{{ route('home') }}" class="inline-flex items-center gap-3 font-medium" wire:navigate>
+                        <span
+                            class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-emerald-300 ring-1 ring-white/10"
+                            aria-hidden="true"
+                        >
+                            <flux:icon name="wallet" class="size-6" />
+                        </span>
+                        <span class="text-lg font-semibold tracking-tight">{{ config('app.name', 'GatewayHub') }}</span>
+                    </a>
+
+                    <div class="max-w-md space-y-6">
+                        <flux:heading size="xl" class="text-white">
+                            {{ __('Accept and track payments in one place') }}
+                        </flux:heading>
+                        <flux:subheading class="text-base text-zinc-300">
+                            {{ __('GatewayHub connects your business to secure checkout, dashboards, and APIs built for modern merchants.') }}
+                        </flux:subheading>
+
+                        <ul class="space-y-4 text-sm text-zinc-200">
+                            <li class="flex gap-3">
+                                <span
+                                    class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-300"
+                                    aria-hidden="true"
+                                >
+                                    <flux:icon name="shield-check" class="size-4" />
+                                </span>
+                                <span>
+                                    <span class="font-medium text-white">{{ __('Secure sign-in') }}</span>
+                                    {{ __('— email, password, and optional Google OAuth.') }}
+                                </span>
+                            </li>
+                            <li class="flex gap-3">
+                                <span
+                                    class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-300"
+                                    aria-hidden="true"
+                                >
+                                    <flux:icon name="chart-bar-square" class="size-4" />
+                                </span>
+                                <span>
+                                    <span class="font-medium text-white">{{ __('Live visibility') }}</span>
+                                    {{ __('— monitor payments and activity from your dashboard.') }}
+                                </span>
+                            </li>
+                            <li class="flex gap-3">
+                                <span
+                                    class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-300"
+                                    aria-hidden="true"
+                                >
+                                    <flux:icon name="bolt" class="size-4" />
+                                </span>
+                                <span>
+                                    <span class="font-medium text-white">{{ __('Developer-friendly') }}</span>
+                                    {{ __('— API credentials and tools when you need automation.') }}
+                                </span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="relative z-10 mt-12 text-sm text-zinc-400">
+                    <p>&copy; {{ now()->year }} {{ config('app.name', 'GatewayHub') }}. {{ __('All rights reserved.') }}</p>
+                </div>
+            </aside>
+
+            {{-- Right: auth forms (full width mobile; 50% on lg) --}}
+            <div
+                class="flex min-h-svh flex-col justify-center bg-zinc-50/80 px-4 py-8 sm:px-8 lg:px-12 dark:bg-transparent"
+            >
+                <a
+                    href="{{ route('home') }}"
+                    class="mb-8 flex flex-col items-center gap-2.5 font-medium lg:hidden"
+                    wire:navigate
+                >
+                    <span
+                        class="flex size-11 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700 shadow-sm dark:bg-emerald-400/15 dark:text-emerald-300"
+                        aria-hidden="true"
+                    >
+                        <flux:icon name="wallet" class="size-6" />
                     </span>
-                    {{ config('app.name', 'Laravel') }}
+                    <span class="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white">
+                        {{ config('app.name', 'GatewayHub') }}
+                    </span>
                 </a>
 
-                @php
-                    [$message, $author] = str(Illuminate\Foundation\Inspiring::quotes()->random())->explode('-');
-                @endphp
-
-                <div class="relative z-20 mt-auto">
-                    <blockquote class="space-y-2">
-                        <flux:heading size="lg">&ldquo;{{ trim($message) }}&rdquo;</flux:heading>
-                        <footer><flux:heading>{{ trim($author) }}</flux:heading></footer>
-                    </blockquote>
-                </div>
-            </div>
-            <div class="w-full lg:p-8">
-                <div class="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
-                    <a href="{{ route('home') }}" class="z-20 flex flex-col items-center gap-2 font-medium lg:hidden" wire:navigate>
-                        <span class="flex h-9 w-9 items-center justify-center rounded-md">
-                            <x-app-logo-icon class="size-9 fill-current text-black dark:text-white" />
-                        </span>
-
-                        <span class="sr-only">{{ config('app.name', 'Laravel') }}</span>
-                    </a>
+                <div class="mx-auto w-full max-w-md">
                     {{ $slot }}
                 </div>
             </div>

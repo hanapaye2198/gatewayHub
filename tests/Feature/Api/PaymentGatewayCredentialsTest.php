@@ -32,10 +32,10 @@ class PaymentGatewayCredentialsTest extends TestCase
         config()->set('coins.gateway.client_secret', '');
         config()->set('coins.gateway.api_base', '');
 
-        $user = User::factory()->create(['api_key' => 'test-key']);
+        $user = User::factory()->withMerchantApiKey('test-key')->create();
         $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => [
@@ -61,9 +61,9 @@ class PaymentGatewayCredentialsTest extends TestCase
         $gateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         $gateway->update(['is_global_enabled' => false]);
 
-        $user = User::factory()->create(['api_key' => 'test-key']);
+        $user = User::factory()->withMerchantApiKey('test-key')->create();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
             'config_json' => [
@@ -109,9 +109,9 @@ class PaymentGatewayCredentialsTest extends TestCase
             ],
         ]);
 
-        $user = User::factory()->create(['api_key' => 'test-key']);
+        $user = User::factory()->withMerchantApiKey('test-key')->create();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
             'config_json' => [],

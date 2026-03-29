@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Merchant;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -14,16 +15,32 @@ class MerchantUserSeeder extends Seeder
      */
     public function run(): void
     {
-        User::query()->firstOrCreate(
+        $user = User::query()->firstOrCreate(
             ['email' => 'merchant@example.com'],
             [
                 'name' => 'Demo Merchant',
                 'password' => Hash::make('password'),
-                'role' => 'merchant',
+                'role' => User::ROLE_MERCHANT_USER,
                 'email_verified_at' => now(),
                 'is_active' => true,
-                'api_key' => Str::random(64),
             ]
         );
+
+        if ($user->merchant_id === null) {
+            Merchant::provisionForUser($user);
+            $user->refresh();
+            $user->forceFill([
+                'onboarding_gateways_at' => now(),
+                'onboarding_completed_at' => now(),
+            ])->save();
+        }
+
+        $merchant = $user->merchant ?? Merchant::query()->find($user->merchant_id);
+        if ($merchant !== null) {
+            $merchant->forceFill([
+                'api_key' => Str::random(64),
+                'is_active' => true,
+            ])->save();
+        }
     }
 }

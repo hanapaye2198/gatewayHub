@@ -25,7 +25,7 @@ class TunnelPaypalApiService
             throw new GatewayException('Tunnel wallet PayPal credentials are missing.');
         }
 
-        $mode = $this->resolveMode((int) $payment->user_id);
+        $mode = $this->resolveMode((int) $payment->merchant_id);
         $this->requestAccessToken($clientId, $clientSecret, $mode);
 
         return [
@@ -35,7 +35,7 @@ class TunnelPaypalApiService
         ];
     }
 
-    private function resolveMode(int $userId): string
+    private function resolveMode(int $merchantId): string
     {
         $paypalGateway = Gateway::query()->where('code', 'paypal')->first();
         if ($paypalGateway === null) {
@@ -43,7 +43,7 @@ class TunnelPaypalApiService
         }
 
         $merchantGateway = MerchantGateway::query()
-            ->where('user_id', $userId)
+            ->where('merchant_id', $merchantId)
             ->where('gateway_id', $paypalGateway->id)
             ->first();
 

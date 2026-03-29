@@ -26,7 +26,7 @@ class RegistrationTest extends TestCase
         ]);
 
         $response->assertSessionHasNoErrors()
-            ->assertRedirect(route('dashboard', absolute: false));
+            ->assertRedirect(route('onboarding.business', absolute: false));
 
         $this->assertAuthenticated();
     }

@@ -15,7 +15,7 @@ class PaymentDetailController extends Controller
 {
     public function __invoke(Payment $payment, QrCodeGenerator $qrGenerator): View|Response|RedirectResponse
     {
-        if ($payment->user_id !== auth()->id()) {
+        if ($payment->merchant_id !== auth()->user()?->merchant_id) {
             abort(404);
         }
 
@@ -51,7 +51,7 @@ class PaymentDetailController extends Controller
      */
     public function status(Payment $payment, PaymentStatusSyncService $paymentStatusSyncService): JsonResponse
     {
-        if ($payment->user_id !== auth()->id()) {
+        if ($payment->merchant_id !== auth()->user()?->merchant_id) {
             abort(404);
         }
 

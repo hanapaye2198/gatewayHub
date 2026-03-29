@@ -41,7 +41,7 @@ class CoinsWebhookTest extends TestCase
         ]);
         $this->user = User::factory()->create();
         $this->merchantGateway = MerchantGateway::query()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_id' => $this->coinsGateway->id,
             'is_enabled' => true,
             'config_json' => [
@@ -108,7 +108,7 @@ class CoinsWebhookTest extends TestCase
     public function test_webhook_returns_200_and_updates_to_paid_when_succeeded(): void
     {
         $payment = Payment::factory()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'ORDER-001',
             'status' => 'pending',
@@ -152,7 +152,7 @@ class CoinsWebhookTest extends TestCase
         Queue::fake();
 
         $payment = Payment::factory()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'ORDER-DEDICATED-001',
             'status' => 'pending',
@@ -183,7 +183,7 @@ class CoinsWebhookTest extends TestCase
     public function test_webhook_accepts_guide_compliant_signature_header_without_timestamp(): void
     {
         $payment = Payment::factory()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'gcash',
             'provider_reference' => 'GUIDE-WEBHOOK-001',
             'status' => 'pending',
@@ -218,14 +218,14 @@ class CoinsWebhookTest extends TestCase
     public function test_webhook_can_retry_same_event_after_processing_failure(): void
     {
         $firstPayment = Payment::factory()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'ORDER-RETRY-001',
             'status' => 'pending',
         ]);
 
         $secondPayment = Payment::factory()->create([
-            'user_id' => User::factory()->create()->id,
+            'merchant_id' => User::factory()->create()->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'ORDER-RETRY-001',
             'status' => 'pending',
@@ -272,7 +272,7 @@ class CoinsWebhookTest extends TestCase
     public function test_webhook_uses_gateway_request_reference_to_resolve_duplicate_merchant_references(): void
     {
         $firstPayment = Payment::factory()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'coins',
             'reference_id' => 'MERCHANT-REF-001',
             'provider_reference' => 'coins-order-merchant-1',
@@ -284,7 +284,7 @@ class CoinsWebhookTest extends TestCase
         ]);
 
         $secondPayment = Payment::factory()->create([
-            'user_id' => User::factory()->create()->id,
+            'merchant_id' => User::factory()->create()->id,
             'gateway_code' => 'coins',
             'reference_id' => 'MERCHANT-REF-001',
             'provider_reference' => 'coins-order-merchant-2',
@@ -321,7 +321,7 @@ class CoinsWebhookTest extends TestCase
     public function test_webhook_updates_payment_when_callback_uses_nested_qrcode_status_and_request_id(): void
     {
         $payment = Payment::factory()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'coins-order-merchant-3',
             'status' => 'pending',
@@ -361,7 +361,7 @@ class CoinsWebhookTest extends TestCase
     public function test_webhook_updates_payment_when_callback_reference_matches_stored_raw_response_identifier(): void
     {
         $payment = Payment::factory()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'coins-order-merchant-4',
             'status' => 'pending',
@@ -401,7 +401,7 @@ class CoinsWebhookTest extends TestCase
     public function test_webhook_updates_payment_when_checkout_callback_uses_completed_at_and_checkout_id(): void
     {
         $payment = Payment::factory()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'MERCHANT_ORDER_20250102_001234567890',
             'status' => 'pending',
@@ -447,7 +447,7 @@ class CoinsWebhookTest extends TestCase
     {
         $otherMerchant = User::factory()->create();
         MerchantGateway::query()->create([
-            'user_id' => $otherMerchant->id,
+            'merchant_id' => $otherMerchant->id,
             'gateway_id' => $this->coinsGateway->id,
             'is_enabled' => true,
             'config_json' => [
@@ -459,7 +459,7 @@ class CoinsWebhookTest extends TestCase
         ]);
 
         $merchantOnePayment = Payment::factory()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'ORDER-COLLISION-001',
             'status' => 'pending',
@@ -467,7 +467,7 @@ class CoinsWebhookTest extends TestCase
         ]);
 
         $merchantTwoPayment = Payment::factory()->create([
-            'user_id' => $otherMerchant->id,
+            'merchant_id' => $otherMerchant->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'ORDER-COLLISION-001',
             'status' => 'pending',
@@ -505,7 +505,7 @@ class CoinsWebhookTest extends TestCase
     public function test_webhook_idempotent_when_already_paid(): void
     {
         $payment = Payment::factory()->paid()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'ORDER-002',
         ]);
@@ -534,7 +534,7 @@ class CoinsWebhookTest extends TestCase
     public function test_webhook_updates_to_failed_when_failed(): void
     {
         $payment = Payment::factory()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'ORDER-003',
             'status' => 'pending',
@@ -560,7 +560,7 @@ class CoinsWebhookTest extends TestCase
     public function test_webhook_updates_to_failed_when_expired(): void
     {
         $payment = Payment::factory()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'ORDER-EXP',
             'status' => 'pending',
@@ -586,7 +586,7 @@ class CoinsWebhookTest extends TestCase
     public function test_webhook_merges_payload_into_raw_response(): void
     {
         $payment = Payment::factory()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'ORDER-MERGE',
             'status' => 'pending',
@@ -680,7 +680,7 @@ class CoinsWebhookTest extends TestCase
     public function test_webhook_duplicate_event_returns_200_without_reprocessing(): void
     {
         $payment = Payment::factory()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'ORDER-DUP',
             'status' => 'pending',

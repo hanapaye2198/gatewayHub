@@ -2,6 +2,7 @@
 
 namespace App\Http\Responses\Fortify;
 
+use App\Models\User;
 use Illuminate\Contracts\Auth\Authenticatable;
 
 class PostLoginRedirect
@@ -18,12 +19,12 @@ class PostLoginRedirect
 
         $role = $user->role ?? null;
 
-        if ($role === 'admin') {
+        if ($role === User::ROLE_ADMIN) {
             return url('/admin');
         }
 
-        if ($role === 'merchant') {
-            return url('/dashboard');
+        if ($role === User::ROLE_MERCHANT_USER) {
+            return $user->merchantOnboardingOrDashboardUrl();
         }
 
         return route('login');

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Http\Responses\Fortify\MerchantRegisterResponse;
 use App\Http\Responses\Fortify\RoleBasedLoginResponse;
 use App\Http\Responses\Fortify\RoleBasedTwoFactorLoginResponse;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
+use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
 use Laravel\Fortify\Contracts\TwoFactorLoginResponse as TwoFactorLoginResponseContract;
 use Laravel\Fortify\Fortify;
 
@@ -24,6 +26,7 @@ class FortifyServiceProvider extends ServiceProvider
     {
         $this->app->singleton(LoginResponseContract::class, RoleBasedLoginResponse::class);
         $this->app->singleton(TwoFactorLoginResponseContract::class, RoleBasedTwoFactorLoginResponse::class);
+        $this->app->singleton(RegisterResponseContract::class, MerchantRegisterResponse::class);
     }
 
     /**

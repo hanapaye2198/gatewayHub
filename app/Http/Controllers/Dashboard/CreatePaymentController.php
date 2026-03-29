@@ -22,7 +22,7 @@ class CreatePaymentController extends Controller
         $enabledGateways = Gateway::query()
             ->where('is_global_enabled', true)
             ->whereHas('merchantGateways', function ($q) use ($user) {
-                $q->where('user_id', $user->id)->where('is_enabled', true);
+                $q->where('merchant_id', $user->merchant_id)->where('is_enabled', true);
             })
             ->orderBy('name')
             ->get(['id', 'code', 'name']);
@@ -34,7 +34,8 @@ class CreatePaymentController extends Controller
 
     public function store(StorePaymentRequest $request, PaymentCreationService $creationService): RedirectResponse
     {
-        $merchant = auth()->user();
+        $user = auth()->user();
+        $merchant = $user?->merchant;
         if ($merchant === null) {
             abort(403);
         }

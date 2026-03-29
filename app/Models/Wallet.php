@@ -27,7 +27,7 @@ class Wallet extends Model
      * @var list<string>
      */
     protected $fillable = [
-        'user_id',
+        'merchant_id',
         'wallet_type',
         'currency',
         'balance',
@@ -55,11 +55,11 @@ class Wallet extends Model
     }
 
     /**
-     * @return BelongsTo<User, $this>
+     * @return BelongsTo<Merchant, $this>
      */
-    public function user(): BelongsTo
+    public function merchant(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Merchant::class);
     }
 
     /**

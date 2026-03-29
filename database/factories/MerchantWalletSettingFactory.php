@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Models\Merchant;
 use App\Models\MerchantWalletSetting;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -21,7 +21,7 @@ class MerchantWalletSettingFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => User::factory(),
+            'merchant_id' => Merchant::factory(),
             'tunnel_wallet_enabled' => true,
             'auto_settle_to_real_wallet' => true,
             'default_currency' => 'PHP',

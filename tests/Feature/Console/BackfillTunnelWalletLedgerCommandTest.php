@@ -21,8 +21,8 @@ class BackfillTunnelWalletLedgerCommandTest extends TestCase
 
     public function test_command_backfills_missing_tunnel_wallet_entries_for_paid_payment(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
-        $payment = Payment::factory()->for($merchant)->paid()->create([
+        $merchant = User::factory()->create();
+        $payment = Payment::factory()->for($merchant->merchant)->paid()->create([
             'gateway_code' => 'coins',
             'currency' => 'PHP',
         ]);
@@ -41,8 +41,8 @@ class BackfillTunnelWalletLedgerCommandTest extends TestCase
 
     public function test_command_dry_run_does_not_create_wallet_entries(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
-        Payment::factory()->for($merchant)->paid()->create([
+        $merchant = User::factory()->create();
+        Payment::factory()->for($merchant->merchant)->paid()->create([
             'gateway_code' => 'coins',
             'currency' => 'PHP',
         ]);

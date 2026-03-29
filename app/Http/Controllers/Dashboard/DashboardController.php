@@ -10,12 +10,12 @@ class DashboardController extends Controller
 {
     public function __invoke(): View
     {
-        $merchantId = auth()->id();
+        $merchantId = auth()->user()?->merchant_id;
         $totalCollections = 0.0;
 
-        if (is_int($merchantId)) {
+        if ($merchantId !== null && $merchantId !== '') {
             $totalCollections = (float) Payment::query()
-                ->where('user_id', $merchantId)
+                ->where('merchant_id', (int) $merchantId)
                 ->where('status', 'paid')
                 ->sum('amount');
         }

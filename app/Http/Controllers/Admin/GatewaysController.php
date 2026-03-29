@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdateMerchantGatewayStatusRequest;
 use App\Http\Requests\Admin\UpdatePlatformGatewayConfigRequest;
 use App\Models\Gateway;
+use App\Models\Merchant;
 use App\Models\MerchantGateway;
-use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 
@@ -19,8 +19,7 @@ class GatewaysController extends Controller
             ->with('merchantGateways')
             ->orderBy('name')
             ->get();
-        $merchants = User::query()
-            ->where('role', 'merchant')
+        $merchants = Merchant::query()
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -59,12 +58,8 @@ class GatewaysController extends Controller
     public function updateMerchantGateway(
         UpdateMerchantGatewayStatusRequest $request,
         Gateway $gateway,
-        User $user
+        Merchant $merchant
     ): RedirectResponse {
-        if ($user->role !== 'merchant') {
-            abort(404);
-        }
-
         $isEnabled = (bool) $request->validated('is_enabled');
         if ($isEnabled && ! $gateway->is_global_enabled) {
             return redirect()
@@ -74,7 +69,7 @@ class GatewaysController extends Controller
 
         MerchantGateway::query()->updateOrCreate(
             [
-                'user_id' => $user->id,
+                'merchant_id' => $merchant->id,
                 'gateway_id' => $gateway->id,
             ],
             [
@@ -86,7 +81,7 @@ class GatewaysController extends Controller
 
         return redirect()
             ->route('admin.gateways.index')
-            ->with('status', "Gateway \"{$gateway->name}\" {$action} for {$user->name}.");
+            ->with('status', "Gateway \"{$gateway->name}\" {$action} for {$merchant->name}.");
     }
 
     public function updatePlatformConfig(

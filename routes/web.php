@@ -6,6 +6,7 @@ use App\Http\Controllers\Dashboard\CreatePaymentController;
 use App\Http\Controllers\Dashboard\PaymentDetailController;
 use App\Http\Controllers\Dashboard\PaymentsExportController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\OnboardingController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/auth/google', [GoogleController::class, 'redirect'])->name('google.redirect');
@@ -19,7 +20,16 @@ Route::get('/demo/checkout', fn () => view('demo.checkout'))->name('demo.checkou
 Route::get('/coins/qr', fn () => view('coins.qr'))->name('coins.qr');
 Route::post('/coins/generate-qr', [CoinsQrController::class, 'generate'])->name('coins.generate-qr');
 
-Route::middleware(['auth', 'verified', \App\Http\Middleware\EnsureMerchant::class])->group(function () {
+Route::middleware(['auth', 'verified'])->prefix('onboarding')->name('onboarding.')->group(function (): void {
+    Route::get('business', [OnboardingController::class, 'business'])->name('business');
+    Route::post('business', [OnboardingController::class, 'storeBusiness'])->name('business.store');
+    Route::get('gateways', [OnboardingController::class, 'gateways'])->name('gateways');
+    Route::post('gateways', [OnboardingController::class, 'storeGateways'])->name('gateways.store');
+    Route::get('api-keys', [OnboardingController::class, 'apiKeys'])->name('api-keys');
+    Route::post('complete', [OnboardingController::class, 'complete'])->name('complete');
+});
+
+Route::middleware(['auth', 'verified', 'merchant.onboarding', \App\Http\Middleware\EnsureMerchant::class])->group(function () {
     Route::livewire('dashboard', 'pages::dashboard.payments')->name('dashboard');
     Route::livewire('dashboard/payments', 'pages::dashboard.payments')->name('dashboard.payments');
     Route::get('dashboard/payments/create', [CreatePaymentController::class, 'create'])->name('dashboard.payments.create');

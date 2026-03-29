@@ -29,15 +29,15 @@ class PaymentStatusTest extends TestCase
 
     public function test_status_returns_success_for_paid_payment(): void
     {
-        $user = User::factory()->create(['api_key' => 'key-1']);
+        $user = User::factory()->withMerchantApiKey('key-1')->create();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => Gateway::query()->where('code', 'coins')->firstOrFail()->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
         ]);
 
-        $payment = Payment::factory()->paid()->create(['user_id' => $user->id]);
+        $payment = Payment::factory()->paid()->create(['merchant_id' => $user->id]);
 
         $response = $this->getJson('/api/payments/'.$payment->id.'/status', [
             'Authorization' => 'Bearer key-1',
@@ -49,15 +49,15 @@ class PaymentStatusTest extends TestCase
 
     public function test_status_returns_pending_for_pending_payment(): void
     {
-        $user = User::factory()->create(['api_key' => 'key-2']);
+        $user = User::factory()->withMerchantApiKey('key-2')->create();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => Gateway::query()->where('code', 'coins')->firstOrFail()->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
         ]);
 
-        $payment = Payment::factory()->create(['user_id' => $user->id, 'status' => 'pending']);
+        $payment = Payment::factory()->create(['merchant_id' => $user->id, 'status' => 'pending']);
 
         $response = $this->getJson('/api/payments/'.$payment->id.'/status', [
             'Authorization' => 'Bearer key-2',
@@ -83,7 +83,7 @@ class PaymentStatusTest extends TestCase
             ], 200),
         ]);
 
-        $user = User::factory()->create(['api_key' => 'key-sync']);
+        $user = User::factory()->withMerchantApiKey('key-sync')->create();
         $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         $coinsGateway->update([
             'config_json' => [
@@ -94,14 +94,14 @@ class PaymentStatusTest extends TestCase
         ]);
 
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
         ]);
 
         $payment = Payment::factory()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_code' => 'gcash',
             'provider_reference' => 'GH-API-STATUS-001',
             'status' => 'pending',
@@ -130,15 +130,15 @@ class PaymentStatusTest extends TestCase
 
     public function test_status_returns_failed_for_failed_payment(): void
     {
-        $user = User::factory()->create(['api_key' => 'key-3']);
+        $user = User::factory()->withMerchantApiKey('key-3')->create();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => Gateway::query()->where('code', 'coins')->firstOrFail()->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
         ]);
 
-        $payment = Payment::factory()->failed()->create(['user_id' => $user->id]);
+        $payment = Payment::factory()->failed()->create(['merchant_id' => $user->id]);
 
         $response = $this->getJson('/api/payments/'.$payment->id.'/status', [
             'Authorization' => 'Bearer key-3',
@@ -150,16 +150,16 @@ class PaymentStatusTest extends TestCase
 
     public function test_status_returns_404_for_other_merchant_payment(): void
     {
-        $user = User::factory()->create(['api_key' => 'key-4']);
-        $otherUser = User::factory()->create(['api_key' => 'key-other']);
+        $user = User::factory()->withMerchantApiKey('key-4')->create();
+        $otherUser = User::factory()->withMerchantApiKey('key-other')->create();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => Gateway::query()->where('code', 'coins')->firstOrFail()->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
         ]);
 
-        $payment = Payment::factory()->create(['user_id' => $otherUser->id]);
+        $payment = Payment::factory()->create(['merchant_id' => $otherUser->id]);
 
         $response = $this->getJson('/api/payments/'.$payment->id.'/status', [
             'Authorization' => 'Bearer key-4',

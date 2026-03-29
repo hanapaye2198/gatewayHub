@@ -14,10 +14,7 @@ class WalletFeatureToggleTest extends TestCase
     public function test_wallet_balance_api_returns_not_found_when_wallet_feature_is_disabled(): void
     {
         $token = Str::random(64);
-        $merchant = User::factory()->create([
-            'role' => 'merchant',
-            'api_key' => $token,
-        ]);
+        User::factory()->withMerchantApiKey($token)->create();
 
         $response = $this->withToken($token)->getJson('/api/wallets/balances');
 

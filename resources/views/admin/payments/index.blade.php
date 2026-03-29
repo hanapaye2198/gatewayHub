@@ -187,9 +187,9 @@
                             <td class="px-5 py-4">
                                 <div class="flex items-center gap-2.5">
                                     <div class="flex size-7 flex-shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-xs font-bold text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
-                                        {{ strtoupper(mb_substr($payment->user?->name ?? 'N', 0, 1)) }}
+                                        {{ strtoupper(mb_substr($payment->merchant?->name ?? 'N', 0, 1)) }}
                                     </div>
-                                    <span class="whitespace-nowrap text-sm text-zinc-700 dark:text-zinc-300">{{ $payment->user?->name ?? 'N/A' }}</span>
+                                    <span class="whitespace-nowrap text-sm text-zinc-700 dark:text-zinc-300">{{ $payment->merchant?->name ?? 'N/A' }}</span>
                                 </div>
                             </td>
                             <td class="px-5 py-4">

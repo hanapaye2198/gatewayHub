@@ -21,7 +21,7 @@
                     <flux:sidebar.item icon="credit-card" :href="route('dashboard.gateways')" :current="request()->routeIs('dashboard.gateways')" wire:navigate>
                         {{ __('Gateways') }}
                     </flux:sidebar.item>
-                    @if (auth()->user()?->role === 'merchant')
+                    @if (auth()->user()?->role === \App\Models\User::ROLE_MERCHANT_USER)
                         <flux:sidebar.item icon="book-open-text" :href="route('dashboard.docs')" :current="request()->routeIs('dashboard.docs')" wire:navigate>
                             {{ __('Docs') }}
                         </flux:sidebar.item>

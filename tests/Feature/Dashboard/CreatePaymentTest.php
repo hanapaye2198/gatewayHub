@@ -31,10 +31,10 @@ class CreatePaymentTest extends TestCase
 
     public function test_create_payment_form_shows_enabled_gateways_only(): void
     {
-        $user = User::factory()->create(['role' => 'merchant']);
+        $user = User::factory()->create();
         $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
@@ -49,7 +49,7 @@ class CreatePaymentTest extends TestCase
 
     public function test_create_payment_form_redirects_when_no_enabled_gateways(): void
     {
-        $user = User::factory()->create(['role' => 'merchant']);
+        $user = User::factory()->create();
 
         $response = $this->actingAs($user)->get(route('dashboard.payments.create'));
 
@@ -63,10 +63,10 @@ class CreatePaymentTest extends TestCase
     {
         Http::fake(['*' => Http::response(['code' => 0, 'data' => ['orderId' => 'ord-1', 'qrCode' => 'qr123']], 200)]);
 
-        $user = User::factory()->create(['role' => 'merchant']);
+        $user = User::factory()->create();
         $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
@@ -80,14 +80,14 @@ class CreatePaymentTest extends TestCase
 
         $response->assertRedirect();
         $this->assertDatabaseHas('payments', [
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_code' => 'coins',
             'amount' => 100,
             'currency' => 'PHP',
             'status' => 'pending',
         ]);
 
-        $payment = Payment::query()->where('user_id', $user->id)->firstOrFail();
+        $payment = Payment::query()->where('merchant_id', $user->id)->firstOrFail();
         $this->assertMatchesRegularExpression(
             '/^GH-'.$user->id.'-[0-9A-HJKMNP-TV-Z]{26}$/',
             (string) ($payment->raw_response['gateway_request_reference'] ?? '')
@@ -97,10 +97,10 @@ class CreatePaymentTest extends TestCase
 
     public function test_store_validates_amount(): void
     {
-        $user = User::factory()->create(['role' => 'merchant']);
+        $user = User::factory()->create();
         $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
@@ -134,11 +134,11 @@ class CreatePaymentTest extends TestCase
             'is_global_enabled' => true,
         ]);
 
-        $user = User::factory()->create(['role' => 'merchant']);
+        $user = User::factory()->create();
         $mayaGateway = Gateway::query()->where('code', 'maya')->firstOrFail();
 
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $mayaGateway->id,
             'is_enabled' => true,
             'config_json' => [
@@ -158,7 +158,7 @@ class CreatePaymentTest extends TestCase
         $response->assertRedirect();
         $this->assertStringContainsString('/dashboard/payments/', (string) $response->headers->get('Location'));
         $this->assertDatabaseHas('payments', [
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_code' => 'maya',
             'provider_reference' => 'COINS-MAYA-ORD-123',
             'status' => 'pending',
@@ -175,10 +175,10 @@ class CreatePaymentTest extends TestCase
             ], 200),
         ]);
 
-        $user = User::factory()->create(['role' => 'merchant']);
+        $user = User::factory()->create();
         $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
@@ -206,10 +206,10 @@ class CreatePaymentTest extends TestCase
             'is_global_enabled' => true,
         ]);
 
-        $user = User::factory()->create(['role' => 'merchant']);
+        $user = User::factory()->create();
         $payQrphGateway = Gateway::query()->where('code', 'payqrph')->firstOrFail();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $payQrphGateway->id,
             'is_enabled' => true,
             'config_json' => [],
@@ -231,10 +231,10 @@ class CreatePaymentTest extends TestCase
             'is_global_enabled' => true,
         ]);
 
-        $user = User::factory()->create(['role' => 'merchant']);
+        $user = User::factory()->create();
         $qrphGateway = Gateway::query()->where('code', 'qrph')->firstOrFail();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $qrphGateway->id,
             'is_enabled' => true,
             'config_json' => [],

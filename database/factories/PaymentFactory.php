@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Models\Merchant;
 use App\Models\Payment;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -19,7 +19,7 @@ class PaymentFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => User::factory(),
+            'merchant_id' => Merchant::factory(),
             'gateway_code' => 'coins',
             'amount' => fake()->randomFloat(2, 10, 10000),
             'currency' => 'PHP',

@@ -305,7 +305,7 @@ class WebhookProcessor
         });
 
         if ($verifiedMerchantIds !== []) {
-            $baseQuery->whereIn('user_id', $verifiedMerchantIds);
+            $baseQuery->whereIn('merchant_id', $verifiedMerchantIds);
         }
 
         if ($provider === 'coins') {

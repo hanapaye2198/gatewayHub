@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\User;
+use App\Models\Merchant;
 use App\Models\Wallet;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -21,7 +21,7 @@ class WalletFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => User::factory(),
+            'merchant_id' => Merchant::factory(),
             'wallet_type' => Wallet::TYPE_MERCHANT_REAL,
             'currency' => 'PHP',
             'balance' => 0,

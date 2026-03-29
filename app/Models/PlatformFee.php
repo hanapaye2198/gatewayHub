@@ -95,10 +95,10 @@ class PlatformFee extends Model
     }
 
     /**
-     * @return BelongsTo<User, $this>
+     * @return BelongsTo<Merchant, $this>
      */
     public function merchant(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'merchant_id');
+        return $this->belongsTo(Merchant::class, 'merchant_id');
     }
 }

@@ -54,7 +54,7 @@ class FeeRuleResolverTest extends TestCase
         ]);
         $user = User::factory()->create();
         $mg = MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
             'config_json' => [],

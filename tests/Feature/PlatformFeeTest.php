@@ -39,7 +39,7 @@ class PlatformFeeTest extends TestCase
         ]);
         $user = User::factory()->create();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
             'config_json' => [
@@ -51,7 +51,7 @@ class PlatformFeeTest extends TestCase
         ]);
 
         $payment = Payment::factory()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'ORD-001',
             'amount' => 1000,
@@ -104,7 +104,7 @@ class PlatformFeeTest extends TestCase
         ]);
         $user = User::factory()->create();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
             'config_json' => [
@@ -116,7 +116,7 @@ class PlatformFeeTest extends TestCase
         ]);
 
         $payment = Payment::factory()->paid()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'ORD-002',
             'amount' => 500,
@@ -179,12 +179,12 @@ class PlatformFeeTest extends TestCase
     {
         $user = User::factory()->create();
         $payment = Payment::factory()->paid()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_code' => 'coins',
             'amount' => 100,
         ]);
 
-        $ledger = $ledger = PlatformFee::query()->create([
+        $ledger = PlatformFee::query()->create([
             'payment_id' => $payment->id,
             'merchant_id' => $user->id,
             'gateway_code' => 'coins',
@@ -198,13 +198,13 @@ class PlatformFeeTest extends TestCase
         $this->assertSame($payment->id, $ledger->payment_id);
         $this->assertTrue($payment->platformFee->is($ledger));
         $this->assertTrue($ledger->payment->is($payment));
-        $this->assertTrue($ledger->merchant->is($user));
+        $this->assertTrue($ledger->merchant->is($user->merchant));
     }
 
     public function test_platform_fees_table_enforces_one_fee_per_payment(): void
     {
         $user = User::factory()->create();
-        $payment = Payment::factory()->paid()->create(['user_id' => $user->id]);
+        $payment = Payment::factory()->paid()->create(['merchant_id' => $user->id]);
 
         PlatformFee::query()->create([
             'payment_id' => $payment->id,
@@ -241,14 +241,14 @@ class PlatformFeeTest extends TestCase
         ]);
         $user = User::factory()->create();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_id' => $gateway->id,
             'is_enabled' => true,
             'config_json' => ['webhook_secret' => 'x'],
         ]);
 
         $payment = Payment::factory()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'gateway_code' => 'coins',
             'amount' => 500,
             'status' => 'paid',
@@ -274,7 +274,7 @@ class PlatformFeeTest extends TestCase
     {
         $user = User::factory()->create();
         $payment = Payment::factory()->paid()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->id,
             'amount' => 100,
         ]);
         PlatformFee::query()->create([
@@ -302,7 +302,7 @@ class PlatformFeeTest extends TestCase
     public function test_platform_fee_reversal_marks_reversed_and_stores_reason(): void
     {
         $user = User::factory()->create();
-        $payment = Payment::factory()->paid()->create(['user_id' => $user->id]);
+        $payment = Payment::factory()->paid()->create(['merchant_id' => $user->id]);
         $fee = PlatformFee::query()->create([
             'payment_id' => $payment->id,
             'merchant_id' => $user->id,
@@ -325,7 +325,7 @@ class PlatformFeeTest extends TestCase
     public function test_platform_fee_reversal_idempotent_when_already_reversed(): void
     {
         $user = User::factory()->create();
-        $payment = Payment::factory()->paid()->create(['user_id' => $user->id]);
+        $payment = Payment::factory()->paid()->create(['merchant_id' => $user->id]);
         $fee = PlatformFee::query()->create([
             'payment_id' => $payment->id,
             'merchant_id' => $user->id,
@@ -362,7 +362,7 @@ class PlatformFeeTest extends TestCase
     public function test_platform_fee_financial_fields_are_immutable(): void
     {
         $user = User::factory()->create();
-        $payment = Payment::factory()->paid()->create(['user_id' => $user->id]);
+        $payment = Payment::factory()->paid()->create(['merchant_id' => $user->id]);
         $fee = PlatformFee::query()->create([
             'payment_id' => $payment->id,
             'merchant_id' => $user->id,
@@ -389,7 +389,7 @@ class PlatformFeeTest extends TestCase
     public function test_platform_fee_status_can_only_transition_posted_to_reversed(): void
     {
         $user = User::factory()->create();
-        $payment = Payment::factory()->paid()->create(['user_id' => $user->id]);
+        $payment = Payment::factory()->paid()->create(['merchant_id' => $user->id]);
         $fee = PlatformFee::query()->create([
             'payment_id' => $payment->id,
             'merchant_id' => $user->id,
@@ -412,7 +412,7 @@ class PlatformFeeTest extends TestCase
     public function test_observer_reverses_platform_fee_when_payment_status_changes_to_refunded(): void
     {
         $user = User::factory()->create();
-        $payment = Payment::factory()->paid()->create(['user_id' => $user->id]);
+        $payment = Payment::factory()->paid()->create(['merchant_id' => $user->id]);
         $fee = PlatformFee::query()->create([
             'payment_id' => $payment->id,
             'merchant_id' => $user->id,
@@ -435,7 +435,7 @@ class PlatformFeeTest extends TestCase
     public function test_observer_reverses_platform_fee_when_payment_status_changes_to_failed_after_paid(): void
     {
         $user = User::factory()->create();
-        $payment = Payment::factory()->paid()->create(['user_id' => $user->id]);
+        $payment = Payment::factory()->paid()->create(['merchant_id' => $user->id]);
         $fee = PlatformFee::query()->create([
             'payment_id' => $payment->id,
             'merchant_id' => $user->id,

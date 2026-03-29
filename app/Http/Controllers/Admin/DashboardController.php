@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\FilterAdminDashboardRequest;
+use App\Models\Merchant;
 use App\Models\Payment;
-use App\Models\User;
 use Illuminate\Contracts\View\View;
 
 class DashboardController extends Controller
@@ -15,18 +15,17 @@ class DashboardController extends Controller
         $validated = $request->validated();
         $selectedClientId = isset($validated['client_id']) ? (int) $validated['client_id'] : null;
 
-        $clients = User::query()
-            ->where('role', 'merchant')
+        $clients = Merchant::query()
             ->orderBy('name')
             ->get(['id', 'name']);
 
         $collectionsByClient = Payment::query()
             ->where('status', 'paid')
-            ->selectRaw('user_id, SUM(amount) as total')
-            ->groupBy('user_id')
-            ->pluck('total', 'user_id');
+            ->selectRaw('merchant_id, SUM(amount) as total')
+            ->groupBy('merchant_id')
+            ->pluck('total', 'merchant_id');
 
-        $clientRows = $clients->map(static function (User $client) use ($collectionsByClient): array {
+        $clientRows = $clients->map(static function (Merchant $client) use ($collectionsByClient): array {
             return [
                 'id' => (int) $client->id,
                 'name' => $client->name,

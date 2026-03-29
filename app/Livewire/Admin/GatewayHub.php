@@ -3,8 +3,8 @@
 namespace App\Livewire\Admin;
 
 use App\Models\Gateway;
+use App\Models\Merchant;
 use App\Models\MerchantGateway;
-use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
@@ -130,7 +130,7 @@ class GatewayHub extends Component
     public function toggleMerchantGateway(int $gatewayId, int $merchantId): void
     {
         $gateway = Gateway::findOrFail($gatewayId);
-        $merchant = User::findOrFail($merchantId);
+        $merchant = Merchant::findOrFail($merchantId);
 
         if (! $gateway->is_global_enabled) {
             $this->showError('Cannot enable because gateway is globally disabled.');
@@ -141,7 +141,7 @@ class GatewayHub extends Component
         DB::transaction(function () use ($gateway, $merchant): void {
             $merchantGateway = MerchantGateway::firstOrNew([
                 'gateway_id' => $gateway->id,
-                'user_id' => $merchant->id,
+                'merchant_id' => $merchant->id,
             ]);
 
             $oldStatus = $merchantGateway->is_enabled ?? false;
@@ -310,7 +310,7 @@ class GatewayHub extends Component
                         MerchantGateway::updateOrCreate(
                             [
                                 'gateway_id' => (int) $gatewayId,
-                                'user_id' => (int) $merchantId,
+                                'merchant_id' => (int) $merchantId,
                             ],
                             ['is_enabled' => true]
                         );
@@ -332,7 +332,7 @@ class GatewayHub extends Component
     {
         DB::transaction(function (): void {
             MerchantGateway::whereIn('gateway_id', $this->selectedGateways)
-                ->whereIn('user_id', $this->selectedMerchants)
+                ->whereIn('merchant_id', $this->selectedMerchants)
                 ->update(['is_enabled' => false]);
 
             $this->logActivity(
@@ -430,7 +430,7 @@ class GatewayHub extends Component
     public function render()
     {
         $gateways = Gateway::query()
-            ->with(['merchantGateways' => fn ($q) => $q->whereIn('user_id', User::where('role', 'merchant')->pluck('id'))])
+            ->with(['merchantGateways' => fn ($q) => $q->whereIn('merchant_id', Merchant::query()->pluck('id'))])
             ->when($this->search !== '', function ($query): void {
                 $query->where(function ($q): void {
                     $q->where('name', 'like', '%'.$this->search.'%')
@@ -446,8 +446,7 @@ class GatewayHub extends Component
             ->orderBy($this->sortField, $this->sortDirection)
             ->get();
 
-        $merchants = User::query()
-            ->where('role', 'merchant')
+        $merchants = Merchant::query()
             ->when($this->merchantFilter !== 'all', function ($query): void {
                 if ($this->merchantFilter === 'active') {
                     $query->where('is_active', true);

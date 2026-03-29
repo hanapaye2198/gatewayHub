@@ -29,7 +29,9 @@ class GoogleController extends Controller
                 'email' => $googleUser->getEmail(),
                 'google_id' => $googleUser->getId(),
                 'password' => Hash::make(Str::random(24)),
-                'role' => 'merchant',
+                'role' => User::ROLE_MERCHANT_USER,
+                'is_active' => true,
+                'merchant_id' => null,
             ]);
         } elseif ($user->google_id === null) {
             $user->forceFill(['google_id' => $googleUser->getId()])->save();

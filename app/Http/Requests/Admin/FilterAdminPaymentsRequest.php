@@ -26,9 +26,7 @@ class FilterAdminPaymentsRequest extends FormRequest
             'merchant_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('users', 'id')->where(static function ($query): void {
-                    $query->where('role', 'merchant');
-                }),
+                Rule::exists('merchants', 'id'),
             ],
             'gateway_code' => ['nullable', 'string', Rule::exists('gateways', 'code')],
             'status' => ['nullable', 'string', Rule::in(['pending', 'paid', 'failed', 'refunded', 'failed_after_paid'])],

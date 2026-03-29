@@ -31,14 +31,8 @@ class EnabledGatewaysApiTest extends TestCase
 
         $merchantToken = Str::random(64);
         $otherMerchantToken = Str::random(64);
-        $merchant = User::factory()->create([
-            'api_key' => $merchantToken,
-            'role' => 'merchant',
-        ]);
-        $otherMerchant = User::factory()->create([
-            'api_key' => $otherMerchantToken,
-            'role' => 'merchant',
-        ]);
+        $merchant = User::factory()->withMerchantApiKey($merchantToken)->create();
+        $otherMerchant = User::factory()->withMerchantApiKey($otherMerchantToken)->create();
 
         $coins = Gateway::query()->create([
             'code' => 'coins',
@@ -72,37 +66,37 @@ class EnabledGatewaysApiTest extends TestCase
         ]);
 
         MerchantGateway::query()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $coins->id,
             'is_enabled' => true,
             'config_json' => [],
         ]);
         MerchantGateway::query()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $gcash->id,
             'is_enabled' => false,
             'config_json' => [],
         ]);
         MerchantGateway::query()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $maya->id,
             'is_enabled' => true,
             'config_json' => [],
         ]);
         MerchantGateway::query()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $paypal->id,
             'is_enabled' => true,
             'config_json' => [],
         ]);
         MerchantGateway::query()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_id' => $qrph->id,
             'is_enabled' => true,
             'config_json' => [],
         ]);
         MerchantGateway::query()->create([
-            'user_id' => $otherMerchant->id,
+            'merchant_id' => $otherMerchant->id,
             'gateway_id' => $gcash->id,
             'is_enabled' => true,
             'config_json' => [],
@@ -124,23 +118,21 @@ class EnabledGatewaysApiTest extends TestCase
         ], $gateways);
     }
 
-    public function test_enabled_gateways_endpoint_rejects_non_merchant_role(): void
+    public function test_enabled_gateways_endpoint_rejects_invalid_api_key(): void
     {
         Gateway::query()->delete();
 
         $adminToken = Str::random(64);
-        $admin = User::factory()->admin()->create([
-            'api_key' => $adminToken,
-        ]);
+        User::factory()->admin()->create();
 
         $response = $this->withToken($adminToken)
             ->getJson('/api/gateways/enabled');
 
-        $response->assertStatus(403);
+        $response->assertStatus(401);
         $response->assertJson([
             'success' => false,
             'data' => [],
-            'error' => 'Forbidden.',
+            'error' => 'Invalid API key.',
         ]);
     }
 }

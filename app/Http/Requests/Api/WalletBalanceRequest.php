@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api;
 
 use App\Http\Responses\ApiResponse;
+use App\Models\Merchant;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -16,7 +17,7 @@ class WalletBalanceRequest extends FormRequest
     {
         $merchant = $this->merchant();
 
-        return $merchant !== null && $merchant->role === 'merchant';
+        return $merchant instanceof Merchant;
     }
 
     /**

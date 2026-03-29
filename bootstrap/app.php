@@ -20,6 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->alias([
+            'merchant.onboarding' => \App\Http\Middleware\EnsureOnboardingComplete::class,
+        ]);
         $middleware->api(append: [
             \App\Http\Middleware\AuthenticateMerchantApi::class,
         ]);

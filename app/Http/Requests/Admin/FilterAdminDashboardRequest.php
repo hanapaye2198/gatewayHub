@@ -26,9 +26,7 @@ class FilterAdminDashboardRequest extends FormRequest
             'client_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('users', 'id')->where(static function ($query): void {
-                    $query->where('role', 'merchant');
-                }),
+                Rule::exists('merchants', 'id'),
             ],
         ];
     }

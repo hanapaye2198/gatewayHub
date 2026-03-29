@@ -26,7 +26,7 @@ class FeeRuleResolver
         $gateway = Gateway::query()->where('code', $gatewayCode)->first();
         $merchantGateway = $gateway instanceof Gateway
             ? MerchantGateway::query()
-                ->where('user_id', $merchantId)
+                ->where('merchant_id', $merchantId)
                 ->where('gateway_id', $gateway->id)
                 ->first()
             : null;

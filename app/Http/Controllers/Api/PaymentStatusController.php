@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
+use App\Models\Merchant;
 use App\Models\Payment;
 use App\Services\PaymentStatusSyncService;
 use Illuminate\Http\JsonResponse;
@@ -16,14 +17,14 @@ class PaymentStatusController extends Controller
      */
     public function __invoke(Request $request, string $id, PaymentStatusSyncService $paymentStatusSyncService): JsonResponse
     {
-        $merchant = $request->attributes->get('merchant');
-        if ($merchant === null) {
+        $merchant = $request->merchant();
+        if (! $merchant instanceof Merchant) {
             return ApiResponse::error('Unauthenticated.', 401);
         }
 
         $payment = Payment::query()
             ->where('id', $id)
-            ->where('user_id', $merchant->id)
+            ->where('merchant_id', $merchant->id)
             ->first();
 
         if ($payment === null) {

@@ -6,9 +6,9 @@ use App\Enums\PlatformFeeStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\FilterAdminPaymentsRequest;
 use App\Models\Gateway;
+use App\Models\Merchant;
 use App\Models\Payment;
 use App\Models\PlatformFee;
-use App\Models\User;
 use DateTimeInterface;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,7 +23,7 @@ class PaymentsController extends Controller
         $filteredPaymentsQuery = $this->buildFilteredPaymentsQuery($filters);
 
         $payments = (clone $filteredPaymentsQuery)
-            ->with(['user', 'gateway', 'platformFee'])
+            ->with(['merchant', 'gateway', 'platformFee'])
             ->latest('created_at')
             ->paginate(25)
             ->withQueryString();
@@ -45,8 +45,7 @@ class PaymentsController extends Controller
             ->where('status', PlatformFeeStatus::Posted)
             ->sum('fee_amount');
 
-        $merchants = User::query()
-            ->where('role', 'merchant')
+        $merchants = Merchant::query()
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -79,7 +78,7 @@ class PaymentsController extends Controller
 
         $fileName = 'admin-payments-'.now()->format('Ymd-His').'.csv';
         $payments = $this->buildFilteredPaymentsQuery($filters)
-            ->with(['user:id,name', 'gateway:code,name', 'platformFee:id,payment_id,fee_amount,net_amount'])
+            ->with(['merchant:id,name', 'gateway:code,name', 'platformFee:id,payment_id,fee_amount,net_amount'])
             ->latest('created_at')
             ->get();
 
@@ -107,7 +106,7 @@ class PaymentsController extends Controller
                     $this->formatCsvDate($payment->created_at),
                     $payment->reference_id,
                     $payment->provider_reference ?? '',
-                    $payment->user?->name ?? '',
+                    $payment->merchant?->name ?? '',
                     $payment->gateway?->name ?? $payment->gateway_code,
                     number_format((float) $payment->amount, 2, '.', ''),
                     $payment->currency,
@@ -131,7 +130,7 @@ class PaymentsController extends Controller
     {
         return Payment::query()
             ->when(isset($filters['merchant_id']), static function (Builder $query) use ($filters): void {
-                $query->where('user_id', (int) $filters['merchant_id']);
+                $query->where('merchant_id', (int) $filters['merchant_id']);
             })
             ->when(isset($filters['gateway_code']), static function (Builder $query) use ($filters): void {
                 $query->where('gateway_code', (string) $filters['gateway_code']);

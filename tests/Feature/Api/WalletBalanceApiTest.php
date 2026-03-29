@@ -29,21 +29,17 @@ class WalletBalanceApiTest extends TestCase
     public function test_wallet_balance_api_is_for_merchants_only(): void
     {
         $adminToken = Str::random(64);
-        $admin = User::factory()->admin()->create([
-            'api_key' => $adminToken,
-        ]);
+        User::factory()->admin()->create();
 
         $this->withToken($adminToken)
             ->getJson('/api/wallets/balances')
-            ->assertForbidden();
+            ->assertUnauthorized();
     }
 
     public function test_wallet_balance_api_returns_zero_amounts_when_wallets_do_not_exist(): void
     {
         $merchantToken = Str::random(64);
-        $merchant = User::factory()->create([
-            'api_key' => $merchantToken,
-        ]);
+        User::factory()->withMerchantApiKey($merchantToken)->create();
 
         $response = $this->withToken($merchantToken)
             ->getJson('/api/wallets/balances');
@@ -67,15 +63,11 @@ class WalletBalanceApiTest extends TestCase
     {
         $merchantToken = Str::random(64);
         $otherMerchantToken = Str::random(64);
-        $merchant = User::factory()->create([
-            'api_key' => $merchantToken,
-        ]);
-        $otherMerchant = User::factory()->create([
-            'api_key' => $otherMerchantToken,
-        ]);
+        $merchant = User::factory()->withMerchantApiKey($merchantToken)->create();
+        $otherMerchant = User::factory()->withMerchantApiKey($otherMerchantToken)->create();
 
         $payment = Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'gateway_code' => 'paypal',
             'currency' => 'PHP',
             'status' => 'paid',
@@ -83,7 +75,7 @@ class WalletBalanceApiTest extends TestCase
         ]);
 
         $otherPayment = Payment::factory()->create([
-            'user_id' => $otherMerchant->id,
+            'merchant_id' => $otherMerchant->id,
             'gateway_code' => 'paypal',
             'currency' => 'PHP',
             'status' => 'paid',
@@ -91,20 +83,20 @@ class WalletBalanceApiTest extends TestCase
         ]);
 
         $tunnelWallet = Wallet::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'wallet_type' => Wallet::TYPE_MERCHANT_CLEARING,
             'currency' => 'PHP',
             'balance' => 980.00,
         ]);
         $realWallet = Wallet::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'wallet_type' => Wallet::TYPE_MERCHANT_REAL,
             'currency' => 'PHP',
             'balance' => 200.00,
         ]);
 
         $otherTunnelWallet = Wallet::factory()->create([
-            'user_id' => $otherMerchant->id,
+            'merchant_id' => $otherMerchant->id,
             'wallet_type' => Wallet::TYPE_MERCHANT_CLEARING,
             'currency' => 'PHP',
             'balance' => 999.00,

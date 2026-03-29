@@ -16,17 +16,17 @@ class AdminPaymentsFilterTest extends TestCase
     public function test_admin_can_filter_payments_by_merchant(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $merchantA = User::factory()->create(['role' => 'merchant', 'name' => 'Merchant Alpha']);
-        $merchantB = User::factory()->create(['role' => 'merchant', 'name' => 'Merchant Beta']);
+        $merchantA = User::factory()->create(['name' => 'Merchant Alpha']);
+        $merchantB = User::factory()->create(['name' => 'Merchant Beta']);
 
         Payment::factory()->create([
-            'user_id' => $merchantA->id,
+            'merchant_id' => $merchantA->id,
             'reference_id' => 'FILTER-MERCHANT-A',
             'gateway_code' => 'coins',
             'status' => 'paid',
         ]);
         Payment::factory()->create([
-            'user_id' => $merchantB->id,
+            'merchant_id' => $merchantB->id,
             'reference_id' => 'FILTER-MERCHANT-B',
             'gateway_code' => 'coins',
             'status' => 'paid',
@@ -44,7 +44,7 @@ class AdminPaymentsFilterTest extends TestCase
     public function test_admin_can_filter_payments_by_gateway_and_status(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
 
         Gateway::query()->create([
             'code' => 'coins',
@@ -60,19 +60,19 @@ class AdminPaymentsFilterTest extends TestCase
         ]);
 
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'FILTER-COINS-PENDING',
             'gateway_code' => 'coins',
             'status' => 'pending',
         ]);
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'FILTER-COINS-PAID',
             'gateway_code' => 'coins',
             'status' => 'paid',
         ]);
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'FILTER-MAYA-PAID',
             'gateway_code' => 'maya',
             'status' => 'paid',
@@ -92,10 +92,10 @@ class AdminPaymentsFilterTest extends TestCase
     public function test_admin_can_filter_payments_by_date_range_and_reference(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
 
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'DATE-RANGE-MATCH-001',
             'provider_reference' => 'PREF-MATCH-001',
             'gateway_code' => 'coins',
@@ -105,7 +105,7 @@ class AdminPaymentsFilterTest extends TestCase
         ]);
 
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'DATE-RANGE-OLD-002',
             'provider_reference' => 'PREF-OLD-002',
             'gateway_code' => 'coins',
@@ -115,7 +115,7 @@ class AdminPaymentsFilterTest extends TestCase
         ]);
 
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'DATE-RANGE-WRONG-003',
             'provider_reference' => 'PREF-WRONG-003',
             'gateway_code' => 'coins',
@@ -139,11 +139,11 @@ class AdminPaymentsFilterTest extends TestCase
     public function test_admin_payments_page_summary_reflects_active_filters(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $merchantA = User::factory()->create(['role' => 'merchant']);
-        $merchantB = User::factory()->create(['role' => 'merchant']);
+        $merchantA = User::factory()->create();
+        $merchantB = User::factory()->create();
 
         Payment::factory()->create([
-            'user_id' => $merchantA->id,
+            'merchant_id' => $merchantA->id,
             'gateway_code' => 'coins',
             'status' => 'paid',
             'amount' => 100,
@@ -151,7 +151,7 @@ class AdminPaymentsFilterTest extends TestCase
         ]);
 
         Payment::factory()->create([
-            'user_id' => $merchantA->id,
+            'merchant_id' => $merchantA->id,
             'gateway_code' => 'coins',
             'status' => 'pending',
             'amount' => 50,
@@ -159,7 +159,7 @@ class AdminPaymentsFilterTest extends TestCase
         ]);
 
         Payment::factory()->create([
-            'user_id' => $merchantA->id,
+            'merchant_id' => $merchantA->id,
             'gateway_code' => 'coins',
             'status' => 'failed',
             'amount' => 70,
@@ -167,7 +167,7 @@ class AdminPaymentsFilterTest extends TestCase
         ]);
 
         Payment::factory()->create([
-            'user_id' => $merchantB->id,
+            'merchant_id' => $merchantB->id,
             'gateway_code' => 'coins',
             'status' => 'paid',
             'amount' => 999,
@@ -190,7 +190,7 @@ class AdminPaymentsFilterTest extends TestCase
     public function test_admin_can_export_filtered_payments_to_csv(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $merchant = User::factory()->create(['role' => 'merchant', 'name' => 'CSV Merchant']);
+        $merchant = User::factory()->create(['name' => 'CSV Merchant']);
 
         Gateway::query()->create([
             'code' => 'coins',
@@ -200,7 +200,7 @@ class AdminPaymentsFilterTest extends TestCase
         ]);
 
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'CSV-PAID-001',
             'provider_reference' => 'CSV-PROVIDER-001',
             'gateway_code' => 'coins',
@@ -211,7 +211,7 @@ class AdminPaymentsFilterTest extends TestCase
         ]);
 
         Payment::factory()->create([
-            'user_id' => $merchant->id,
+            'merchant_id' => $merchant->id,
             'reference_id' => 'CSV-PENDING-002',
             'provider_reference' => 'CSV-PROVIDER-002',
             'gateway_code' => 'coins',

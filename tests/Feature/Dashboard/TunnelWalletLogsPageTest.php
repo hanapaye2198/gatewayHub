@@ -18,7 +18,7 @@ class TunnelWalletLogsPageTest extends TestCase
 
     public function test_removed_tunnel_wallet_logs_path_returns_not_found_for_merchant(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
 
         $response = $this->actingAs($merchant)->get('/dashboard/tunnel-wallet-logs');
 

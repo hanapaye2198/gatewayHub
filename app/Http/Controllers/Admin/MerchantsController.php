@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Merchant;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -11,8 +12,8 @@ class MerchantsController extends Controller
 {
     public function index(): View
     {
-        $merchants = User::query()
-            ->where('role', 'merchant')
+        $merchants = Merchant::query()
+            ->with('users')
             ->orderBy('name')
             ->get();
 
@@ -22,15 +23,13 @@ class MerchantsController extends Controller
         ]);
     }
 
-    public function toggleActive(User $user): RedirectResponse
+    public function toggleActive(Merchant $merchant): RedirectResponse
     {
-        if ($user->role !== 'merchant') {
-            abort(404);
-        }
+        $merchant->update(['is_active' => ! $merchant->is_active]);
 
-        $user->update(['is_active' => ! $user->is_active]);
+        User::query()->where('merchant_id', $merchant->id)->update(['is_active' => $merchant->is_active]);
 
         return redirect()->route('admin.merchants.index')
-            ->with('status', $user->is_active ? 'Merchant activated.' : 'Merchant deactivated.');
+            ->with('status', $merchant->is_active ? 'Merchant activated.' : 'Merchant deactivated.');
     }
 }

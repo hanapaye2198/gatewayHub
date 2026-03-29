@@ -28,6 +28,9 @@ class CreateNewUser implements CreatesNewUsers
             'name' => $input['name'],
             'email' => $input['email'],
             'password' => $input['password'],
+            'role' => User::ROLE_MERCHANT_USER,
+            'is_active' => true,
+            'merchant_id' => null,
         ]);
     }
 }

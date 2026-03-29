@@ -77,7 +77,7 @@ class PlatformGatewayConfigTest extends TestCase
 
     public function test_merchant_cannot_update_platform_gateway_credentials(): void
     {
-        $merchant = User::factory()->create(['role' => 'merchant']);
+        $merchant = User::factory()->create();
         $gateway = Gateway::query()->create([
             'code' => 'coins',
             'name' => 'Coins.ph',

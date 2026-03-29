@@ -29,10 +29,12 @@ class ApiPaymentHardeningTest extends TestCase
 
     public function test_inactive_merchant_receives_403(): void
     {
-        $user = User::factory()->create(['api_key' => 'inactive-key', 'is_active' => false]);
+        $user = User::factory()->withMerchantApiKey('inactive-key')->create();
+        $user->merchant->update(['is_active' => false]);
+
         $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->merchant_id,
             'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
@@ -64,10 +66,10 @@ class ApiPaymentHardeningTest extends TestCase
 
     public function test_amount_zero_returns_422(): void
     {
-        $user = User::factory()->create(['api_key' => 'key-1']);
+        $user = User::factory()->withMerchantApiKey('key-1')->create();
         $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->merchant_id,
             'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
@@ -86,14 +88,17 @@ class ApiPaymentHardeningTest extends TestCase
 
     public function test_hashed_api_key_can_authenticate_without_plaintext_key(): void
     {
-        $user = User::factory()->create([
+        $user = User::factory()->create();
+        DB::table('merchants')->where('id', $user->merchant_id)->update([
             'api_key' => null,
             'api_key_hash' => hash('sha256', 'key-hash-only'),
             'api_key_last_four' => 'only',
+            'updated_at' => now(),
         ]);
+
         $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->merchant_id,
             'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
@@ -112,22 +117,17 @@ class ApiPaymentHardeningTest extends TestCase
 
     public function test_plaintext_only_legacy_api_key_is_rejected(): void
     {
-        $user = User::factory()->create([
-            'api_key' => null,
+        $user = User::factory()->create();
+        DB::table('merchants')->where('id', $user->merchant_id)->update([
+            'api_key' => 'legacy-plaintext-key',
             'api_key_hash' => null,
             'api_key_last_four' => null,
+            'updated_at' => now(),
         ]);
-        DB::table('users')
-            ->where('id', $user->id)
-            ->update([
-                'api_key' => 'legacy-plaintext-key',
-                'api_key_hash' => null,
-                'api_key_last_four' => null,
-            ]);
 
         $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->merchant_id,
             'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
@@ -151,10 +151,10 @@ class ApiPaymentHardeningTest extends TestCase
     {
         Http::fake(['*' => Http::response(['code' => 0, 'data' => ['orderId' => 'ord-1', 'qrCode' => 'qr123']], 200)]);
 
-        $user = User::factory()->create(['api_key' => 'key-idem']);
+        $user = User::factory()->withMerchantApiKey('key-idem')->create();
         $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->merchant_id,
             'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
@@ -188,10 +188,10 @@ class ApiPaymentHardeningTest extends TestCase
     {
         Http::fake(['*' => Http::response(['code' => 0, 'data' => ['orderId' => 'x', 'qrCode' => 'y']], 200)]);
 
-        $user = User::factory()->create(['api_key' => 'key-format']);
+        $user = User::factory()->withMerchantApiKey('key-format')->create();
         $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
         MerchantGateway::query()->create([
-            'user_id' => $user->id,
+            'merchant_id' => $user->merchant_id,
             'gateway_id' => $coinsGateway->id,
             'is_enabled' => true,
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
