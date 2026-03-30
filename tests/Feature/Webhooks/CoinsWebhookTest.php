@@ -70,6 +70,44 @@ class CoinsWebhookTest extends TestCase
         $response->assertJson(['message' => 'Invalid signature.']);
     }
 
+    public function test_webhook_accepts_client_secret_fallback_when_webhook_secret_not_set(): void
+    {
+        $this->app['config']->set('coins.webhook.secret', '');
+        $this->coinsGateway->update([
+            'config_json' => [
+                'client_id' => 'client',
+                'client_secret' => self::WEBHOOK_SECRET,
+                'api_base' => 'sandbox',
+            ],
+        ]);
+
+        $payment = Payment::factory()->create([
+            'user_id' => $this->user->id,
+            'gateway_code' => 'coins',
+            'provider_reference' => 'ORDER-FALLBACK-001',
+            'status' => 'pending',
+            'paid_at' => null,
+        ]);
+
+        $payload = [
+            'referenceId' => 'ORDER-FALLBACK-001',
+            'status' => 'SUCCEEDED',
+            'settleDate' => 1707475200000,
+        ];
+        $signed = $this->signatureService->signWebhook($payload, self::WEBHOOK_SECRET);
+
+        $response = $this->postJson('/api/webhooks/coins', $payload, [
+            'Content-Type' => 'application/json',
+            'Signature' => $signed['signature'],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['received' => true]);
+
+        $payment->refresh();
+        $this->assertSame('paid', $payment->status);
+    }
+
     public function test_webhook_returns_401_when_signature_invalid(): void
     {
         $payload = [

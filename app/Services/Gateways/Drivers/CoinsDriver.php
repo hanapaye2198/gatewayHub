@@ -72,7 +72,7 @@ class CoinsDriver implements GatewayInterface
         $this->clientId = trim((string) ($config['client_id'] ?? $config['api_key'] ?? ''));
         $this->clientSecret = trim((string) ($config['client_secret'] ?? $config['api_secret'] ?? ''));
         $this->apiBase = strtolower(trim((string) ($config['api_base'] ?? '')));
-        $this->webhookSecret = trim((string) ($config['webhook_secret'] ?? ''));
+        $this->webhookSecret = trim((string) ($config['webhook_secret'] ?? $config['client_secret'] ?? $config['api_secret'] ?? ''));
         $this->source = trim((string) ($config['source'] ?? self::SOURCE_IDENTIFIER));
         if ($this->source === '') {
             $this->source = self::SOURCE_IDENTIFIER;

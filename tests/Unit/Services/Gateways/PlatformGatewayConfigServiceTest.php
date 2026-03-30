@@ -60,6 +60,28 @@ class PlatformGatewayConfigServiceTest extends TestCase
         $this->assertSame('prod', $resolved['config']['api_base'] ?? null);
     }
 
+    public function test_for_gateway_code_with_meta_falls_back_webhook_secret_to_client_secret_for_coins(): void
+    {
+        config()->set('coins.webhook.secret', '');
+
+        Gateway::query()->create([
+            'code' => 'coins',
+            'name' => 'Coins.ph',
+            'driver_class' => CoinsDriver::class,
+            'is_global_enabled' => true,
+            'config_json' => [
+                'client_id' => 'db-client-id',
+                'client_secret' => 'db-client-secret',
+                'api_base' => 'prod',
+            ],
+        ]);
+
+        $service = new PlatformGatewayConfigService;
+        $resolved = $service->forGatewayCodeWithMeta('coins');
+
+        $this->assertSame('db-client-secret', $resolved['config']['webhook_secret'] ?? null);
+    }
+
     public function test_for_gateway_code_with_meta_ignores_placeholder_db_values(): void
     {
         config([

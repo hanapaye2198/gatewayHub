@@ -58,4 +58,27 @@ class CoinsDriverTest extends TestCase
 
         $this->assertFalse($driver->verifyWebhook($request));
     }
+
+    public function test_verify_webhook_falls_back_to_client_secret_when_webhook_secret_missing(): void
+    {
+        $payload = [
+            'requestId' => 'C0000000000001108',
+            'referenceId' => '2007398545514304271',
+            'status' => 'SUCCEEDED',
+            'settleDate' => '1754038804000',
+        ];
+        $secret = 'coins-client-secret';
+        $signature = (new CoinsSignatureService)->signWebhook($payload, $secret)['signature'];
+
+        $request = Request::create('/api/webhooks/coins', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($payload));
+        $request->headers->set('Signature', $signature);
+
+        $driver = new CoinsDriver([
+            'client_id' => 'coins-client-id',
+            'client_secret' => $secret,
+            'api_base' => 'sandbox',
+        ]);
+
+        $this->assertTrue($driver->verifyWebhook($request));
+    }
 }
