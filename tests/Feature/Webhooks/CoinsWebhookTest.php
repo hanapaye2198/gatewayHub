@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\WebhookEvent;
 use App\Services\Coins\CoinsSignatureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -82,7 +83,7 @@ class CoinsWebhookTest extends TestCase
         ]);
 
         $payment = Payment::factory()->create([
-            'user_id' => $this->user->id,
+            'merchant_id' => $this->user->id,
             'gateway_code' => 'coins',
             'provider_reference' => 'ORDER-FALLBACK-001',
             'status' => 'pending',
@@ -110,6 +111,8 @@ class CoinsWebhookTest extends TestCase
 
     public function test_webhook_returns_401_when_signature_invalid(): void
     {
+        Log::spy();
+
         $payload = [
             'referenceId' => 'ORDER-001',
             'status' => 'SUCCEEDED',
@@ -123,6 +126,19 @@ class CoinsWebhookTest extends TestCase
 
         $response->assertStatus(401);
         $response->assertJson(['message' => 'Invalid signature.']);
+
+        Log::shouldHaveReceived('warning')
+            ->once()
+            ->withArgs(function (string $message, array $context): bool {
+                return $message === 'Coins webhook rejected: invalid signature'
+                    && $context['reason'] === 'signature_mismatch'
+                    && $context['signature_header'] === 'X-COINS-SIGNATURE'
+                    && $context['reference_id'] === 'ORDER-001'
+                    && $context['status'] === 'SUCCEEDED'
+                    && $context['signature_length'] === strlen('invalid-signature')
+                    && is_string($context['body_sha256'])
+                    && strlen($context['body_sha256']) === 64;
+            });
     }
 
     public function test_webhook_returns_200_when_payment_not_found(): void
