@@ -269,6 +269,41 @@ class CoinsWebhookTest extends TestCase
         $this->assertSame(1754038804, $payment->paid_at->timestamp);
     }
 
+    public function test_webhook_accepts_uppercase_hex_signature_header_without_timestamp(): void
+    {
+        $payment = Payment::factory()->create([
+            'merchant_id' => $this->user->id,
+            'gateway_code' => 'gcash',
+            'provider_reference' => 'GUIDE-WEBHOOK-002',
+            'status' => 'pending',
+            'paid_at' => null,
+        ]);
+
+        $payload = [
+            'requestId' => 'GUIDE-WEBHOOK-002',
+            'referenceId' => '2007398545514304271',
+            'cashInBank' => 'gcash',
+            'channelInvoiceNo' => '304271',
+            'errorMsg' => '',
+            'settleDate' => '1754038804001',
+            'status' => 'SUCCEEDED',
+        ];
+        $signature = strtoupper($this->signatureService->signWebhook($payload, self::WEBHOOK_SECRET)['signature']);
+
+        $response = $this->postJson('/api/webhooks', $payload, [
+            'Content-Type' => 'application/json',
+            'Signature' => $signature,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['received' => true]);
+
+        $payment->refresh();
+        $this->assertSame('paid', $payment->status);
+        $this->assertNotNull($payment->paid_at);
+        $this->assertSame(1754038804, $payment->paid_at->timestamp);
+    }
+
     public function test_webhook_accepts_raw_payload_signature_from_live_callback_shape(): void
     {
         $payment = Payment::factory()->create([

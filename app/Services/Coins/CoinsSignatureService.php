@@ -148,7 +148,7 @@ class CoinsSignatureService
         $canonical = $this->buildCanonicalString($normalized);
         $expectedSignature = hash_hmac('sha256', $canonical, $apiSecret);
 
-        if (! hash_equals($expectedSignature, trim($receivedSignature))) {
+        if (! $this->signaturesMatch($expectedSignature, trim($receivedSignature))) {
             throw new CoinsApiException('Coins signature verification failed: signature mismatch.');
         }
 
@@ -246,7 +246,7 @@ class CoinsSignatureService
         $receivedSignature = trim($receivedSignature);
         foreach ($this->webhookCanonicalCandidates($normalized, $rawPayload) as $canonical) {
             $expectedSignature = hash_hmac('sha256', $canonical, $apiSecret);
-            if (hash_equals($expectedSignature, $receivedSignature)) {
+            if ($this->signaturesMatch($expectedSignature, $receivedSignature)) {
                 return true;
             }
         }
@@ -326,5 +326,19 @@ class CoinsSignatureService
         }
 
         return array_values(array_unique($candidates));
+    }
+
+    private function signaturesMatch(string $expectedSignature, string $receivedSignature): bool
+    {
+        if ($this->looksLikeHexDigest($expectedSignature) && $this->looksLikeHexDigest($receivedSignature)) {
+            return hash_equals(strtolower($expectedSignature), strtolower($receivedSignature));
+        }
+
+        return hash_equals($expectedSignature, $receivedSignature);
+    }
+
+    private function looksLikeHexDigest(string $signature): bool
+    {
+        return preg_match('/\A[0-9a-fA-F]{64}\z/', $signature) === 1;
     }
 }

@@ -29,6 +29,26 @@ class CoinsDriverTest extends TestCase
         $this->assertTrue($driver->verifyWebhook($request));
     }
 
+    public function test_verify_webhook_accepts_uppercase_hex_signature(): void
+    {
+        $payload = [
+            'requestId' => 'C0000000000001107',
+            'referenceId' => '2007398545514304270',
+            'cashInBank' => 'gcash',
+            'status' => 'SUCCEEDED',
+            'settleDate' => '1754038804000',
+        ];
+        $secret = 'coins-webhook-secret';
+        $signature = strtoupper((new CoinsSignatureService)->signWebhook($payload, $secret)['signature']);
+
+        $request = Request::create('/api/webhooks/coins', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($payload));
+        $request->headers->set('Signature', $signature);
+
+        $driver = new CoinsDriver(['webhook_secret' => $secret]);
+
+        $this->assertTrue($driver->verifyWebhook($request));
+    }
+
     public function test_verify_webhook_returns_false_for_invalid_signature(): void
     {
         $payload = [

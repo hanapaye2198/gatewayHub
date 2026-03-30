@@ -152,6 +152,21 @@ class CoinsSignatureServiceTest extends TestCase
         );
     }
 
+    public function test_verify_webhook_accepts_uppercase_hex_signature(): void
+    {
+        $payload = [
+            'referenceId' => '2007398545514304270',
+            'requestId' => 'C0000000000001107',
+            'status' => 'SUCCEEDED',
+            'settleDate' => '1754038804000',
+        ];
+        $signed = $this->service->signWebhook($payload, 'webhook-secret');
+
+        $this->assertTrue(
+            $this->service->verifyWebhook($payload, 'webhook-secret', strtoupper($signed['signature']))
+        );
+    }
+
     public function test_verify_webhook_accepts_input_order_signature(): void
     {
         $payload = [
