@@ -192,6 +192,39 @@ class CoinsSignatureServiceTest extends TestCase
         );
     }
 
+    public function test_verify_webhook_accepts_documented_qrph_subset_signature_with_live_payload_extras(): void
+    {
+        $payload = [
+            'amount' => '1',
+            'settleDate' => '1774841898000',
+            'senderBic' => '',
+            'userId' => '6',
+            'referenceId' => '2181934522336370231',
+            'errorMsg' => 'success',
+            'senderName' => '',
+            'senderNumber' => '',
+            'referenceNumber' => '',
+            'requestId' => 'GH-6-01KMYE1RG5HW6MZNZ6K6FJG8WK',
+            'cashInBank' => 'GCash',
+            'channelInvoiceNo' => '251598',
+            'createDate' => '1774842864000',
+            'status' => 'SUCCEEDED',
+        ];
+        $signed = $this->service->signWebhook([
+            'requestId' => 'GH-6-01KMYE1RG5HW6MZNZ6K6FJG8WK',
+            'referenceId' => '2181934522336370231',
+            'cashInBank' => 'GCash',
+            'channelInvoiceNo' => '251598',
+            'settleDate' => '1774841898000',
+            'errorMsg' => 'success',
+            'status' => 'SUCCEEDED',
+        ], 'webhook-secret');
+
+        $this->assertTrue(
+            $this->service->verifyWebhook($payload, 'webhook-secret', $signed['signature'])
+        );
+    }
+
     public function test_verify_webhook_accepts_raw_payload_signature(): void
     {
         $payload = [

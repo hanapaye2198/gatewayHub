@@ -114,4 +114,40 @@ class CoinsDriverTest extends TestCase
 
         $this->assertTrue($driver->verifyWebhook($request));
     }
+
+    public function test_verify_webhook_accepts_documented_qrph_subset_signature_with_live_payload_extras(): void
+    {
+        $payload = [
+            'amount' => '1',
+            'settleDate' => '1774841898000',
+            'senderBic' => '',
+            'userId' => '6',
+            'referenceId' => '2181934522336370231',
+            'errorMsg' => 'success',
+            'senderName' => '',
+            'senderNumber' => '',
+            'referenceNumber' => '',
+            'requestId' => 'GH-6-01KMYE1RG5HW6MZNZ6K6FJG8WK',
+            'cashInBank' => 'GCash',
+            'channelInvoiceNo' => '251598',
+            'createDate' => '1774842864000',
+            'status' => 'SUCCEEDED',
+        ];
+        $signature = (new CoinsSignatureService)->signWebhook([
+            'requestId' => 'GH-6-01KMYE1RG5HW6MZNZ6K6FJG8WK',
+            'referenceId' => '2181934522336370231',
+            'cashInBank' => 'GCash',
+            'channelInvoiceNo' => '251598',
+            'settleDate' => '1774841898000',
+            'errorMsg' => 'success',
+            'status' => 'SUCCEEDED',
+        ], 'coins-webhook-secret')['signature'];
+
+        $request = Request::create('/api/webhooks/coins', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($payload));
+        $request->headers->set('Signature', $signature);
+
+        $driver = new CoinsDriver(['webhook_secret' => 'coins-webhook-secret']);
+
+        $this->assertTrue($driver->verifyWebhook($request));
+    }
 }

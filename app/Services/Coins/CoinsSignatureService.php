@@ -23,6 +23,37 @@ use App\Services\Gateways\Exceptions\CoinsApiException;
 class CoinsSignatureService
 {
     /**
+     * Dynamic QRPH fields documented in the Coins partner guide.
+     *
+     * @var list<string>
+     */
+    private const QRPH_WEBHOOK_FIELDS = [
+        'requestId',
+        'referenceId',
+        'cashInBank',
+        'channelInvoiceNo',
+        'settleDate',
+        'errorMsg',
+        'status',
+    ];
+
+    /**
+     * Dynamic QRPH fields plus amount for live callback variants.
+     *
+     * @var list<string>
+     */
+    private const QRPH_WEBHOOK_FIELDS_WITH_AMOUNT = [
+        'amount',
+        'requestId',
+        'referenceId',
+        'cashInBank',
+        'channelInvoiceNo',
+        'settleDate',
+        'errorMsg',
+        'status',
+    ];
+
+    /**
      * Sign body for Coins Fiat API (POST JSON body, signature in header).
      *
      * Canonical string = body params sorted by key, then "&timestamp={timestamp}".
@@ -316,16 +347,45 @@ class CoinsSignatureService
      */
     private function webhookCanonicalCandidates(array $normalized, ?string $rawPayload): array
     {
-        $candidates = [
-            $this->buildCanonicalString($normalized, true),
-            $this->buildCanonicalString($normalized, false),
-        ];
+        $candidates = [];
+
+        foreach ([
+            $normalized,
+            $this->filterCanonicalSubset($normalized, self::QRPH_WEBHOOK_FIELDS),
+            $this->filterCanonicalSubset($normalized, self::QRPH_WEBHOOK_FIELDS_WITH_AMOUNT),
+        ] as $candidateParams) {
+            if ($candidateParams === []) {
+                continue;
+            }
+
+            $candidates[] = $this->buildCanonicalString($candidateParams, true);
+            $candidates[] = $this->buildCanonicalString($candidateParams, false);
+        }
 
         if (is_string($rawPayload) && $rawPayload !== '') {
             $candidates[] = $rawPayload;
         }
 
         return array_values(array_unique($candidates));
+    }
+
+    /**
+     * @param  array<string, string>  $normalized
+     * @param  list<string>  $fields
+     * @return array<string, string>
+     */
+    private function filterCanonicalSubset(array $normalized, array $fields): array
+    {
+        $allowedFields = array_flip($fields);
+        $subset = [];
+
+        foreach ($normalized as $key => $value) {
+            if (array_key_exists($key, $allowedFields)) {
+                $subset[$key] = $value;
+            }
+        }
+
+        return $subset;
     }
 
     private function signaturesMatch(string $expectedSignature, string $receivedSignature): bool
