@@ -181,7 +181,12 @@ class CoinsDriver implements GatewayInterface
         }
 
         try {
-            return $this->signatureService->verifyWebhook($payload, $this->webhookSecret, $signature);
+            return $this->signatureService->verifyWebhook(
+                $payload,
+                $this->webhookSecret,
+                $signature,
+                (string) $request->getContent()
+            );
         } catch (CoinsApiException) {
             return false;
         }

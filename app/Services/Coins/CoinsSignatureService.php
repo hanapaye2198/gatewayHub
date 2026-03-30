@@ -167,7 +167,8 @@ class CoinsSignatureService
     public function signWebhook(
         array $payload,
         string $apiSecret,
-        bool $includeCanonicalForDebug = false
+        bool $includeCanonicalForDebug = false,
+        bool $sortKeys = true
     ): array {
         if ($apiSecret === '') {
             throw new CoinsApiException('Coins signature requires a non-empty API secret.');
@@ -178,13 +179,42 @@ class CoinsSignatureService
             throw new CoinsApiException('Coins webhook signature requires a non-empty payload.');
         }
 
-        $canonical = $this->buildCanonicalString($normalized);
+        $canonical = $this->buildCanonicalString($normalized, $sortKeys);
         $result = [
             'signature' => hash_hmac('sha256', $canonical, $apiSecret),
         ];
 
         if ($includeCanonicalForDebug) {
             $result['canonical_string'] = $canonical;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Sign a raw webhook payload body exactly as transmitted.
+     *
+     * @return array{signature: string, canonical_string?: string}
+     */
+    public function signRawPayload(
+        string $rawPayload,
+        string $apiSecret,
+        bool $includeCanonicalForDebug = false
+    ): array {
+        if ($apiSecret === '') {
+            throw new CoinsApiException('Coins signature requires a non-empty API secret.');
+        }
+
+        if ($rawPayload === '') {
+            throw new CoinsApiException('Coins raw payload signature requires a non-empty payload.');
+        }
+
+        $result = [
+            'signature' => hash_hmac('sha256', $rawPayload, $apiSecret),
+        ];
+
+        if ($includeCanonicalForDebug) {
+            $result['canonical_string'] = $rawPayload;
         }
 
         return $result;
@@ -201,7 +231,8 @@ class CoinsSignatureService
     public function verifyWebhook(
         array $payload,
         string $apiSecret,
-        string $receivedSignature
+        string $receivedSignature,
+        ?string $rawPayload = null
     ): bool {
         if ($apiSecret === '') {
             throw new CoinsApiException('Coins signature verification requires a non-empty API secret.');
@@ -212,14 +243,15 @@ class CoinsSignatureService
             throw new CoinsApiException('Coins signature verification requires a non-empty payload.');
         }
 
-        $canonical = $this->buildCanonicalString($normalized);
-        $expectedSignature = hash_hmac('sha256', $canonical, $apiSecret);
-
-        if (! hash_equals($expectedSignature, trim($receivedSignature))) {
-            throw new CoinsApiException('Coins signature verification failed: signature mismatch.');
+        $receivedSignature = trim($receivedSignature);
+        foreach ($this->webhookCanonicalCandidates($normalized, $rawPayload) as $canonical) {
+            $expectedSignature = hash_hmac('sha256', $canonical, $apiSecret);
+            if (hash_equals($expectedSignature, $receivedSignature)) {
+                return true;
+            }
         }
 
-        return true;
+        throw new CoinsApiException('Coins signature verification failed: signature mismatch.');
     }
 
     /**
@@ -276,5 +308,23 @@ class CoinsSignatureService
         }
 
         return implode('&', $pairs);
+    }
+
+    /**
+     * @param  array<string, string>  $normalized
+     * @return list<string>
+     */
+    private function webhookCanonicalCandidates(array $normalized, ?string $rawPayload): array
+    {
+        $candidates = [
+            $this->buildCanonicalString($normalized, true),
+            $this->buildCanonicalString($normalized, false),
+        ];
+
+        if (is_string($rawPayload) && $rawPayload !== '') {
+            $candidates[] = $rawPayload;
+        }
+
+        return array_values(array_unique($candidates));
     }
 }

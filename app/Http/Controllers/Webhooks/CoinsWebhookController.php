@@ -50,7 +50,7 @@ class CoinsWebhookController extends Controller
             }
 
             try {
-                $this->signatureService->verifyWebhook($payload, $secret, $signature);
+                $this->signatureService->verifyWebhook($payload, $secret, $signature, (string) $request->getContent());
             } catch (CoinsApiException) {
                 return $this->rejectInvalidSignature($request, $payload, $signatureMeta, 'signature_mismatch');
             }

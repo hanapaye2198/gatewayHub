@@ -269,6 +269,48 @@ class CoinsWebhookTest extends TestCase
         $this->assertSame(1754038804, $payment->paid_at->timestamp);
     }
 
+    public function test_webhook_accepts_raw_payload_signature_from_live_callback_shape(): void
+    {
+        $payment = Payment::factory()->create([
+            'merchant_id' => $this->user->id,
+            'gateway_code' => 'gcash',
+            'provider_reference' => 'GH-6-01KMYE1RG5HW6MZNZ6K6FJG8WK',
+            'status' => 'pending',
+            'paid_at' => null,
+            'raw_response' => [
+                'gateway_request_reference' => 'GH-6-01KMYE1RG5HW6MZNZ6K6FJG8WK',
+                'data' => [
+                    'requestId' => 'GH-6-01KMYE1RG5HW6MZNZ6K6FJG8WK',
+                    'status' => 'PENDING',
+                ],
+            ],
+        ]);
+
+        $rawPayload = '{"amount":"1","settleDate":"1774841898000","senderBic":"","userId":"6","referenceId":"2181934522336370231","errorMsg":"success","senderName":"","senderNumber":"","referenceNumber":"","requestId":"GH-6-01KMYE1RG5HW6MZNZ6K6FJG8WK","cashInBank":"GCash","channelInvoiceNo":"251598","createDate":"1774842864000","status":"SUCCEEDED"}';
+        $signature = $this->signatureService->signRawPayload($rawPayload, self::WEBHOOK_SECRET)['signature'];
+
+        $response = $this->call(
+            'POST',
+            '/api/webhooks/coins',
+            [],
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_SIGNATURE' => $signature,
+            ],
+            $rawPayload
+        );
+
+        $response->assertStatus(200);
+        $response->assertJson(['received' => true]);
+
+        $payment->refresh();
+        $this->assertSame('paid', $payment->status);
+        $this->assertNotNull($payment->paid_at);
+        $this->assertSame(1774841898, $payment->paid_at->timestamp);
+    }
+
     public function test_webhook_can_retry_same_event_after_processing_failure(): void
     {
         $firstPayment = Payment::factory()->create([
