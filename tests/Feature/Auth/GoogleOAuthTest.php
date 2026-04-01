@@ -4,6 +4,7 @@ namespace Tests\Feature\Auth;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Fortify\Features;
 use Laravel\Socialite\Facades\Socialite;
 use Mockery;
 use Tests\TestCase;
@@ -72,6 +73,29 @@ class GoogleOAuthTest extends TestCase
 
         $existingUser->refresh();
         $this->assertSame('google-123', $existingUser->google_id);
+    }
+
+    public function test_google_callback_redirects_to_two_factor_challenge_when_two_factor_is_enabled(): void
+    {
+        if (! Features::canManageTwoFactorAuthentication()) {
+            $this->markTestSkipped('Two-factor authentication is disabled.');
+        }
+
+        $existingUser = User::factory()->withTwoFactor()->create([
+            'email' => '2fa-google@example.com',
+            'google_id' => null,
+        ]);
+
+        $socialiteUser = $this->mockSocialiteUser('google-2fa-1', $existingUser->email, $existingUser->name);
+        $this->mockSocialiteDriver($socialiteUser);
+
+        $response = $this->get(route('google.callback'));
+
+        $response->assertRedirect(route('two-factor.login'));
+        $this->assertGuest();
+
+        $existingUser->refresh();
+        $this->assertSame('google-2fa-1', $existingUser->google_id);
     }
 
     public function test_google_callback_redirects_admin_to_admin_panel(): void

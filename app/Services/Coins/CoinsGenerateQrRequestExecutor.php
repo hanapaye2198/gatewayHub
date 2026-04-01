@@ -34,6 +34,15 @@ class CoinsGenerateQrRequestExecutor
         $jsonBody = $signer->encodeJsonBody($bodyParams);
         $includeCanonicalForDebug = (bool) ($context['include_canonical_for_debug'] ?? false);
 
+        $endpointForLog = (string) ($context['endpoint'] ?? 'generate_qr_code');
+        $requestIdForLog = (string) ($context['request_id'] ?? ($bodyParams['requestId'] ?? ''));
+        Log::info('Coins generate_qr request payload', [
+            'endpoint' => $endpointForLog,
+            'request_id' => $requestIdForLog,
+            'qr_code_merchant_name' => $bodyParams['qrCodeMerchantName'] ?? null,
+            'payload' => $bodyParams,
+        ]);
+
         $strategy = $this->normalizeStrategy(
             (string) ($context['strategy'] ?? config('coins.auth.generate_qr.strategy', self::STRATEGY_AUTO))
         );

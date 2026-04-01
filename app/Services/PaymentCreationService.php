@@ -36,6 +36,7 @@ class PaymentCreationService
             'amount' => $data['amount'],
             'currency' => $data['currency'],
             'reference' => $gatewayRequestReference,
+            'qr_code_merchant_name' => $merchant->business_name,
         ]);
 
         $externalPaymentId = $response['external_payment_id'] ?? $response['provider_reference'] ?? null;

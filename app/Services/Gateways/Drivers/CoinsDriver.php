@@ -2,6 +2,7 @@
 
 namespace App\Services\Gateways\Drivers;
 
+use App\Models\Merchant;
 use App\Services\Coins\CoinsApiErrorMessageResolver;
 use App\Services\Coins\CoinsGenerateQrRequestExecutor;
 use App\Services\Coins\CoinsSignatureService;
@@ -114,7 +115,7 @@ class CoinsDriver implements GatewayInterface
      * Follows Coins Partner Integration Guide v2.5: no signature or timestamp in URL;
      * JSON body only; X-COINS-APIKEY, Timestamp, and Signature in headers.
      *
-     * @param  array{amount: float|int|string, currency: string, reference: string}  $data
+     * @param  array{amount: float|int|string, currency: string, reference: string, qr_code_merchant_name?: string|null}  $data
      * @return array{external_payment_id: string, qr_data: string|null, raw: array, provider_reference?: string, qr_string?: string, qr_image?: string}
      *
      * @throws CoinsApiException On non-2xx HTTP status or response status !== 0. No payment record created on error.
@@ -134,6 +135,9 @@ class CoinsDriver implements GatewayInterface
             'currency' => $currency,
             'expiredSeconds' => (string) $expirationSeconds,
             'source' => $this->source,
+            'qrCodeMerchantName' => Merchant::normalizeQrCodeMerchantName(
+                isset($data['qr_code_merchant_name']) ? (string) $data['qr_code_merchant_name'] : null
+            ),
         ];
 
         $execution = $this->generateQrRequestExecutor->execute(

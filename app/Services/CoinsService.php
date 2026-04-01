@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Merchant;
 use App\Services\Coins\CoinsApiErrorMessageResolver;
 use App\Services\Coins\CoinsGenerateQrRequestExecutor;
 use App\Services\Gateways\Exceptions\CoinsApiException;
@@ -45,7 +46,7 @@ class CoinsService
     /**
      * Call Coins generate_qr_code API and return decoded response.
      *
-     * @param  array{amount: float|int|string, requestId: string, currency?: string}  $params
+     * @param  array{amount: float|int|string, requestId: string, currency?: string, qr_code_merchant_name?: string|null}  $params
      * @return array{success: bool, qr_code_string: string|null, reference_id: string|null, raw: array<string, mixed>}
      *
      * @throws CoinsApiException On request failure or API error (non-2xx or status !== 0).
@@ -80,6 +81,9 @@ class CoinsService
             'currency' => $currency,
             'expiredSeconds' => (string) self::DEFAULT_EXPIRATION_SECONDS,
             'source' => $source,
+            'qrCodeMerchantName' => Merchant::normalizeQrCodeMerchantName(
+                isset($params['qr_code_merchant_name']) ? (string) $params['qr_code_merchant_name'] : null
+            ),
         ];
 
         $url = str_ends_with($baseUrl, self::GENERATE_QR_PATH)

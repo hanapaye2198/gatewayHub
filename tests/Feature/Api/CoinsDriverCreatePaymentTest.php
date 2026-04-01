@@ -91,6 +91,69 @@ class CoinsDriverCreatePaymentTest extends TestCase
         $this->assertSame('portal-order-456', $result['provider_reference']);
     }
 
+    public function test_create_payment_sends_qr_code_merchant_name_in_request_body(): void
+    {
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/*' => function (\Illuminate\Http\Client\Request $request) {
+                $body = json_decode($request->body(), true);
+                $this->assertIsArray($body);
+                $this->assertSame('ABC Laundry Services', $body['qrCodeMerchantName'] ?? null);
+
+                return Http::response([
+                    'status' => 0,
+                    'data' => [
+                        'orderId' => 'ord-qr-name',
+                        'qrCode' => 'qr-named',
+                    ],
+                ], 200);
+            },
+        ]);
+
+        $driver = new CoinsDriver([
+            'client_id' => 'test-client',
+            'client_secret' => 'test-secret',
+            'api_base' => 'sandbox',
+        ]);
+
+        $driver->createPayment([
+            'amount' => 100,
+            'currency' => 'PHP',
+            'reference' => 'ref-qr-name',
+            'qr_code_merchant_name' => 'ABC Laundry Services',
+        ]);
+    }
+
+    public function test_create_payment_defaults_qr_code_merchant_name_when_not_provided(): void
+    {
+        Http::fake([
+            'api.9001.pl-qa.coinsxyz.me/*' => function (\Illuminate\Http\Client\Request $request) {
+                $body = json_decode($request->body(), true);
+                $this->assertIsArray($body);
+                $this->assertSame('GatewayHub Merchant', $body['qrCodeMerchantName'] ?? null);
+
+                return Http::response([
+                    'status' => 0,
+                    'data' => [
+                        'orderId' => 'ord-default-qr',
+                        'qrCode' => 'qr-default',
+                    ],
+                ], 200);
+            },
+        ]);
+
+        $driver = new CoinsDriver([
+            'client_id' => 'test-client',
+            'client_secret' => 'test-secret',
+            'api_base' => 'sandbox',
+        ]);
+
+        $driver->createPayment([
+            'amount' => 100,
+            'currency' => 'PHP',
+            'reference' => 'ref-default-qr',
+        ]);
+    }
+
     public function test_get_payment_status_returns_provider_status_payload(): void
     {
         Http::fake([

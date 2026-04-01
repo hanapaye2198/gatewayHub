@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -45,6 +46,45 @@ class Merchant extends Model
             'api_key_generated_at' => 'datetime',
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Customer-facing business name for QR branding (stored in the `name` column).
+     *
+     * @return Attribute<string|null, never>
+     */
+    protected function businessName(): Attribute
+    {
+        return Attribute::make(
+            get: function (): ?string {
+                $name = trim((string) ($this->attributes['name'] ?? ''));
+
+                return $name === '' ? null : $name;
+            }
+        );
+    }
+
+    /**
+     * Display name for Coins Dynamic QR (`qrCodeMerchantName`), with platform default when unset.
+     */
+    public function qrCodeMerchantDisplayName(): string
+    {
+        return self::normalizeQrCodeMerchantName($this->business_name);
+    }
+
+    /**
+     * @param  string|null  $businessName  Trimmed merchant business name, or null when empty
+     */
+    public static function normalizeQrCodeMerchantName(?string $businessName): string
+    {
+        if (is_string($businessName)) {
+            $trimmed = trim($businessName);
+            if ($trimmed !== '') {
+                return $trimmed;
+            }
+        }
+
+        return 'GatewayHub Merchant';
     }
 
     /**

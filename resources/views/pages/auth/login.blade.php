@@ -6,6 +6,12 @@
             <div class="flex flex-col gap-6">
                 <x-auth-header :title="__('Log in to your account')" :description="__('Sign in with email or Google to continue')" />
 
+                @if (Laravel\Fortify\Features::canManageTwoFactorAuthentication())
+                    <p class="text-center text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+                        {{ __('After signing in, you can enable an authenticator app (two-factor authentication) under Settings for stronger account security.') }}
+                    </p>
+                @endif
+
                 <x-auth-session-status
                     class="rounded-lg border border-emerald-200/90 bg-emerald-50/90 px-3 py-2.5 text-center text-sm text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/50 dark:text-emerald-200"
                     :status="session('status')"

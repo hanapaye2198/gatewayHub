@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CoinsGenerateQrRequest;
 use App\Models\CoinsTransaction;
+use App\Models\Merchant;
 use App\Services\CoinsService;
 use App\Services\Gateways\Exceptions\CoinsApiException;
 use Illuminate\Http\JsonResponse;
@@ -24,11 +25,16 @@ class CoinsQrController extends Controller
         $amount = (float) $request->validated('amount');
         $currency = 'PHP';
 
+        $qrMerchantName = Merchant::normalizeQrCodeMerchantName(
+            $request->user()?->merchant?->business_name
+        );
+
         try {
             $result = $this->coinsService->generateDynamicQr([
                 'requestId' => $requestId,
                 'amount' => $amount,
                 'currency' => $currency,
+                'qr_code_merchant_name' => $qrMerchantName,
             ]);
         } catch (CoinsApiException $e) {
             $body = $e->getResponseBody();
