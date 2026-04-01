@@ -121,6 +121,22 @@ class CoinsSignatureServiceTest extends TestCase
         );
     }
 
+    public function test_sign_webhook_can_preserve_input_order(): void
+    {
+        $payload = [
+            'status' => 'SUCCEEDED',
+            'requestId' => 'C0000000000001107',
+            'referenceId' => '2007398545514304270',
+        ];
+
+        $result = $this->service->signWebhook($payload, 'secret', true, false);
+
+        $this->assertSame(
+            'status=SUCCEEDED&requestId=C0000000000001107&referenceId=2007398545514304270',
+            $result['canonical_string']
+        );
+    }
+
     public function test_verify_webhook_returns_true_when_signature_matches_without_timestamp(): void
     {
         $payload = [
@@ -133,6 +149,99 @@ class CoinsSignatureServiceTest extends TestCase
 
         $this->assertTrue(
             $this->service->verifyWebhook($payload, 'webhook-secret', $signed['signature'])
+        );
+    }
+
+    public function test_verify_webhook_accepts_uppercase_hex_signature(): void
+    {
+        $payload = [
+            'referenceId' => '2007398545514304270',
+            'requestId' => 'C0000000000001107',
+            'status' => 'SUCCEEDED',
+            'settleDate' => '1754038804000',
+        ];
+        $signed = $this->service->signWebhook($payload, 'webhook-secret');
+
+        $this->assertTrue(
+            $this->service->verifyWebhook($payload, 'webhook-secret', strtoupper($signed['signature']))
+        );
+    }
+
+    public function test_verify_webhook_accepts_input_order_signature(): void
+    {
+        $payload = [
+            'amount' => '1',
+            'settleDate' => '1774841898000',
+            'senderBic' => '',
+            'userId' => '6',
+            'referenceId' => '2181934522336370231',
+            'errorMsg' => 'success',
+            'senderName' => '',
+            'senderNumber' => '',
+            'referenceNumber' => '',
+            'requestId' => 'GH-6-01KMYE1RG5HW6MZNZ6K6FJG8WK',
+            'cashInBank' => 'GCash',
+            'channelInvoiceNo' => '251598',
+            'createDate' => '1774842864000',
+            'status' => 'SUCCEEDED',
+        ];
+        $signed = $this->service->signWebhook($payload, 'webhook-secret', false, false);
+
+        $this->assertTrue(
+            $this->service->verifyWebhook($payload, 'webhook-secret', $signed['signature'])
+        );
+    }
+
+    public function test_verify_webhook_accepts_documented_qrph_subset_signature_with_live_payload_extras(): void
+    {
+        $payload = [
+            'amount' => '1',
+            'settleDate' => '1774841898000',
+            'senderBic' => '',
+            'userId' => '6',
+            'referenceId' => '2181934522336370231',
+            'errorMsg' => 'success',
+            'senderName' => '',
+            'senderNumber' => '',
+            'referenceNumber' => '',
+            'requestId' => 'GH-6-01KMYE1RG5HW6MZNZ6K6FJG8WK',
+            'cashInBank' => 'GCash',
+            'channelInvoiceNo' => '251598',
+            'createDate' => '1774842864000',
+            'status' => 'SUCCEEDED',
+        ];
+        $signed = $this->service->signWebhook([
+            'requestId' => 'GH-6-01KMYE1RG5HW6MZNZ6K6FJG8WK',
+            'referenceId' => '2181934522336370231',
+            'cashInBank' => 'GCash',
+            'channelInvoiceNo' => '251598',
+            'settleDate' => '1774841898000',
+            'errorMsg' => 'success',
+            'status' => 'SUCCEEDED',
+        ], 'webhook-secret');
+
+        $this->assertTrue(
+            $this->service->verifyWebhook($payload, 'webhook-secret', $signed['signature'])
+        );
+    }
+
+    public function test_verify_webhook_accepts_raw_payload_signature(): void
+    {
+        $payload = [
+            'amount' => '1',
+            'settleDate' => '1774841898000',
+            'referenceId' => '2181934522336370231',
+            'requestId' => 'GH-6-01KMYE1RG5HW6MZNZ6K6FJG8WK',
+            'cashInBank' => 'GCash',
+            'channelInvoiceNo' => '251598',
+            'createDate' => '1774842864000',
+            'status' => 'SUCCEEDED',
+        ];
+        $rawPayload = '{"amount":"1","settleDate":"1774841898000","referenceId":"2181934522336370231","requestId":"GH-6-01KMYE1RG5HW6MZNZ6K6FJG8WK","cashInBank":"GCash","channelInvoiceNo":"251598","createDate":"1774842864000","status":"SUCCEEDED"}';
+        $signed = $this->service->signRawPayload($rawPayload, 'webhook-secret');
+
+        $this->assertTrue(
+            $this->service->verifyWebhook($payload, 'webhook-secret', $signed['signature'], $rawPayload)
         );
     }
 

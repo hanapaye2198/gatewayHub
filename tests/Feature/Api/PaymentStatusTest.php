@@ -128,6 +128,57 @@ class PaymentStatusTest extends TestCase
         $this->assertSame(1774608656, $payment->paid_at->timestamp);
     }
 
+    public function test_status_keeps_pending_when_coins_status_sync_fallback_is_disabled(): void
+    {
+        config()->set('coins.status_sync.fallback_enabled', false);
+
+        Http::fake();
+
+        $user = User::factory()->withMerchantApiKey('key-no-sync')->create();
+        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
+        $coinsGateway->update([
+            'config_json' => [
+                'client_id' => 'sync-client',
+                'client_secret' => 'sync-secret',
+                'api_base' => 'sandbox',
+            ],
+        ]);
+
+        MerchantGateway::query()->create([
+            'merchant_id' => $user->id,
+            'gateway_id' => $coinsGateway->id,
+            'is_enabled' => true,
+            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
+        ]);
+
+        $payment = Payment::factory()->create([
+            'merchant_id' => $user->id,
+            'gateway_code' => 'gcash',
+            'provider_reference' => 'GH-API-STATUS-002',
+            'status' => 'pending',
+            'paid_at' => null,
+            'raw_response' => [
+                'gateway_request_reference' => 'GH-API-STATUS-002',
+                'data' => [
+                    'requestId' => 'GH-API-STATUS-002',
+                    'status' => 'PENDING',
+                ],
+            ],
+        ]);
+
+        $response = $this->getJson('/api/payments/'.$payment->id.'/status', [
+            'Authorization' => 'Bearer key-no-sync',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.status', 'pending');
+
+        $payment->refresh();
+        $this->assertSame('pending', $payment->status);
+        $this->assertNull($payment->paid_at);
+        Http::assertNothingSent();
+    }
+
     public function test_status_returns_failed_for_failed_payment(): void
     {
         $user = User::factory()->withMerchantApiKey('key-3')->create();

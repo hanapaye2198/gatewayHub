@@ -27,6 +27,10 @@ class PaymentStatusSyncService
             return;
         }
 
+        if (! config('coins.status_sync.fallback_enabled', true)) {
+            return;
+        }
+
         $requestId = $this->resolveCoinsRequestId($payment);
         if ($requestId === null) {
             return;

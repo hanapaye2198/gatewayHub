@@ -116,6 +116,51 @@ class PaymentStatusSyncTest extends TestCase
         $this->assertSame(1774608656, $payment->paid_at->timestamp);
     }
 
+    public function test_dashboard_status_poll_keeps_pending_when_coins_status_sync_fallback_is_disabled(): void
+    {
+        config()->set('coins.status_sync.fallback_enabled', false);
+
+        Http::fake();
+
+        Gateway::query()->create([
+            'code' => 'coins',
+            'name' => 'Coins.ph',
+            'driver_class' => CoinsDriver::class,
+            'is_global_enabled' => true,
+            'config_json' => [
+                'client_id' => 'prod-client',
+                'client_secret' => 'prod-secret',
+                'api_base' => 'prod',
+            ],
+        ]);
+
+        $merchant = User::factory()->create();
+        $payment = Payment::factory()->create([
+            'merchant_id' => $merchant->id,
+            'gateway_code' => 'gcash',
+            'provider_reference' => 'GH-STATUS-002',
+            'status' => 'pending',
+            'paid_at' => null,
+            'raw_response' => [
+                'gateway_request_reference' => 'GH-STATUS-002',
+                'merchant_reference' => 'DASH-TEST-002',
+                'data' => [
+                    'requestId' => 'GH-STATUS-002',
+                    'status' => 'PENDING',
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($merchant)->getJson(route('dashboard.payments.status', $payment));
+
+        $response->assertOk()->assertJson(['status' => 'pending']);
+
+        $payment->refresh();
+        $this->assertSame('pending', $payment->status);
+        $this->assertNull($payment->paid_at);
+        Http::assertNothingSent();
+    }
+
     public function test_payment_detail_page_does_not_auto_redirect_pending_payment_without_webhook_update(): void
     {
         Http::fake();

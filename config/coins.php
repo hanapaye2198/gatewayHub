@@ -42,6 +42,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Coins.ph Status Sync Fallback
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, pending Coins-orchestrated payments can reconcile their
+    | status directly from Coins during status polling. Disable this to test
+    | webhook-only status updates.
+    |
+    */
+    'status_sync' => [
+        'fallback_enabled' => filter_var(env('COINS_STATUS_SYNC_FALLBACK_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | SurePay Platform Gateway Credentials (Coins)
     |--------------------------------------------------------------------------
     |

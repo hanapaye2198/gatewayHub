@@ -23,6 +23,37 @@ use App\Services\Gateways\Exceptions\CoinsApiException;
 class CoinsSignatureService
 {
     /**
+     * Dynamic QRPH fields documented in the Coins partner guide.
+     *
+     * @var list<string>
+     */
+    private const QRPH_WEBHOOK_FIELDS = [
+        'requestId',
+        'referenceId',
+        'cashInBank',
+        'channelInvoiceNo',
+        'settleDate',
+        'errorMsg',
+        'status',
+    ];
+
+    /**
+     * Dynamic QRPH fields plus amount for live callback variants.
+     *
+     * @var list<string>
+     */
+    private const QRPH_WEBHOOK_FIELDS_WITH_AMOUNT = [
+        'amount',
+        'requestId',
+        'referenceId',
+        'cashInBank',
+        'channelInvoiceNo',
+        'settleDate',
+        'errorMsg',
+        'status',
+    ];
+
+    /**
      * Sign body for Coins Fiat API (POST JSON body, signature in header).
      *
      * Canonical string = body params sorted by key, then "&timestamp={timestamp}".
@@ -148,7 +179,7 @@ class CoinsSignatureService
         $canonical = $this->buildCanonicalString($normalized);
         $expectedSignature = hash_hmac('sha256', $canonical, $apiSecret);
 
-        if (! hash_equals($expectedSignature, trim($receivedSignature))) {
+        if (! $this->signaturesMatch($expectedSignature, trim($receivedSignature))) {
             throw new CoinsApiException('Coins signature verification failed: signature mismatch.');
         }
 
@@ -167,7 +198,8 @@ class CoinsSignatureService
     public function signWebhook(
         array $payload,
         string $apiSecret,
-        bool $includeCanonicalForDebug = false
+        bool $includeCanonicalForDebug = false,
+        bool $sortKeys = true
     ): array {
         if ($apiSecret === '') {
             throw new CoinsApiException('Coins signature requires a non-empty API secret.');
@@ -178,13 +210,42 @@ class CoinsSignatureService
             throw new CoinsApiException('Coins webhook signature requires a non-empty payload.');
         }
 
-        $canonical = $this->buildCanonicalString($normalized);
+        $canonical = $this->buildCanonicalString($normalized, $sortKeys);
         $result = [
             'signature' => hash_hmac('sha256', $canonical, $apiSecret),
         ];
 
         if ($includeCanonicalForDebug) {
             $result['canonical_string'] = $canonical;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Sign a raw webhook payload body exactly as transmitted.
+     *
+     * @return array{signature: string, canonical_string?: string}
+     */
+    public function signRawPayload(
+        string $rawPayload,
+        string $apiSecret,
+        bool $includeCanonicalForDebug = false
+    ): array {
+        if ($apiSecret === '') {
+            throw new CoinsApiException('Coins signature requires a non-empty API secret.');
+        }
+
+        if ($rawPayload === '') {
+            throw new CoinsApiException('Coins raw payload signature requires a non-empty payload.');
+        }
+
+        $result = [
+            'signature' => hash_hmac('sha256', $rawPayload, $apiSecret),
+        ];
+
+        if ($includeCanonicalForDebug) {
+            $result['canonical_string'] = $rawPayload;
         }
 
         return $result;
@@ -201,7 +262,8 @@ class CoinsSignatureService
     public function verifyWebhook(
         array $payload,
         string $apiSecret,
-        string $receivedSignature
+        string $receivedSignature,
+        ?string $rawPayload = null
     ): bool {
         if ($apiSecret === '') {
             throw new CoinsApiException('Coins signature verification requires a non-empty API secret.');
@@ -212,14 +274,15 @@ class CoinsSignatureService
             throw new CoinsApiException('Coins signature verification requires a non-empty payload.');
         }
 
-        $canonical = $this->buildCanonicalString($normalized);
-        $expectedSignature = hash_hmac('sha256', $canonical, $apiSecret);
-
-        if (! hash_equals($expectedSignature, trim($receivedSignature))) {
-            throw new CoinsApiException('Coins signature verification failed: signature mismatch.');
+        $receivedSignature = trim($receivedSignature);
+        foreach ($this->webhookCanonicalCandidates($normalized, $rawPayload) as $canonical) {
+            $expectedSignature = hash_hmac('sha256', $canonical, $apiSecret);
+            if ($this->signaturesMatch($expectedSignature, $receivedSignature)) {
+                return true;
+            }
         }
 
-        return true;
+        throw new CoinsApiException('Coins signature verification failed: signature mismatch.');
     }
 
     /**
@@ -276,5 +339,66 @@ class CoinsSignatureService
         }
 
         return implode('&', $pairs);
+    }
+
+    /**
+     * @param  array<string, string>  $normalized
+     * @return list<string>
+     */
+    private function webhookCanonicalCandidates(array $normalized, ?string $rawPayload): array
+    {
+        $candidates = [];
+
+        foreach ([
+            $normalized,
+            $this->filterCanonicalSubset($normalized, self::QRPH_WEBHOOK_FIELDS),
+            $this->filterCanonicalSubset($normalized, self::QRPH_WEBHOOK_FIELDS_WITH_AMOUNT),
+        ] as $candidateParams) {
+            if ($candidateParams === []) {
+                continue;
+            }
+
+            $candidates[] = $this->buildCanonicalString($candidateParams, true);
+            $candidates[] = $this->buildCanonicalString($candidateParams, false);
+        }
+
+        if (is_string($rawPayload) && $rawPayload !== '') {
+            $candidates[] = $rawPayload;
+        }
+
+        return array_values(array_unique($candidates));
+    }
+
+    /**
+     * @param  array<string, string>  $normalized
+     * @param  list<string>  $fields
+     * @return array<string, string>
+     */
+    private function filterCanonicalSubset(array $normalized, array $fields): array
+    {
+        $allowedFields = array_flip($fields);
+        $subset = [];
+
+        foreach ($normalized as $key => $value) {
+            if (array_key_exists($key, $allowedFields)) {
+                $subset[$key] = $value;
+            }
+        }
+
+        return $subset;
+    }
+
+    private function signaturesMatch(string $expectedSignature, string $receivedSignature): bool
+    {
+        if ($this->looksLikeHexDigest($expectedSignature) && $this->looksLikeHexDigest($receivedSignature)) {
+            return hash_equals(strtolower($expectedSignature), strtolower($receivedSignature));
+        }
+
+        return hash_equals($expectedSignature, $receivedSignature);
+    }
+
+    private function looksLikeHexDigest(string $signature): bool
+    {
+        return preg_match('/\A[0-9a-fA-F]{64}\z/', $signature) === 1;
     }
 }
