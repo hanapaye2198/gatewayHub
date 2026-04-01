@@ -65,15 +65,19 @@ class PaymentController extends Controller
             }
 
             $payment = $result['payment'];
+            $redirectUrl = $result['redirect_url'] ?? null;
             $data = [
                 'payment_id' => $payment->id,
+                'transaction_id' => $payment->id,
                 'gateway' => $payment->gateway_code,
                 'amount' => (float) $payment->amount,
                 'currency' => $payment->currency,
                 'status' => $payment->status,
                 'qr_data' => $result['qr_data'],
                 'expires_at' => $result['expires_at'],
-                'redirect_url' => $result['redirect_url'] ?? null,
+                'redirect_url' => $redirectUrl,
+                'checkout_url' => $redirectUrl,
+                'merchant' => $merchant->brandingForApi(),
             ];
 
             if ($cacheKey !== null) {

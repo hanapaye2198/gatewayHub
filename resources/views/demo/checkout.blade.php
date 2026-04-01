@@ -14,6 +14,22 @@
         })"
         x-init="init()"
     >
+        <template x-if="merchantBranding">
+            <div class="flex items-center gap-4 rounded-xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-950">
+                <img
+                    x-bind:src="merchantBranding.logo"
+                    alt=""
+                    width="48"
+                    height="48"
+                    class="size-12 rounded-lg object-contain"
+                />
+                <div class="min-w-0">
+                    <p class="text-xs text-stone-500 dark:text-stone-400">Demo merchant</p>
+                    <p class="truncate font-semibold text-stone-900 dark:text-white" x-text="merchantBranding.name"></p>
+                </div>
+            </div>
+        </template>
+
         <flux:heading size="lg">Demo Checkout</flux:heading>
 
         @if (blank($demoApiKey))
@@ -29,13 +45,19 @@
                     </div>
 
                     <template x-if="state === 'idle'">
-                        <flux:button variant="primary" class="w-full" @click="createPayment()" x-bind:disabled="loading">
+                        <flux:button
+                            variant="primary"
+                            class="w-full"
+                            @click="createPayment()"
+                            x-bind:disabled="loading"
+                            x-bind:style="merchantBranding ? 'background-color: ' + merchantBranding.theme_color + '; border-color: ' + merchantBranding.theme_color + ';' : ''"
+                        >
                             Pay Now
                         </flux:button>
                     </template>
 
                     <template x-if="state === 'loading'">
-                        <flux:button variant="primary" class="w-full" disabled>
+                        <flux:button variant="primary" class="w-full" disabled x-bind:style="merchantBranding ? 'background-color: ' + merchantBranding.theme_color + '; border-color: ' + merchantBranding.theme_color + ';' : ''">
                             <flux:icon name="arrow-path" class="size-5 animate-spin" />
                             Creating payment…
                         </flux:button>
@@ -94,6 +116,7 @@
                 checkoutLink: null,
                 referenceId: null,
                 errorMessage: null,
+                merchantBranding: null,
 
                 get qrImageUrl() {
                     if (!this.qrValue) return '';
@@ -128,6 +151,7 @@
                                 currency: 'PHP',
                                 gateway: 'coins',
                                 reference: reference,
+                                checkout: true,
                             }),
                         });
 
@@ -138,12 +162,18 @@
                         }
 
                         const payment = data.data || data.payment || {};
+                        this.merchantBranding = payment.merchant || null;
                         this.referenceId = payment.reference_id || payment.payment_id || reference;
+                        const checkoutUrl = payment.checkout_url || payment.redirect_url || null;
+                        if (checkoutUrl) {
+                            window.location.assign(checkoutUrl);
+                            return;
+                        }
                         if (payment.qr_data) {
                             this.qrValue = payment.qr_data;
                         }
-                        if (payment.checkout_link) {
-                            this.checkoutLink = payment.checkout_link;
+                        if (payment.checkout_url || payment.redirect_url) {
+                            this.checkoutLink = payment.checkout_url || payment.redirect_url;
                         }
                         this.state = 'success';
                     } catch (err) {

@@ -1,5 +1,20 @@
 <x-layouts::auth.simple>
     <div class="flex w-full max-w-sm flex-col gap-6">
+        @if ($merchantBranding)
+            <div class="flex items-center gap-4 rounded-xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-950">
+                <img
+                    src="{{ $merchantBranding['logo'] }}"
+                    alt=""
+                    width="48"
+                    height="48"
+                    class="size-12 rounded-lg object-contain"
+                />
+                <div class="min-w-0">
+                    <p class="text-xs text-stone-500 dark:text-stone-400">{{ __('Payment') }}</p>
+                    <p class="truncate font-semibold text-stone-900 dark:text-white">{{ $merchantBranding['name'] }}</p>
+                </div>
+            </div>
+        @endif
         <flux:heading size="lg">Coins Dynamic QR</flux:heading>
 
         <form id="coins-qr-form" class="flex flex-col gap-4">
@@ -8,7 +23,14 @@
                 <flux:input type="number" name="amount" id="amount" min="1" step="0.01" placeholder="100" required />
                 <flux:error name="amount" />
             </flux:field>
-            <flux:button type="submit" variant="primary" id="generate-btn">
+            <flux:button
+                type="submit"
+                variant="primary"
+                id="generate-btn"
+                @if ($merchantBranding)
+                    style="background-color: {{ $merchantBranding['theme_color'] }}; border-color: {{ $merchantBranding['theme_color'] }};"
+                @endif
+            >
                 Generate QR
             </flux:button>
         </form>

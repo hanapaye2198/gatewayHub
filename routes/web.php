@@ -6,7 +6,9 @@ use App\Http\Controllers\Dashboard\CreatePaymentController;
 use App\Http\Controllers\Dashboard\PaymentDetailController;
 use App\Http\Controllers\Dashboard\PaymentsExportController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\Merchant\MerchantLogoController;
 use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\PaymentRedirectController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/auth/google', [GoogleController::class, 'redirect'])->name('google.redirect');
@@ -14,6 +16,11 @@ Route::get('/auth/google/callback', [GoogleController::class, 'callback'])->name
 
 Route::get('/', HomeController::class)->name('home');
 Route::get('/health', fn () => response('ok', 200))->name('health');
+
+Route::get('/payment/success/{transaction}', [PaymentRedirectController::class, 'success'])->name('payment.success');
+Route::get('/payment/failure/{transaction}', [PaymentRedirectController::class, 'failure'])->name('payment.failure');
+Route::get('/payment/cancel/{transaction}', [PaymentRedirectController::class, 'cancel'])->name('payment.cancel');
+Route::get('/payment/default/{transaction}', [PaymentRedirectController::class, 'default'])->name('payment.default');
 
 Route::get('/demo/checkout', fn () => view('demo.checkout'))->name('demo.checkout');
 
@@ -40,6 +47,8 @@ Route::middleware(['auth', 'verified', 'merchant.onboarding', \App\Http\Middlewa
     Route::livewire('dashboard/docs', 'pages::dashboard.docs')->name('dashboard.docs');
     Route::get('dashboard/payments/{payment}', [PaymentDetailController::class, '__invoke'])->name('dashboard.payments.show');
     Route::get('dashboard/payments/{payment}/status', [PaymentDetailController::class, 'status'])->name('dashboard.payments.status');
+
+    Route::post('merchant/logo', [MerchantLogoController::class, 'store'])->name('merchant.logo');
 });
 
 require __DIR__.'/settings.php';

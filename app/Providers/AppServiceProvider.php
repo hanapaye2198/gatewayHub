@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Bootstrap\ValidateProductionEnvironment;
 use App\Http\Responses\ApiResponse;
+use App\Models\Merchant;
 use App\Models\Payment;
 use App\Observers\PaymentObserver;
 use Carbon\CarbonImmutable;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -35,7 +37,26 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
         $this->configureRateLimiting();
         $this->registerRequestMacros();
+        View::share('merchantBranding', null);
+        $this->registerViewComposers();
         Payment::observe(PaymentObserver::class);
+    }
+
+    protected function registerViewComposers(): void
+    {
+        View::composer(
+            [
+                'layouts.app.sidebar',
+                'layouts.auth.simple',
+            ],
+            function ($view): void {
+                $merchant = auth()->user()?->merchant;
+                $view->with(
+                    'merchantBranding',
+                    $merchant instanceof Merchant ? $merchant->brandingForApi() : null
+                );
+            }
+        );
     }
 
     /**

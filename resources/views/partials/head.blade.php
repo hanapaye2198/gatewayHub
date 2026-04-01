@@ -1,6 +1,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+@php
+    $merchantThemeColor = ($merchantBranding ?? [])['theme_color'] ?? null;
+@endphp
+@if (is_string($merchantThemeColor) && $merchantThemeColor !== '')
+    <meta name="theme-color" content="{{ $merchantThemeColor }}" />
+@endif
+
 <title>{{ $title ?? config('app.name') }}</title>
 
 <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon.png') }}?v=gh2">

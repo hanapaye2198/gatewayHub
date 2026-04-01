@@ -72,6 +72,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Coins.ph Hosted Checkout (Fiat)
+    |--------------------------------------------------------------------------
+    |
+    | Path is appended to the sandbox/prod API base URL. Override if Coins
+    | documents a different route for your integration tier.
+    |
+    */
+    'checkout' => [
+        'path' => env('COINS_CHECKOUT_PATH', '/openapi/fiat/v1/create_checkout'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Coins.ph Generate QR Authentication
     |--------------------------------------------------------------------------
     |

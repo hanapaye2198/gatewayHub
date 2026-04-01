@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -15,6 +16,12 @@ use Illuminate\Support\Str;
  */
 class Merchant extends Model
 {
+    public const DEFAULT_THEME_COLOR = '#1D4ED8';
+
+    public const DEFAULT_DISPLAY_NAME = 'GatewayHub Merchant';
+
+    public const QR_MERCHANT_NAME_MAX_LENGTH = 64;
+
     /** @use HasFactory<\Database\Factories\MerchantFactory> */
     use HasFactory;
 
@@ -23,6 +30,9 @@ class Merchant extends Model
      */
     protected $fillable = [
         'name',
+        'logo_path',
+        'theme_color',
+        'qr_display_name',
         'email',
         'api_key',
         'api_key_hash',
@@ -65,11 +75,79 @@ class Merchant extends Model
     }
 
     /**
-     * Display name for Coins Dynamic QR (`qrCodeMerchantName`), with platform default when unset.
+     * Human-facing name for UI, QR labels, and checkout (not necessarily the Coins API string length).
+     */
+    public function getDisplayName(): string
+    {
+        $qrOverride = $this->attributes['qr_display_name'] ?? null;
+        if (is_string($qrOverride)) {
+            $trimmed = trim($qrOverride);
+            if ($trimmed !== '') {
+                return $trimmed;
+            }
+        }
+
+        $business = $this->business_name;
+        if ($business !== null) {
+            return $business;
+        }
+
+        return self::DEFAULT_DISPLAY_NAME;
+    }
+
+    /**
+     * Normalized name for Coins `qrCodeMerchantName` (trim, max 64 chars, safe fallback).
+     */
+    public function getQrMerchantName(): string
+    {
+        $name = trim($this->getDisplayName());
+        if ($name === '') {
+            $name = self::DEFAULT_DISPLAY_NAME;
+        }
+
+        return mb_substr($name, 0, self::QR_MERCHANT_NAME_MAX_LENGTH);
+    }
+
+    public function getLogoUrl(): string
+    {
+        $path = $this->attributes['logo_path'] ?? null;
+        if (is_string($path) && trim($path) !== '' && Storage::disk('public')->exists($path)) {
+            return Storage::disk('public')->url($path);
+        }
+
+        return asset('images/default-logo.svg');
+    }
+
+    public function getThemeColor(): string
+    {
+        $raw = isset($this->attributes['theme_color']) ? trim((string) $this->attributes['theme_color']) : '';
+        if ($raw !== '' && preg_match('/^#[0-9A-Fa-f]{6}$/', $raw) === 1) {
+            return $raw;
+        }
+
+        return self::DEFAULT_THEME_COLOR;
+    }
+
+    /**
+     * Branding payload for API responses and shared views.
+     *
+     * @return array{name: string, logo: string, theme_color: string}
+     */
+    public function brandingForApi(): array
+    {
+        return [
+            'name' => $this->getDisplayName(),
+            'logo' => $this->getLogoUrl(),
+            'theme_color' => $this->getThemeColor(),
+        ];
+    }
+
+    /**
+     * @deprecated Use {@see getQrMerchantName()} instead.
      */
     public function qrCodeMerchantDisplayName(): string
     {
-        return self::normalizeQrCodeMerchantName($this->business_name);
+        return $this->getQrMerchantName();
     }
 
     /**
@@ -80,11 +158,11 @@ class Merchant extends Model
         if (is_string($businessName)) {
             $trimmed = trim($businessName);
             if ($trimmed !== '') {
-                return $trimmed;
+                return mb_substr($trimmed, 0, self::QR_MERCHANT_NAME_MAX_LENGTH);
             }
         }
 
-        return 'GatewayHub Merchant';
+        return self::DEFAULT_DISPLAY_NAME;
     }
 
     /**

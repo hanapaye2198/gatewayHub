@@ -45,6 +45,16 @@ class PaymentStatusTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.status', 'success');
+        $response->assertJsonStructure([
+            'data' => [
+                'status',
+                'merchant' => [
+                    'name',
+                    'logo',
+                    'theme_color',
+                ],
+            ],
+        ]);
     }
 
     public function test_status_returns_pending_for_pending_payment(): void

@@ -6,7 +6,24 @@
     <body class="min-h-screen bg-zinc-100 dark:bg-zinc-900">
         <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
             <flux:sidebar.header>
-                <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
+                @if ($merchantBranding)
+                    <a
+                        href="{{ route('dashboard') }}"
+                        wire:navigate
+                        class="flex min-w-0 items-center gap-2.5"
+                    >
+                        <img
+                            src="{{ $merchantBranding['logo'] }}"
+                            alt=""
+                            width="32"
+                            height="32"
+                            class="size-8 shrink-0 rounded-md object-contain"
+                        />
+                        <span class="truncate font-semibold tracking-tight text-zinc-900 dark:text-white">{{ $merchantBranding['name'] }}</span>
+                    </a>
+                @else
+                    <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
+                @endif
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 

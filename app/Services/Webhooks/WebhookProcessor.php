@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class WebhookProcessor
 {
@@ -39,7 +40,12 @@ class WebhookProcessor
         $normalized = $normalizer->normalize($payload, $headers);
 
         if ($normalized['event_id'] === null) {
-            return response()->json(['received' => true], 200);
+            Log::warning("{$providerName} webhook: missing event_id and payment reference; acknowledging without update", [
+                'provider' => $normalized['provider'] ?? null,
+                'payment_reference' => $normalized['payment_reference'] ?? null,
+            ]);
+
+            return $this->acknowledge();
         }
 
         $eventId = $normalized['event_id'];
@@ -53,7 +59,9 @@ class WebhookProcessor
                 'event_id' => $eventId,
             ]);
 
-            return $this->acknowledge();
+            return $this->acknowledgeWithMessage([
+                'message' => 'Already processed',
+            ]);
         }
 
         try {
@@ -90,7 +98,14 @@ class WebhookProcessor
             if ($payment->status === 'paid' && in_array($normalized['status'], ['paid', 'pending'], true)) {
                 $this->markEventProcessed($event, $payment->id);
 
-                return $this->acknowledge();
+                Log::info('WEBHOOK PROCESSED', [
+                    'request_id' => $paymentReference,
+                    'status' => $normalized['status'],
+                    'updated_to' => $payment->status,
+                    'duplicate' => true,
+                ]);
+
+                return $this->acknowledgeWithMessage(['message' => 'Already processed']);
             }
 
             DB::transaction(function () use ($payment, $normalized): void {
@@ -99,10 +114,19 @@ class WebhookProcessor
                 $payment->save();
             });
 
+            $payment->refresh();
+
+            Log::info('WEBHOOK PROCESSED', [
+                'request_id' => $paymentReference,
+                'status' => $normalized['status'],
+                'updated_to' => $payment->status,
+                'payment_id' => $payment->id,
+            ]);
+
             $this->markEventProcessed($event, $payment->id);
 
             return $this->acknowledge();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->markEventFailed($event, $e->getMessage());
 
             Log::warning("{$providerName} webhook: processing failed", [
@@ -194,7 +218,21 @@ class WebhookProcessor
 
     private function acknowledge(): JsonResponse
     {
-        return response()->json(['received' => true], 200);
+        return response()->json([
+            'success' => true,
+            'received' => true,
+        ], 200);
+    }
+
+    /**
+     * @param  array<string, mixed>  $extra
+     */
+    private function acknowledgeWithMessage(array $extra = []): JsonResponse
+    {
+        return response()->json(array_merge([
+            'success' => true,
+            'received' => true,
+        ], $extra), 200);
     }
 
     /**

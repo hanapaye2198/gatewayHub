@@ -28,6 +28,8 @@ class CreatePaymentRequest extends FormRequest
             'currency' => ['required', 'string', 'size:3', Rule::in(config('payments.currencies', ['PHP']))],
             'gateway' => ['required', 'string', 'max:50'],
             'reference' => ['required', 'string', 'max:255'],
+            'checkout' => ['sometimes', 'boolean'],
+            'product_name' => ['nullable', 'string', 'max:255'],
         ];
     }
 

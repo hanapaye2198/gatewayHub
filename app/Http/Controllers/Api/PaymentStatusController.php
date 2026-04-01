@@ -49,6 +49,9 @@ class PaymentStatusController extends Controller
             default => 'pending',
         };
 
-        return ApiResponse::success(['status' => $status]);
+        return ApiResponse::success([
+            'status' => $status,
+            'merchant' => $merchant->brandingForApi(),
+        ]);
     }
 }

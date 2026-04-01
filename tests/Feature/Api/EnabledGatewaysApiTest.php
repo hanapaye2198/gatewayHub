@@ -109,6 +109,17 @@ class EnabledGatewaysApiTest extends TestCase
         $response->assertJsonPath('success', true);
         $response->assertJsonPath('error', null);
         $response->assertJsonPath('data.count', 3);
+        $response->assertJsonStructure([
+            'data' => [
+                'gateways',
+                'count',
+                'merchant' => [
+                    'name',
+                    'logo',
+                    'theme_color',
+                ],
+            ],
+        ]);
 
         $gateways = $response->json('data.gateways');
         $this->assertSame([

@@ -19,6 +19,9 @@ class MerchantFactory extends Factory
     {
         return [
             'name' => fake()->company(),
+            'logo_path' => null,
+            'theme_color' => null,
+            'qr_display_name' => null,
             'email' => fake()->unique()->safeEmail(),
             'is_active' => true,
         ];

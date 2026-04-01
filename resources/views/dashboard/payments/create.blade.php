@@ -7,6 +7,21 @@
         </div>
 
         <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
+            @if ($merchantBranding)
+                <div class="mb-6 flex items-center gap-4">
+                    <img
+                        src="{{ $merchantBranding['logo'] }}"
+                        alt=""
+                        width="48"
+                        height="48"
+                        class="size-12 rounded-lg object-contain"
+                    />
+                    <div>
+                        <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Collecting as') }}</p>
+                        <p class="text-lg font-semibold text-zinc-900 dark:text-white">{{ $merchantBranding['name'] }}</p>
+                    </div>
+                </div>
+            @endif
             <flux:heading size="lg">{{ __('Create Payment') }}</flux:heading>
             <flux:subheading class="mt-1">{{ __('Create a new payment. All options are collected via Coins dynamic QR.') }}</flux:subheading>
 
@@ -60,7 +75,13 @@
                     </flux:field>
 
                     <div class="flex gap-3">
-                        <flux:button type="submit" variant="primary">
+                        <flux:button
+                            type="submit"
+                            variant="primary"
+                            @if ($merchantBranding)
+                                style="background-color: {{ $merchantBranding['theme_color'] }}; border-color: {{ $merchantBranding['theme_color'] }};"
+                            @endif
+                        >
                             {{ __('Create Payment') }}
                         </flux:button>
                         <flux:button type="button" variant="ghost" :href="route('dashboard.payments')" wire:navigate>

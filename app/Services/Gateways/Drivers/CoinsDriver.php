@@ -44,6 +44,8 @@ class CoinsDriver implements GatewayInterface
 
     private const DEFAULT_EXPIRATION_SECONDS = 1800;
 
+    private const DEFAULT_CHECKOUT_PRODUCT_NAME = 'Service Payment';
+
     private const SOURCE_IDENTIFIER = 'GATEWAYHUB';
 
     protected string $clientId = '';
@@ -159,6 +161,151 @@ class CoinsDriver implements GatewayInterface
         $this->throwIfResponseHasError($response, $body);
 
         return $this->normalizeResponse($body, $reference);
+    }
+
+    /**
+     * Create a hosted checkout session (Coins Checkout API). Uses the same header signing as Dynamic QR.
+     *
+     * @param  array{
+     *     reference: string,
+     *     amount: float|int|string,
+     *     currency: string,
+     *     merchant_name: string,
+     *     redirect_urls: array{success: string, failure: string, cancel: string, default: string},
+     *     product_name?: string
+     * }  $data
+     * @return array{external_payment_id: string, redirect_url: string, raw: array<string, mixed>}
+     *
+     * @throws CoinsApiException
+     */
+    public function createCheckoutSession(array $data): array
+    {
+        $this->ensureConfigValid();
+
+        $reference = trim((string) ($data['reference'] ?? ''));
+        if ($reference === '') {
+            throw new CoinsApiException('Coins.ph checkout requires a non-empty reference.');
+        }
+
+        $currency = strtoupper(trim((string) ($data['currency'] ?? 'PHP')));
+        $amount = (float) ($data['amount'] ?? 0);
+        if ($amount <= 0) {
+            throw new CoinsApiException('Coins.ph checkout requires a positive amount.');
+        }
+
+        $amountStr = number_format($amount, 2, '.', '');
+        $merchantName = trim((string) ($data['merchant_name'] ?? ''));
+        if ($merchantName === '') {
+            $merchantName = Merchant::DEFAULT_DISPLAY_NAME;
+        }
+
+        $redirects = $data['redirect_urls'] ?? [];
+        if (! is_array($redirects)) {
+            throw new CoinsApiException('Coins.ph checkout requires redirect_urls.');
+        }
+
+        foreach (['success', 'failure', 'cancel', 'default'] as $key) {
+            if (! isset($redirects[$key]) || ! is_string($redirects[$key]) || trim($redirects[$key]) === '') {
+                throw new CoinsApiException(
+                    'Coins.ph checkout requires redirect_urls (success, failure, cancel, default).'
+                );
+            }
+        }
+
+        $productName = trim((string) ($data['product_name'] ?? self::DEFAULT_CHECKOUT_PRODUCT_NAME));
+        if ($productName === '') {
+            $productName = self::DEFAULT_CHECKOUT_PRODUCT_NAME;
+        }
+
+        $checkoutPath = $this->checkoutApiPath();
+        $bodyParams = [
+            'requestId' => $reference,
+            'totalAmount' => $amountStr,
+            'amount' => $amountStr,
+            'currency' => $currency,
+            'merchantName' => $merchantName,
+            'redirectUrl' => [
+                'success' => $redirects['success'],
+                'failure' => $redirects['failure'],
+                'cancel' => $redirects['cancel'],
+                'defaultUrl' => $redirects['default'],
+            ],
+            'productDetails' => [
+                [
+                    'name' => $productName,
+                    'type' => 'others',
+                    'amount' => $amountStr,
+                ],
+            ],
+            'source' => $this->source,
+        ];
+
+        $execution = $this->generateQrRequestExecutor->execute(
+            $this->getBaseUrl().$checkoutPath,
+            $this->clientId,
+            $this->clientSecret,
+            $bodyParams,
+            [
+                'api_base' => $this->apiBase,
+                'endpoint' => 'create_checkout',
+                'request_id' => $reference,
+                'include_canonical_for_debug' => $this->includeCanonicalForDebug,
+            ]
+        );
+
+        $response = $execution['response'];
+        $body = $execution['body'];
+
+        $this->throwIfResponseHasError($response, $body);
+
+        return $this->normalizeCheckoutResponse($body, $reference);
+    }
+
+    private function checkoutApiPath(): string
+    {
+        $path = trim((string) config('coins.checkout.path', '/openapi/fiat/v1/create_checkout'));
+        if ($path === '') {
+            $path = '/openapi/fiat/v1/create_checkout';
+        }
+
+        return str_starts_with($path, '/') ? $path : '/'.$path;
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array{external_payment_id: string, redirect_url: string, raw: array<string, mixed>}
+     */
+    private function normalizeCheckoutResponse(array $body, string $reference): array
+    {
+        $data = $body['data'] ?? $body;
+        $checkoutUrl = null;
+        if (is_array($data)) {
+            $checkoutUrl = $data['checkoutUrl'] ?? $data['checkoutURL'] ?? $data['redirectUrl'] ?? $data['url'] ?? null;
+        }
+        if (! is_string($checkoutUrl) || trim($checkoutUrl) === '') {
+            $checkoutUrl = $body['checkoutUrl'] ?? $body['redirectUrl'] ?? null;
+        }
+        if (! is_string($checkoutUrl) || trim($checkoutUrl) === '') {
+            throw new CoinsApiException('Coins.ph checkout response missing checkout URL.');
+        }
+
+        $providerRef = null;
+        if (is_array($data)) {
+            $providerRef = $data['orderId'] ?? $data['checkoutId'] ?? $data['internalOrderId'] ?? $data['requestId'] ?? $data['id'] ?? null;
+        }
+        $providerRef = $providerRef ?? $body['orderId'] ?? $body['checkoutId'] ?? $reference;
+
+        if (is_array($providerRef)) {
+            $providerRef = $reference;
+        }
+
+        $externalId = $providerRef === null ? $reference : (string) $providerRef;
+
+        return [
+            'external_payment_id' => $externalId,
+            'redirect_url' => $checkoutUrl,
+            'raw' => $body,
+        ];
     }
 
     /**

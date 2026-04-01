@@ -30,9 +30,16 @@ class CoinsWebhookController extends Controller
      */
     public function handle(Request $request): JsonResponse
     {
+        Log::info('COINS WEBHOOK RECEIVED', [
+            'payload' => $request->all(),
+        ]);
+
         $payload = $this->getPayload($request);
         if ($payload === null) {
-            return response()->json(['received' => true], 200);
+            return response()->json([
+                'success' => true,
+                'received' => true,
+            ], 200);
         }
 
         if (! config('coins.webhook.allow_dev_bypass', false)) {

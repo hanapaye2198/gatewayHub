@@ -25,9 +25,10 @@ class CoinsQrController extends Controller
         $amount = (float) $request->validated('amount');
         $currency = 'PHP';
 
-        $qrMerchantName = Merchant::normalizeQrCodeMerchantName(
-            $request->user()?->merchant?->business_name
-        );
+        $merchant = $request->user()?->merchant;
+        $qrMerchantName = $merchant !== null
+            ? $merchant->getQrMerchantName()
+            : Merchant::normalizeQrCodeMerchantName(null);
 
         try {
             $result = $this->coinsService->generateDynamicQr([

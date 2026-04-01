@@ -17,6 +17,18 @@
         </div>
 
         <div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
+            @if ($merchantBranding)
+                <div class="mb-4 flex items-center gap-3">
+                    <img
+                        src="{{ $merchantBranding['logo'] }}"
+                        alt=""
+                        width="40"
+                        height="40"
+                        class="size-10 rounded-md object-contain"
+                    />
+                    <span class="font-medium text-zinc-900 dark:text-white">{{ $merchantBranding['name'] }}</span>
+                </div>
+            @endif
             <flux:heading size="lg">{{ $payment->reference_id }}</flux:heading>
             <flux:subheading class="mt-1">
                 {{ $payment->gateway?->name ?? ucfirst($payment->gateway_code) }} | {{ number_format($payment->amount, 2) }} {{ $payment->currency }}
@@ -27,7 +39,20 @@
 
             <div class="mt-6 flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-8">
                 @if ($qrImageUrl)
-                    <div class="flex shrink-0 flex-col items-center gap-3">
+                    <div class="flex shrink-0 flex-col items-center gap-4 sm:flex-row sm:items-start">
+                        @if ($merchantBranding)
+                            <div class="flex flex-col items-center gap-2 sm:items-end sm:pt-2">
+                                <img
+                                    src="{{ $merchantBranding['logo'] }}"
+                                    alt=""
+                                    width="56"
+                                    height="56"
+                                    class="size-14 rounded-lg object-contain"
+                                />
+                                <span class="max-w-[8rem] text-center text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ $merchantBranding['name'] }}</span>
+                            </div>
+                        @endif
+                        <div class="flex flex-col items-center gap-3">
                         <img
                             src="{{ $qrImageUrl }}"
                             alt="{{ __('Payment QR Code') }}"
@@ -38,6 +63,7 @@
                         <p class="text-center text-sm text-zinc-500 dark:text-zinc-400">
                             {{ __('Scan with GCash, Maya, Coins wallet, or other QRPH-compatible apps.') }}
                         </p>
+                        </div>
                     </div>
                 @endif
 

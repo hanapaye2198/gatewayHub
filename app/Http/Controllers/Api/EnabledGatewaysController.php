@@ -38,6 +38,7 @@ class EnabledGatewaysController extends Controller
         return ApiResponse::success([
             'gateways' => $gatewayRows,
             'count' => count($gatewayRows),
+            'merchant' => $merchant->brandingForApi(),
         ]);
     }
 }

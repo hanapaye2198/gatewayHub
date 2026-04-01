@@ -47,9 +47,13 @@ class CoinsWebhookNormalizer implements WebhookNormalizerInterface
         }
 
         $reference = $this->extractPaymentReference($payload, $data);
-        $eventTimestamp = $this->extractEventTimestamp($payload, $data);
-        if ($reference !== null && $reference !== '' && $eventTimestamp !== null) {
-            return $reference.':'.$status.':'.$eventTimestamp;
+        if ($reference !== null && $reference !== '') {
+            $eventTimestamp = $this->extractEventTimestamp($payload, $data);
+            if ($eventTimestamp !== null) {
+                return $reference.':'.$status.':'.$eventTimestamp;
+            }
+
+            return $reference.':'.$status;
         }
 
         return null;
@@ -63,10 +67,10 @@ class CoinsWebhookNormalizer implements WebhookNormalizerInterface
     private function extractPaymentReference(array $payload, array $data): ?string
     {
         $candidates = [
-            $payload['orderId'] ?? null,
-            $data['orderId'] ?? null,
             $payload['requestId'] ?? null,
             $data['requestId'] ?? null,
+            $payload['orderId'] ?? null,
+            $data['orderId'] ?? null,
             $payload['referenceId'] ?? null,
             $data['referenceId'] ?? null,
             $payload['checkoutId'] ?? null,
@@ -104,7 +108,7 @@ class CoinsWebhookNormalizer implements WebhookNormalizerInterface
         }
 
         return match (strtoupper($status)) {
-            'SUCCEEDED', 'SUCCESS', 'PAID' => 'paid',
+            'SUCCEEDED', 'SUCCESS', 'PAID', 'COMPLETED' => 'paid',
             'FAILED', 'EXPIRED', 'CANCEL', 'CANCELED', 'CANCELLED' => 'failed',
             'REFUNDED' => 'refunded',
             default => 'pending',
@@ -134,6 +138,10 @@ class CoinsWebhookNormalizer implements WebhookNormalizerInterface
             $data['status'] ?? null,
             $payload['requestStatus'] ?? null,
             $data['requestStatus'] ?? null,
+            $payload['paymentStatus'] ?? null,
+            $data['paymentStatus'] ?? null,
+            $payload['transactionStatus'] ?? null,
+            $data['transactionStatus'] ?? null,
         ];
 
         foreach ($candidates as $candidate) {

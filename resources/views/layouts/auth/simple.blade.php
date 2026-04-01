@@ -7,15 +7,28 @@
         <div class="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
             <div class="flex w-full max-w-md flex-col gap-2">
                 <a href="{{ route('home') }}" class="flex flex-col items-center gap-2.5 font-medium" wire:navigate>
-                    <span
-                        class="flex size-11 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700 shadow-sm dark:bg-emerald-400/15 dark:text-emerald-300"
-                        aria-hidden="true"
-                    >
-                        <flux:icon name="wallet" class="size-6" />
-                    </span>
-                    <span class="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white">
-                        {{ config('app.name', 'GatewayHub') }}
-                    </span>
+                    @if ($merchantBranding)
+                        <img
+                            src="{{ $merchantBranding['logo'] }}"
+                            alt=""
+                            width="44"
+                            height="44"
+                            class="size-11 rounded-xl object-contain shadow-sm"
+                        />
+                        <span class="text-lg font-semibold tracking-tight" style="color: {{ $merchantBranding['theme_color'] }}">
+                            {{ $merchantBranding['name'] }}
+                        </span>
+                    @else
+                        <span
+                            class="flex size-11 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700 shadow-sm dark:bg-emerald-400/15 dark:text-emerald-300"
+                            aria-hidden="true"
+                        >
+                            <flux:icon name="wallet" class="size-6" />
+                        </span>
+                        <span class="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white">
+                            {{ config('app.name', 'GatewayHub') }}
+                        </span>
+                    @endif
                 </a>
                 <div class="flex flex-col gap-6">
                     {{ $slot }}
