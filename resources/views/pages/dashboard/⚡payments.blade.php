@@ -2,6 +2,7 @@
 
 use App\Models\Gateway;
 use App\Models\Payment;
+use App\Services\PaymentStatusSyncService;
 use App\Services\QrCodeGenerator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -225,9 +226,22 @@ new class extends Component {
             return null;
         }
     }
+
+    /**
+     * Reconcile pending Coins-orchestrated payments from Coins get_qr_code (fallback when webhook is delayed or fails).
+     */
+    public function syncPendingFromProvider(PaymentStatusSyncService $paymentStatusSyncService): void
+    {
+        $merchantId = auth()->user()?->merchant_id;
+        if ($merchantId === null || $merchantId === '') {
+            return;
+        }
+
+        $paymentStatusSyncService->syncPendingPaymentsForMerchant((int) $merchantId, 10);
+    }
 }; ?>
 
-<div wire:poll.12s class="flex h-full w-full flex-1 flex-col gap-6">
+<div wire:poll.12s="syncPendingFromProvider" class="flex h-full w-full flex-1 flex-col gap-6">
     {{-- Header Section with Stats Overview --}}
     <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-zinc-50/50 p-6 shadow-sm dark:from-zinc-800 dark:to-zinc-800/50 border border-zinc-200 dark:border-zinc-700">
         <div class="absolute -right-20 -top-20 size-40 rounded-full bg-gradient-to-br from-blue-500/5 to-purple-500/5 blur-3xl"></div>

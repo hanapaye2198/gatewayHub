@@ -6,6 +6,7 @@ use App\Models\Gateway;
 use App\Models\Payment;
 use App\Models\User;
 use App\Services\Gateways\Drivers\CoinsDriver;
+use App\Services\PaymentStatusSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -114,6 +115,50 @@ class PaymentStatusSyncTest extends TestCase
         $this->assertSame('paid', $payment->status);
         $this->assertNotNull($payment->paid_at);
         $this->assertSame(1774608656, $payment->paid_at->timestamp);
+    }
+
+    public function test_sync_pending_payments_for_merchant_reconciles_using_provider_reference_when_raw_missing_gateway_ref(): void
+    {
+        Gateway::query()->create([
+            'code' => 'coins',
+            'name' => 'Coins.ph',
+            'driver_class' => CoinsDriver::class,
+            'is_global_enabled' => true,
+            'config_json' => [
+                'client_id' => 'prod-client',
+                'client_secret' => 'prod-secret',
+                'api_base' => 'prod',
+            ],
+        ]);
+
+        Http::fake([
+            'api.pro.coins.ph/openapi/fiat/v1/get_qr_code*' => Http::response([
+                'status' => 0,
+                'error' => 'OK',
+                'data' => [
+                    'requestId' => 'GH-PROV-ONLY-001',
+                    'referenceId' => '2179969337375674286',
+                    'status' => 'SETTLED',
+                    'settleDate' => '1774608656000',
+                ],
+            ], 200),
+        ]);
+
+        $merchant = User::factory()->create();
+        $payment = Payment::factory()->create([
+            'merchant_id' => $merchant->id,
+            'gateway_code' => 'coins',
+            'provider_reference' => 'GH-PROV-ONLY-001',
+            'status' => 'pending',
+            'paid_at' => null,
+            'raw_response' => [],
+        ]);
+
+        app(PaymentStatusSyncService::class)->syncPendingPaymentsForMerchant((int) $merchant->id, 10);
+
+        $payment->refresh();
+        $this->assertSame('paid', $payment->status);
+        $this->assertNotNull($payment->paid_at);
     }
 
     public function test_dashboard_status_poll_keeps_pending_when_coins_status_sync_fallback_is_disabled(): void

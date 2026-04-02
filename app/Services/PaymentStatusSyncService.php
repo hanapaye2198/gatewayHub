@@ -31,6 +31,11 @@ class PaymentStatusSyncService
             return;
         }
 
+        $expiresAt = $payment->getExpiresAt();
+        if ($expiresAt !== null && now()->isAfter($expiresAt)) {
+            return;
+        }
+
         $requestId = $this->resolveCoinsRequestId($payment);
         if ($requestId === null) {
             return;
@@ -61,6 +66,34 @@ class PaymentStatusSyncService
         $payment->save();
     }
 
+    /**
+     * Poll Coins get_qr_code for recent pending payments (dashboard / list refresh).
+     * Does nothing when status sync fallback is disabled.
+     */
+    public function syncPendingPaymentsForMerchant(int $merchantId, int $limit = 10): void
+    {
+        if (! config('coins.status_sync.fallback_enabled', true)) {
+            return;
+        }
+
+        if ($merchantId <= 0) {
+            return;
+        }
+
+        $pending = Payment::query()
+            ->where('merchant_id', $merchantId)
+            ->where('status', 'pending')
+            ->whereIn('gateway_code', self::COINS_ORCHESTRATED_GATEWAYS)
+            ->where('created_at', '>=', now()->subDays(7))
+            ->orderByDesc('created_at')
+            ->limit(max(1, min($limit, 25)))
+            ->get();
+
+        foreach ($pending as $payment) {
+            $this->syncPendingPayment($payment);
+        }
+    }
+
     private function resolveCoinsRequestId(Payment $payment): ?string
     {
         if (! in_array($payment->gateway_code, self::COINS_ORCHESTRATED_GATEWAYS, true)) {
@@ -81,6 +114,15 @@ class PaymentStatusSyncService
         foreach ($candidates as $candidate) {
             if (is_string($candidate) && trim($candidate) !== '') {
                 return trim($candidate);
+            }
+        }
+
+        // Coins QR / hosted checkout: provider_reference is the Coins order id or request id when raw merge failed.
+        // Do not use for PayPal (native); that id is not a Coins get_qr_code requestId.
+        if (in_array($payment->gateway_code, ['coins', 'gcash', 'maya', 'qrph'], true)) {
+            $providerRef = $payment->provider_reference;
+            if (is_string($providerRef) && trim($providerRef) !== '') {
+                return trim($providerRef);
             }
         }
 

@@ -108,7 +108,7 @@ class CoinsWebhookNormalizer implements WebhookNormalizerInterface
         }
 
         return match (strtoupper($status)) {
-            'SUCCEEDED', 'SUCCESS', 'PAID', 'COMPLETED' => 'paid',
+            'SUCCEEDED', 'SUCCESS', 'SUCCESSFUL', 'PAID', 'COMPLETED', 'SETTLED', 'DONE' => 'paid',
             'FAILED', 'EXPIRED', 'CANCEL', 'CANCELED', 'CANCELLED' => 'failed',
             'REFUNDED' => 'refunded',
             default => 'pending',
