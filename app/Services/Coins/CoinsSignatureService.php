@@ -360,6 +360,8 @@ class CoinsSignatureService
 
             $candidates[] = $this->buildCanonicalString($candidateParams, true);
             $candidates[] = $this->buildCanonicalString($candidateParams, false);
+            $candidates[] = $this->buildCanonicalJsonString($candidateParams, true);
+            $candidates[] = $this->buildCanonicalJsonString($candidateParams, false);
         }
 
         if (is_string($rawPayload) && $rawPayload !== '') {
@@ -367,6 +369,20 @@ class CoinsSignatureService
         }
 
         return array_values(array_unique($candidates));
+    }
+
+    /**
+     * Build canonical JSON string for webhook variants that sign sorted JSON bodies.
+     *
+     * @param  array<string, string>  $params
+     */
+    private function buildCanonicalJsonString(array $params, bool $sortKeys = true): string
+    {
+        if ($sortKeys) {
+            ksort($params, SORT_STRING);
+        }
+
+        return (string) json_encode($params, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     /**

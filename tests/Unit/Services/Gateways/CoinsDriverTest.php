@@ -150,4 +150,38 @@ class CoinsDriverTest extends TestCase
 
         $this->assertTrue($driver->verifyWebhook($request));
     }
+
+    public function test_verify_webhook_accepts_sorted_json_signature_with_live_payload(): void
+    {
+        $payload = [
+            'amount' => '1.000000000000000000',
+            'settleDate' => '1775746470000',
+            'senderBic' => 'GXCHPHM2XXX',
+            'userId' => '1583222866450592768',
+            'referenceId' => '2189514213746393519',
+            'errorMsg' => 'success',
+            'senderName' => 'ARNIEQUE AMABA',
+            'senderNumber' => '09916694076',
+            'referenceNumber' => '20260409GXCHPHM2XXXB000000013593043',
+            'requestId' => 'GH-6-01KNSBRGMAZP6D2R7S7WK5ZDRA',
+            'cashInBank' => 'GCash',
+            'channelInvoiceNo' => '593043',
+            'createDate' => '1775746433000',
+            'status' => 'SUCCEEDED',
+        ];
+        $sortedPayload = $payload;
+        ksort($sortedPayload, SORT_STRING);
+        $signature = hash_hmac(
+            'sha256',
+            (string) json_encode($sortedPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'coins-webhook-secret'
+        );
+
+        $request = Request::create('/api/webhooks/coins', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($payload));
+        $request->headers->set('Signature', $signature);
+
+        $driver = new CoinsDriver(['webhook_secret' => 'coins-webhook-secret']);
+
+        $this->assertTrue($driver->verifyWebhook($request));
+    }
 }

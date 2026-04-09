@@ -225,6 +225,38 @@ class CoinsSignatureServiceTest extends TestCase
         );
     }
 
+    public function test_verify_webhook_accepts_sorted_json_signature_with_live_payload(): void
+    {
+        $payload = [
+            'amount' => '1.000000000000000000',
+            'settleDate' => '1775746470000',
+            'senderBic' => 'GXCHPHM2XXX',
+            'userId' => '1583222866450592768',
+            'referenceId' => '2189514213746393519',
+            'errorMsg' => 'success',
+            'senderName' => 'ARNIEQUE AMABA',
+            'senderNumber' => '09916694076',
+            'referenceNumber' => '20260409GXCHPHM2XXXB000000013593043',
+            'requestId' => 'GH-6-01KNSBRGMAZP6D2R7S7WK5ZDRA',
+            'cashInBank' => 'GCash',
+            'channelInvoiceNo' => '593043',
+            'createDate' => '1775746433000',
+            'status' => 'SUCCEEDED',
+        ];
+
+        $sortedPayload = $payload;
+        ksort($sortedPayload, SORT_STRING);
+        $signature = hash_hmac(
+            'sha256',
+            (string) json_encode($sortedPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'webhook-secret'
+        );
+
+        $this->assertTrue(
+            $this->service->verifyWebhook($payload, 'webhook-secret', $signature)
+        );
+    }
+
     public function test_verify_webhook_accepts_raw_payload_signature(): void
     {
         $payload = [

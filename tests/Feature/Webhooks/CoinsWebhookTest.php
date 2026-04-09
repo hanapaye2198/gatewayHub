@@ -403,6 +403,61 @@ class CoinsWebhookTest extends TestCase
         $this->assertSame(1774844114, $payment->paid_at->timestamp);
     }
 
+    public function test_webhook_accepts_sorted_json_signature_from_live_callback_shape(): void
+    {
+        $payment = Payment::factory()->create([
+            'merchant_id' => $this->user->id,
+            'gateway_code' => 'gcash',
+            'provider_reference' => 'GH-6-01KNSBRGMAZP6D2R7S7WK5ZDRA',
+            'status' => 'pending',
+            'paid_at' => null,
+            'raw_response' => [
+                'gateway_request_reference' => 'GH-6-01KNSBRGMAZP6D2R7S7WK5ZDRA',
+                'data' => [
+                    'requestId' => 'GH-6-01KNSBRGMAZP6D2R7S7WK5ZDRA',
+                    'status' => 'PENDING',
+                ],
+            ],
+        ]);
+
+        $payload = [
+            'amount' => '1.000000000000000000',
+            'settleDate' => '1775746470000',
+            'senderBic' => 'GXCHPHM2XXX',
+            'userId' => '1583222866450592768',
+            'referenceId' => '2189514213746393519',
+            'errorMsg' => 'success',
+            'senderName' => 'ARNIEQUE AMABA',
+            'senderNumber' => '09916694076',
+            'referenceNumber' => '20260409GXCHPHM2XXXB000000013593043',
+            'requestId' => 'GH-6-01KNSBRGMAZP6D2R7S7WK5ZDRA',
+            'cashInBank' => 'GCash',
+            'channelInvoiceNo' => '593043',
+            'createDate' => '1775746433000',
+            'status' => 'SUCCEEDED',
+        ];
+        $sortedPayload = $payload;
+        ksort($sortedPayload, SORT_STRING);
+        $signature = hash_hmac(
+            'sha256',
+            (string) json_encode($sortedPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            self::WEBHOOK_SECRET
+        );
+
+        $response = $this->postJson('/api/webhooks/coins', $payload, [
+            'Content-Type' => 'application/json',
+            'Signature' => $signature,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['received' => true]);
+
+        $payment->refresh();
+        $this->assertSame('paid', $payment->status);
+        $this->assertNotNull($payment->paid_at);
+        $this->assertSame(1775746470, $payment->paid_at->timestamp);
+    }
+
     public function test_webhook_can_retry_same_event_after_processing_failure(): void
     {
         $firstPayment = Payment::factory()->create([
