@@ -78,9 +78,7 @@
                         <flux:button
                             type="submit"
                             variant="primary"
-                            @if ($merchantBranding)
-                                style="background-color: {{ $merchantBranding['theme_color'] }}; border-color: {{ $merchantBranding['theme_color'] }};"
-                            @endif
+                            style="{{ $merchantBranding ? 'background-color: '.$merchantBranding['theme_color'].'; border-color: '.$merchantBranding['theme_color'].';' : '' }}"
                         >
                             {{ __('Create Payment') }}
                         </flux:button>

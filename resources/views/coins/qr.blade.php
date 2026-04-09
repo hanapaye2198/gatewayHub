@@ -27,9 +27,7 @@
                 type="submit"
                 variant="primary"
                 id="generate-btn"
-                @if ($merchantBranding)
-                    style="background-color: {{ $merchantBranding['theme_color'] }}; border-color: {{ $merchantBranding['theme_color'] }};"
-                @endif
+                style="{{ $merchantBranding ? 'background-color: '.$merchantBranding['theme_color'].'; border-color: '.$merchantBranding['theme_color'].';' : '' }}"
             >
                 Generate QR
             </flux:button>
