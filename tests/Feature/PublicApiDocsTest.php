@@ -11,7 +11,19 @@ class PublicApiDocsTest extends TestCase
         $this->get('/api-docs')
             ->assertOk()
             ->assertSee('GatewayHub API Documentation', false)
-            ->assertSee('Integrate payments using GatewayHub APIs', false);
+            ->assertSee('Integrate payments using GatewayHub APIs', false)
+            ->assertSee('https://gatewayhub.io', false);
+    }
+
+    public function test_public_api_docs_uses_production_base_url_in_examples(): void
+    {
+        $response = $this->get('/api-docs')->assertOk();
+
+        $content = $response->getContent() ?: '';
+
+        $this->assertStringContainsString('curl -X POST https://gatewayhub.io/api/payments', $content);
+        $this->assertStringContainsString('curl -X GET https://gatewayhub.io/api/payments/', $content);
+        $this->assertStringNotContainsString('https://your-domain', $content);
     }
 
     public function test_public_api_docs_contains_core_developer_sections(): void

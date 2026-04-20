@@ -145,7 +145,7 @@ new class extends Component {
 }</pre>
 
         <h3 class="{{ $subHeading }}">{{ __('cURL Example') }}</h3>
-        <pre class="{{ $endpointCardClasses }}" style="{{ $endpointCardStyle }}"><span style="color:#f4f4f5">curl -X POST https://gatewayhub.io/api/payments \
+        <pre class="{{ $endpointCardClasses }}" style="{{ $endpointCardStyle }}"><span style="color:#f4f4f5">curl -X POST https://your-domain/api/payments \
   -H </span><span style="color:#fcd34d">"Authorization: Bearer YOUR_API_KEY"</span><span style="color:#f4f4f5"> \
   -H </span><span style="color:#fcd34d">"Content-Type: application/json"</span><span style="color:#f4f4f5"> \
   -H </span><span style="color:#fcd34d">"Accept: application/json"</span><span style="color:#f4f4f5"> \
@@ -202,7 +202,7 @@ new class extends Component {
 <span style="color:#7dd3fc">Accept:</span> <span style="color:#f4f4f5">application/json</span></pre>
 
         <h3 class="{{ $subHeading }}">{{ __('cURL Example') }}</h3>
-        <pre class="{{ $endpointCardClasses }}" style="{{ $endpointCardStyle }}"><span style="color:#f4f4f5">curl -X GET https://gatewayhub.io/api/payments/</span><span style="color:#fcd34d">{payment_id}</span><span style="color:#f4f4f5">/status \
+        <pre class="{{ $endpointCardClasses }}" style="{{ $endpointCardStyle }}"><span style="color:#f4f4f5">curl -X GET https://your-domain/api/payments/</span><span style="color:#fcd34d">{payment_id}</span><span style="color:#f4f4f5">/status \
   -H </span><span style="color:#fcd34d">"Authorization: Bearer YOUR_API_KEY"</span><span style="color:#f4f4f5"> \
   -H </span><span style="color:#fcd34d">"Accept: application/json"</span></pre>
     </div>

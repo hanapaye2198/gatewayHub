@@ -4,18 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="index, follow">
-    <title>GatewayHub API Documentation — gatewayhub.io</title>
-    <meta name="description" content="Integrate payments using GatewayHub APIs. Official developer documentation for endpoints, webhooks, and security best practices. Base URL: https://gatewayhub.io">
-    <link rel="canonical" href="https://gatewayhub.io/api-docs">
+    <title>GatewayHub API Documentation</title>
+    <meta name="description" content="Integrate payments using GatewayHub APIs. Public developer documentation for endpoints, webhooks, and security best practices.">
 
-    <meta property="og:type" content="website">
-    <meta property="og:site_name" content="GatewayHub">
     <meta property="og:title" content="GatewayHub API Documentation">
-    <meta property="og:description" content="Integrate payments using GatewayHub APIs. Official developer documentation.">
+    <meta property="og:description" content="Integrate payments using GatewayHub APIs.">
     <meta property="og:url" content="https://gatewayhub.io/api-docs">
-    <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="GatewayHub API Documentation">
-    <meta name="twitter:description" content="Integrate payments using GatewayHub APIs.">
+    <meta property="og:type" content="website">
+    <link rel="canonical" href="https://gatewayhub.io/api-docs">
 
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon.png') }}?v=gh2">
     <link rel="icon" href="{{ asset('favicon.ico') }}?v=gh2" sizes="any">
@@ -71,26 +67,20 @@
     @endphp
 
     <header class="sticky top-0 z-30 border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
-        <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-            <a href="https://gatewayhub.io" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100" rel="noopener">
+        <div class="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
+            <a href="https://gatewayhub.io" class="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
                 <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
                 </span>
-                <span class="flex flex-col leading-tight">
-                    <span class="text-base font-semibold tracking-tight">GatewayHub</span>
-                    <span class="text-[0.65rem] font-medium tracking-wide text-zinc-500 dark:text-zinc-400">gatewayhub.io</span>
-                </span>
+                <span class="text-base font-semibold tracking-tight">GatewayHub</span>
             </a>
-            <nav class="hidden items-center gap-5 text-sm text-zinc-600 dark:text-zinc-400 md:flex">
+            <nav class="hidden items-center gap-5 text-sm text-zinc-600 dark:text-zinc-400 sm:flex">
                 <a href="#flow" class="hover:text-zinc-900 dark:hover:text-zinc-100">Flow</a>
                 <a href="#endpoints" class="hover:text-zinc-900 dark:hover:text-zinc-100">Endpoints</a>
                 <a href="#webhooks" class="hover:text-zinc-900 dark:hover:text-zinc-100">Webhooks</a>
                 <a href="#security" class="hover:text-zinc-900 dark:hover:text-zinc-100">Security</a>
+                <a href="https://gatewayhub.io" class="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">gatewayhub.io &rarr;</a>
             </nav>
-            <a href="https://gatewayhub.io" class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition hover:border-zinc-400 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-zinc-600 dark:hover:text-zinc-100" rel="noopener">
-                Visit gatewayhub.io
-                <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M8 7h9v9"/></svg>
-            </a>
         </div>
     </header>
 
@@ -99,10 +89,10 @@
         <section class="overflow-hidden rounded-2xl border border-zinc-200 bg-gradient-to-br from-white via-blue-50/40 to-indigo-50/40 p-8 shadow-sm dark:border-zinc-800 dark:from-zinc-900 dark:via-zinc-900 dark:to-indigo-950/20 sm:p-10">
             <span class="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-100/60 px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300">
                 <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
-                Developer Docs &middot; gatewayhub.io
+                Developer Docs
             </span>
             <h1 class="mt-4 text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">GatewayHub API Documentation</h1>
-            <p class="mt-3 max-w-2xl text-base text-zinc-600 dark:text-zinc-400">Integrate payments using GatewayHub APIs. Official public reference for endpoints, payment flow, webhooks, and security best practices — all requests go to <a href="https://gatewayhub.io" class="font-medium text-zinc-900 underline underline-offset-2 hover:text-blue-600 dark:text-zinc-100 dark:hover:text-blue-400" rel="noopener">https://gatewayhub.io</a>.</p>
+            <p class="mt-3 max-w-2xl text-base text-zinc-600 dark:text-zinc-400">Integrate payments using GatewayHub APIs. This is the public reference for endpoints, payment flow, webhooks, and security best practices.</p>
 
             <div class="mt-6 flex flex-wrap items-center gap-3 text-sm">
                 <a href="#flow" class="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3.5 py-2 font-medium text-white shadow-sm transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white">
@@ -125,10 +115,13 @@
                     <li>Authenticate merchant API calls with a Bearer token issued from your merchant dashboard. Keep this token server-side only.</li>
                     <li>Final payment status is delivered by webhook. Treat the webhook as the source of truth.</li>
                 </ul>
+            </section>
 
-                <h3 class="{{ $subHeading }}">Base URL</h3>
+            <section class="{{ $cardWrap }}">
+                <h2 class="{{ $sectionHeading }}">Base URL</h2>
+                <p class="{{ $bodyText }}">All production API calls are made against the GatewayHub production host. Prepend this base URL to every endpoint shown below.</p>
                 <pre class="{{ $codeCard }}"><span style="color:#f4f4f5">https://gatewayhub.io</span></pre>
-                <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">All endpoints in this document are relative to the base URL above.</p>
+                <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-500">Marketing site: <a href="https://gatewayhub.io" class="text-blue-600 hover:underline dark:text-blue-400">gatewayhub.io</a></p>
             </section>
 
             <section id="flow" class="{{ $cardWrap }}">
@@ -307,8 +300,10 @@
                 </div>
 
                 <h3 class="{{ $subHeading }}">Delivery</h3>
-                <pre class="{{ $codeCard }}"><span style="color:#34d399">POST</span> <span style="color:#f4f4f5">https://merchant.example.com/your-webhook-endpoint HTTP/1.1</span>
+                <p class="mt-1 text-sm text-zinc-700 dark:text-zinc-300">GatewayHub delivers webhooks to the URL you register in your merchant dashboard. The request looks like this:</p>
+                <pre class="{{ $codeCard }}"><span style="color:#34d399">POST</span> <span style="color:#f4f4f5">https://your-server.example.com/your-webhook-endpoint HTTP/1.1</span>
 <span style="color:#7dd3fc">Content-Type:</span> <span style="color:#f4f4f5">application/json</span>
+<span style="color:#7dd3fc">User-Agent:</span> <span style="color:#f4f4f5">GatewayHub-Webhooks/1.0</span>
 <span style="color:#7dd3fc">X-Signature:</span> <span style="color:#fcd34d">&lt;hmac-sha256-signature&gt;</span></pre>
 
                 <h3 class="{{ $subHeading }}">How It Works</h3>
@@ -400,11 +395,15 @@
             </section>
         </div>
 
-        <footer class="mt-10 flex flex-col items-center gap-1 border-t border-zinc-200 pt-6 text-center text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-500">
-            <div>&copy; {{ date('Y') }} GatewayHub. Public developer documentation.</div>
-            <div>
-                <a href="https://gatewayhub.io" class="text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-400" rel="noopener">gatewayhub.io</a>
-            </div>
+        <footer class="mt-10 border-t border-zinc-200 pt-6 text-center text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-500">
+            <p>&copy; {{ date('Y') }} GatewayHub. Public developer documentation.</p>
+            <p class="mt-1">
+                <a href="https://gatewayhub.io" class="hover:text-zinc-700 dark:hover:text-zinc-300">gatewayhub.io</a>
+                <span class="mx-1.5 text-zinc-400">&middot;</span>
+                <a href="https://gatewayhub.io#privacy" class="hover:text-zinc-700 dark:hover:text-zinc-300">Privacy</a>
+                <span class="mx-1.5 text-zinc-400">&middot;</span>
+                <a href="https://gatewayhub.io#terms" class="hover:text-zinc-700 dark:hover:text-zinc-300">Terms</a>
+            </p>
         </footer>
     </main>
 
