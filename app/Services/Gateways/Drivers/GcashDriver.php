@@ -15,6 +15,12 @@ class GcashDriver implements GatewayInterface
 
     private const PAYMENT_STATUS_PATH = '/v1/payments/%s';
 
+    /** TCP connect timeout for outbound GCash API requests, in seconds. */
+    private const HTTP_CONNECT_TIMEOUT_SECONDS = 3;
+
+    /** Total request timeout for outbound GCash API requests, in seconds. */
+    private const HTTP_TIMEOUT_SECONDS = 10;
+
     public function __construct(
         protected array $config = []
     ) {}
@@ -81,6 +87,8 @@ class GcashDriver implements GatewayInterface
         try {
             /** @var Response $response */
             $response = Http::withBasicAuth($clientId, $clientSecret)
+                ->connectTimeout(self::HTTP_CONNECT_TIMEOUT_SECONDS)
+                ->timeout(self::HTTP_TIMEOUT_SECONDS)
                 ->acceptJson()
                 ->post($apiBaseUrl.self::CREATE_PAYMENT_PATH, $payload);
         } catch (HttpClientException $e) {
@@ -150,6 +158,8 @@ class GcashDriver implements GatewayInterface
         try {
             /** @var Response $response */
             $response = Http::withBasicAuth($clientId, $clientSecret)
+                ->connectTimeout(self::HTTP_CONNECT_TIMEOUT_SECONDS)
+                ->timeout(self::HTTP_TIMEOUT_SECONDS)
                 ->acceptJson()
                 ->get($apiBaseUrl.sprintf(self::PAYMENT_STATUS_PATH, urlencode($reference)));
         } catch (HttpClientException $e) {

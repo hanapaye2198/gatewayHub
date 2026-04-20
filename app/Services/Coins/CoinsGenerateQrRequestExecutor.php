@@ -14,6 +14,12 @@ class CoinsGenerateQrRequestExecutor
 
     private const STRATEGY_AUTO = 'auto';
 
+    /** TCP connect timeout for the Coins generate_qr request, in seconds. */
+    private const HTTP_CONNECT_TIMEOUT_SECONDS = 3;
+
+    /** Total request timeout for the Coins generate_qr request, in seconds. */
+    private const HTTP_TIMEOUT_SECONDS = 10;
+
     public function __construct(
         private readonly ?CoinsGenerateQrSigner $signer = null
     ) {}
@@ -36,11 +42,11 @@ class CoinsGenerateQrRequestExecutor
 
         $endpointForLog = (string) ($context['endpoint'] ?? 'generate_qr_code');
         $requestIdForLog = (string) ($context['request_id'] ?? ($bodyParams['requestId'] ?? ''));
-        Log::info('Coins generate_qr request payload', [
+        Log::info('coins.generate_qr.request', [
             'endpoint' => $endpointForLog,
             'request_id' => $requestIdForLog,
-            'qr_code_merchant_name' => $bodyParams['qrCodeMerchantName'] ?? null,
-            'payload' => $bodyParams,
+            'currency' => is_string($bodyParams['currency'] ?? null) ? $bodyParams['currency'] : null,
+            'body_sha256' => hash('sha256', $jsonBody),
         ]);
 
         $strategy = $this->normalizeStrategy(
@@ -88,6 +94,8 @@ class CoinsGenerateQrRequestExecutor
 
             try {
                 $response = Http::withHeaders($headers)
+                    ->connectTimeout(self::HTTP_CONNECT_TIMEOUT_SECONDS)
+                    ->timeout(self::HTTP_TIMEOUT_SECONDS)
                     ->withBody($jsonBody, 'application/json')
                     ->post($url);
             } catch (HttpClientException $e) {
@@ -107,7 +115,7 @@ class CoinsGenerateQrRequestExecutor
             $responseCode = $body['status'] ?? $body['code'] ?? null;
             $responseMessage = $this->extractResponseMessage($body, $response);
 
-            Log::info('Coins generate_qr auth attempt', [
+            Log::info('coins.generate_qr.attempt', [
                 'endpoint' => $endpoint,
                 'strategy' => $attemptStrategy,
                 'attempt' => $attemptCount,
@@ -128,7 +136,7 @@ class CoinsGenerateQrRequestExecutor
             if (! $this->isSignatureInvalidResponse($response, $body, $responseMessage)) {
                 $status = $body['status'] ?? $body['code'] ?? null;
                 if ($response->successful() && ($status === null || (int) $status === 0)) {
-                    Log::info('Coins generate_qr auth success', [
+                    Log::info('coins.generate_qr.success', [
                         'endpoint' => $endpoint,
                         'winning_strategy' => $attemptStrategy,
                         'winning_timestamp_unit' => $attemptTimestampUnit,

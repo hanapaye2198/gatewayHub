@@ -26,7 +26,11 @@ use Illuminate\Support\Facades\Http;
  *   "client_id": "string",       // Or "api_key". Coins.ph OAuth2 / API client ID.
  *   "client_secret": "string",   // Or "api_secret". Coins.ph OAuth2 / API client secret.
  *   "api_base": "sandbox|prod",  // Required. Environment: "sandbox" or "prod".
- *   "webhook_secret": "string"   // Optional. For webhook signature verification (later phase).
+ *   "webhook_secret": "string"   // Required. Dedicated secret for webhook signature
+ *                                // verification. Must NEVER fall back to
+ *                                // client_secret / api_secret — using the API
+ *                                // signing key to verify webhooks lets any API
+ *                                // consumer forge callbacks.
  * }
  *
  * The same platform credentials are shared across merchants for this gateway.
@@ -47,6 +51,12 @@ class CoinsDriver implements GatewayInterface
     private const DEFAULT_CHECKOUT_PRODUCT_NAME = 'Service Payment';
 
     private const SOURCE_IDENTIFIER = 'GATEWAYHUB';
+
+    /** TCP connect timeout for outbound Coins API requests, in seconds. */
+    private const HTTP_CONNECT_TIMEOUT_SECONDS = 3;
+
+    /** Total request timeout for outbound Coins API requests, in seconds. */
+    private const HTTP_TIMEOUT_SECONDS = 10;
 
     protected string $clientId = '';
 
@@ -75,7 +85,7 @@ class CoinsDriver implements GatewayInterface
         $this->clientId = trim((string) ($config['client_id'] ?? $config['api_key'] ?? ''));
         $this->clientSecret = trim((string) ($config['client_secret'] ?? $config['api_secret'] ?? ''));
         $this->apiBase = strtolower(trim((string) ($config['api_base'] ?? '')));
-        $this->webhookSecret = trim((string) ($config['webhook_secret'] ?? $config['client_secret'] ?? $config['api_secret'] ?? ''));
+        $this->webhookSecret = trim((string) ($config['webhook_secret'] ?? ''));
         $this->source = trim((string) ($config['source'] ?? self::SOURCE_IDENTIFIER));
         if ($this->source === '') {
             $this->source = self::SOURCE_IDENTIFIER;
@@ -97,7 +107,7 @@ class CoinsDriver implements GatewayInterface
             'client_id' => ['required', 'string', 'max:255'],
             'client_secret' => ['required', 'string', 'max:255'],
             'api_base' => ['required', 'string', 'in:sandbox,prod'],
-            'webhook_secret' => ['nullable', 'string', 'max:255'],
+            'webhook_secret' => ['required', 'string', 'max:255'],
         ];
     }
 
@@ -310,12 +320,25 @@ class CoinsDriver implements GatewayInterface
 
     /**
      * Verify webhook signature using CoinsSignatureService (no API call).
-     * Returns false if webhook_secret is not configured or request has no signature to verify.
+     *
+     * Behaviour:
+     *  - Returns true  when the request signature matches `webhook_secret`.
+     *  - Returns false when a signature is present but does not match, or when
+     *    the request carries no signature at all.
+     *  - Throws {@see CoinsApiException} when `webhook_secret` is not
+     *    configured. This is intentional: silently returning false on a
+     *    misconfigured gateway would hide the fact that callbacks cannot be
+     *    authenticated, and we refuse to fall back to `client_secret` /
+     *    `api_secret` because that would let any API consumer forge webhooks.
+     *
+     * @throws CoinsApiException
      */
     public function verifyWebhook(Request $request): bool
     {
         if ($this->webhookSecret === '') {
-            return false;
+            throw new CoinsApiException(
+                'Coins.ph webhook_secret is not configured. Set a dedicated webhook_secret on the platform gateway — never reuse client_secret.'
+            );
         }
 
         $signature = $request->header('X-COINS-SIGNATURE')
@@ -361,7 +384,11 @@ class CoinsDriver implements GatewayInterface
             $response = Http::withHeaders([
                 'X-COINS-APIKEY' => $this->clientId,
                 'Content-Type' => 'application/json; charset=utf-8',
-            ])->acceptJson()->get($this->getBaseUrl().self::GET_QR_STATUS_PATH, $query);
+            ])
+                ->connectTimeout(self::HTTP_CONNECT_TIMEOUT_SECONDS)
+                ->timeout(self::HTTP_TIMEOUT_SECONDS)
+                ->acceptJson()
+                ->get($this->getBaseUrl().self::GET_QR_STATUS_PATH, $query);
         } catch (HttpClientException $e) {
             throw new CoinsApiException('Coins.ph status request failed: '.$e->getMessage(), null, null, $e);
         }

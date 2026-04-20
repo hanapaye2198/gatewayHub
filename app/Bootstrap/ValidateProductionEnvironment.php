@@ -119,9 +119,15 @@ class ValidateProductionEnvironment
         $webhookSecret = trim((string) config('coins.webhook.secret', ''));
         $hasClientId = $clientId !== '';
         $hasClientSecret = $clientSecret !== '';
+        $hasWebhookSecret = $webhookSecret !== '';
 
         if ($hasClientId xor $hasClientSecret) {
             $errors[] = 'Coins fallback credentials must set both COINS_GATEWAY_CLIENT_ID and COINS_GATEWAY_CLIENT_SECRET together, or leave both empty.';
+        }
+
+        if (($hasClientId || $hasClientSecret) && ! $hasWebhookSecret) {
+            $errors[] = 'COINS_WEBHOOK_SECRET must be set in production whenever Coins credentials are configured. '
+                .'Webhook verification requires a dedicated secret; the system no longer falls back to COINS_GATEWAY_CLIENT_SECRET.';
         }
 
         foreach ([

@@ -4,6 +4,7 @@ namespace Tests\Unit\Services\Gateways;
 
 use App\Services\Coins\CoinsSignatureService;
 use App\Services\Gateways\Drivers\CoinsDriver;
+use App\Services\Gateways\Exceptions\CoinsApiException;
 use Illuminate\Http\Request;
 use PHPUnit\Framework\TestCase;
 
@@ -64,7 +65,7 @@ class CoinsDriverTest extends TestCase
         $this->assertFalse($driver->verifyWebhook($request));
     }
 
-    public function test_verify_webhook_returns_false_when_secret_missing(): void
+    public function test_verify_webhook_throws_when_secret_missing(): void
     {
         $payload = [
             'requestId' => 'C0000000000001107',
@@ -76,10 +77,13 @@ class CoinsDriverTest extends TestCase
 
         $driver = new CoinsDriver([]);
 
-        $this->assertFalse($driver->verifyWebhook($request));
+        $this->expectException(CoinsApiException::class);
+        $this->expectExceptionMessage('webhook_secret is not configured');
+
+        $driver->verifyWebhook($request);
     }
 
-    public function test_verify_webhook_falls_back_to_client_secret_when_webhook_secret_missing(): void
+    public function test_verify_webhook_does_not_fall_back_to_client_secret_when_webhook_secret_missing(): void
     {
         $payload = [
             'requestId' => 'C0000000000001108',
@@ -99,7 +103,10 @@ class CoinsDriverTest extends TestCase
             'api_base' => 'sandbox',
         ]);
 
-        $this->assertTrue($driver->verifyWebhook($request));
+        $this->expectException(CoinsApiException::class);
+        $this->expectExceptionMessage('webhook_secret is not configured');
+
+        $driver->verifyWebhook($request);
     }
 
     public function test_verify_webhook_accepts_raw_payload_signature(): void

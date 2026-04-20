@@ -139,45 +139,94 @@ class WebhookProcessor
     }
 
     /**
-     * Update payment from normalized webhook data.
+     * Transitions a webhook may drive on a Payment. Everything outside this map
+     * is treated as terminal or pre-live and silently ignored (with a log).
+     *
+     * Rules enforced:
+     *  - pending -> paid    : normal success
+     *  - pending -> failed  : normal failure (expired/cancelled/etc.)
+     *  - paid   -> *        : BLOCKED. paid is financial finality; reversals
+     *                         must go through an explicit reconciliation flow,
+     *                         never a late-arriving webhook.
+     *  - failed -> paid     : BLOCKED. We already decided this payment failed;
+     *                         a later "SUCCEEDED" could be a replay, a misrouted
+     *                         provider retry, or a compromised callback.
+     *  - refunded / failed_after_paid / provisioning / provisioning_failed
+     *                       : terminal or pre-live, webhook cannot mutate.
+     *
+     * @var array<string, list<string>>
+     */
+    private const ALLOWED_WEBHOOK_TRANSITIONS = [
+        'pending' => ['paid', 'failed'],
+    ];
+
+    /**
+     * Apply a normalized webhook status to the payment, respecting the strict
+     * transition map above. Returns true when the payment's status actually
+     * changed, false when the inbound webhook was ignored (same-state delivery
+     * or a blocked transition). Blocked transitions are logged so ops can see
+     * replays, misrouted callbacks, or provider-side reversals they need to
+     * reconcile out-of-band.
      *
      * @param  array{status: 'paid'|'failed'|'pending'|'refunded'|'failed_after_paid', paid_at?: int|null}  $normalized
      */
-    private function applyStatusFromNormalized(Payment $payment, array $normalized): void
+    private function applyStatusFromNormalized(Payment $payment, array $normalized): bool
     {
-        $status = $normalized['status'];
+        $incoming = $normalized['status'];
+        $current = (string) $payment->status;
 
-        if ($status === 'paid') {
+        if ($incoming === $current) {
+            return false;
+        }
+
+        $allowed = self::ALLOWED_WEBHOOK_TRANSITIONS[$current] ?? [];
+        if (! in_array($incoming, $allowed, true)) {
+            Log::warning('webhook.payment_transition_blocked', [
+                'payment_id' => $payment->id,
+                'current_status' => $current,
+                'incoming_status' => $incoming,
+                'reason' => $this->resolveBlockReason($current, $incoming),
+            ]);
+
+            return false;
+        }
+
+        if ($incoming === 'paid') {
             $payment->status = 'paid';
             $paidAt = $normalized['paid_at'] ?? null;
             $payment->paid_at = $paidAt !== null ? Carbon::createFromTimestamp($paidAt) : now();
 
-            return;
+            return true;
         }
 
-        if ($status === 'failed') {
-            if ($payment->status === 'paid') {
-                $payment->status = 'failed_after_paid';
-
-                return;
-            }
-
+        if ($incoming === 'failed') {
             $payment->status = 'failed';
 
-            return;
+            return true;
         }
 
-        if ($status === 'failed_after_paid') {
-            $payment->status = 'failed_after_paid';
+        return false;
+    }
 
-            return;
+    private function resolveBlockReason(string $current, string $incoming): string
+    {
+        if ($current === 'paid') {
+            return 'paid_is_terminal';
         }
 
-        if ($status === 'refunded') {
-            $payment->status = 'refunded';
-
-            return;
+        if ($current === 'failed' && $incoming === 'paid') {
+            return 'failed_cannot_become_paid';
         }
+
+        if (in_array($current, ['refunded', 'failed_after_paid'], true)) {
+            return 'terminal_state';
+        }
+
+        if (in_array($current, ['provisioning', 'provisioning_failed'], true)) {
+            return 'payment_not_live';
+        }
+
+        return 'transition_not_allowed';
     }
 
     /**
@@ -360,64 +409,62 @@ class WebhookProcessor
     }
 
     /**
+     * Strict, tenant-safe resolution for Coins (and Coins-backed gateways).
+     *
+     * A match is ONLY accepted when the normalized payment reference exactly
+     * equals either our outbound identifier (`raw_response->gateway_request_reference`,
+     * a per-payment ULID we issue) or the provider-assigned id we stored on the
+     * payment (`provider_reference`). These are the only fields we are
+     * contractually sure are unique per tenant/payment.
+     *
+     * Fuzzy/fallback paths (reference_id, raw_response->data->referenceId,
+     * checkoutId, orderId, ...) have been removed: they could resolve the same
+     * callback to a different merchant's payment, which is a cross-tenant
+     * leakage risk. It is better to miss a match than to assign to the wrong
+     * merchant — operators can re-drive via the queue or reconcile via the
+     * status-sync service.
+     *
      * @param  EloquentBuilder<Payment>  $baseQuery
      * @param  array<string, mixed>  $normalized
-     * @return array{status: 'matched', payment: Payment}|array{status: 'not_found'|'ambiguous'}
+     * @return array{status: 'matched', payment: Payment}|array{status: 'not_found'}
      */
     private function resolveCoinsPayment(EloquentBuilder $baseQuery, string $paymentReference, array $normalized): array
     {
-        $exactQuery = (clone $baseQuery)->where(function (EloquentBuilder $paymentQuery) use ($paymentReference): void {
-            $paymentQuery
-                ->where('provider_reference', $paymentReference)
-                ->orWhere('raw_response->gateway_request_reference', $paymentReference)
-                ->orWhere('raw_response->requestId', $paymentReference)
-                ->orWhere('raw_response->data->requestId', $paymentReference)
-                ->orWhere('raw_response->referenceId', $paymentReference)
-                ->orWhere('raw_response->data->referenceId', $paymentReference)
-                ->orWhere('raw_response->checkoutId', $paymentReference)
-                ->orWhere('raw_response->data->checkoutId', $paymentReference)
-                ->orWhere('raw_response->orderId', $paymentReference)
-                ->orWhere('raw_response->data->orderId', $paymentReference)
-                ->orWhere('raw_response->internalOrderId', $paymentReference)
-                ->orWhere('raw_response->data->internalOrderId', $paymentReference)
-                ->orWhere('raw_response->externalOrderId', $paymentReference)
-                ->orWhere('raw_response->data->externalOrderId', $paymentReference)
-                ->orWhere('raw_response->id', $paymentReference)
-                ->orWhere('raw_response->data->id', $paymentReference);
-        });
-        $exactResolution = $this->resolveSinglePayment($exactQuery);
-        if ($exactResolution['status'] !== 'not_found') {
-            return $exactResolution;
+        $matches = (clone $baseQuery)
+            ->where(function (EloquentBuilder $paymentQuery) use ($paymentReference): void {
+                $paymentQuery
+                    ->where('provider_reference', $paymentReference)
+                    ->orWhere('raw_response->gateway_request_reference', $paymentReference);
+            })
+            ->limit(2)
+            ->get();
+
+        if ($matches->isEmpty()) {
+            Log::warning('coins.webhook.payment_not_found', [
+                'payment_reference' => $paymentReference,
+                'reason' => 'no_strict_match',
+                'status' => $normalized['status'] ?? null,
+            ]);
+
+            return ['status' => 'not_found'];
         }
 
-        $narrowedReferenceQuery = (clone $baseQuery)->where('reference_id', $paymentReference);
-        $narrowedReferenceQuery = $this->applyWebhookPayloadNarrowing($narrowedReferenceQuery, $normalized);
-        $narrowedResolution = $this->resolveSinglePayment($narrowedReferenceQuery);
-        if ($narrowedResolution['status'] !== 'not_found') {
-            return $narrowedResolution;
+        if ($matches->count() > 1) {
+            Log::warning('coins.webhook.payment_not_found', [
+                'payment_reference' => $paymentReference,
+                'reason' => 'multiple_strict_candidates',
+                'status' => $normalized['status'] ?? null,
+                'candidate_payment_ids' => $matches->pluck('id')->all(),
+                'candidate_merchant_ids' => $matches->pluck('merchant_id')->unique()->values()->all(),
+            ]);
+
+            return ['status' => 'not_found'];
         }
 
-        return $this->resolveSinglePayment((clone $baseQuery)->where('reference_id', $paymentReference));
-    }
-
-    /**
-     * @param  EloquentBuilder<Payment>  $query
-     * @param  array<string, mixed>  $normalized
-     * @return EloquentBuilder<Payment>
-     */
-    private function applyWebhookPayloadNarrowing(EloquentBuilder $query, array $normalized): EloquentBuilder
-    {
-        $amount = $normalized['amount'] ?? null;
-        if (is_numeric($amount)) {
-            $query->where('amount', number_format((float) $amount, 2, '.', ''));
-        }
-
-        $currency = $normalized['currency'] ?? null;
-        if (is_string($currency) && trim($currency) !== '') {
-            $query->where('currency', strtoupper(trim($currency)));
-        }
-
-        return $query;
+        return [
+            'status' => 'matched',
+            'payment' => $matches->first(),
+        ];
     }
 
     /**

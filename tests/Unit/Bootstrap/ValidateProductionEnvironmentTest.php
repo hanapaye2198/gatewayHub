@@ -120,6 +120,32 @@ class ValidateProductionEnvironmentTest extends TestCase
         $validator->bootstrap($this->applicationMock(true));
     }
 
+    public function test_it_fails_when_coins_credentials_are_set_without_webhook_secret(): void
+    {
+        config()->set('app.url', 'http://gatewayhub.example');
+        config()->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
+        config()->set('database.default', 'sqlite');
+        config()->set('database.connections.sqlite.database', ':memory:');
+        config()->set('app.debug', false);
+        config()->set('coins.gateway.client_id', 'coins-client-id');
+        config()->set('coins.gateway.client_secret', 'coins-client-secret');
+        config()->set('coins.webhook.secret', '');
+        config()->set('coins.webhook.allow_dev_bypass', false);
+        config()->set('gcash.webhook.allow_dev_bypass', false);
+        config()->set('maya.webhook.allow_dev_bypass', false);
+        config()->set('paypal.webhook.allow_dev_bypass', false);
+        config()->set('paypal.webhook.client_id', '');
+        config()->set('paypal.webhook.client_secret', '');
+        config()->set('paypal.webhook.webhook_id', '');
+
+        $validator = new ValidateProductionEnvironment;
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('COINS_WEBHOOK_SECRET must be set in production');
+
+        $validator->bootstrap($this->applicationMock(true));
+    }
+
     public function test_it_fails_when_coins_fallback_values_are_placeholders(): void
     {
         config()->set('app.url', 'http://gatewayhub.example');

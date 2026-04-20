@@ -45,7 +45,6 @@ class PlatformGatewayConfigService
         }
 
         $resolvedConfig = array_merge($defaults, $overrides);
-        $resolvedConfig = $this->applyCoinsWebhookSecretFallback($code, $resolvedConfig);
 
         return [
             'config' => $resolvedConfig,
@@ -114,34 +113,6 @@ class PlatformGatewayConfigService
         }
 
         return is_string($fallback) ? trim($fallback) : '';
-    }
-
-    /**
-     * @param  array<string, mixed>  $config
-     * @return array<string, mixed>
-     */
-    private function applyCoinsWebhookSecretFallback(string $code, array $config): array
-    {
-        if (! in_array($code, ['coins', 'qrph', 'payqrph'], true)) {
-            return $config;
-        }
-
-        $webhookSecret = is_string($config['webhook_secret'] ?? null)
-            ? trim((string) $config['webhook_secret'])
-            : '';
-
-        if ($webhookSecret !== '') {
-            return $config;
-        }
-
-        $clientSecret = is_string($config['client_secret'] ?? null)
-            ? trim((string) $config['client_secret'])
-            : '';
-        if ($clientSecret !== '') {
-            $config['webhook_secret'] = $clientSecret;
-        }
-
-        return $config;
     }
 
     /**

@@ -60,7 +60,7 @@ class PlatformGatewayConfigServiceTest extends TestCase
         $this->assertSame('prod', $resolved['config']['api_base'] ?? null);
     }
 
-    public function test_for_gateway_code_with_meta_falls_back_webhook_secret_to_client_secret_for_coins(): void
+    public function test_for_gateway_code_with_meta_does_not_fall_back_webhook_secret_to_client_secret_for_coins(): void
     {
         config()->set('coins.webhook.secret', '');
 
@@ -79,7 +79,16 @@ class PlatformGatewayConfigServiceTest extends TestCase
         $service = new PlatformGatewayConfigService;
         $resolved = $service->forGatewayCodeWithMeta('coins');
 
-        $this->assertSame('db-client-secret', $resolved['config']['webhook_secret'] ?? null);
+        $this->assertNotSame(
+            'db-client-secret',
+            $resolved['config']['webhook_secret'] ?? null,
+            'client_secret must never be used as a webhook verification secret.'
+        );
+        $webhookSecret = $resolved['config']['webhook_secret'] ?? '';
+        $this->assertTrue(
+            $webhookSecret === '' || $webhookSecret === null,
+            'webhook_secret must remain unset when not explicitly configured; got ['.(string) $webhookSecret.'].'
+        );
     }
 
     public function test_for_gateway_code_with_meta_ignores_placeholder_db_values(): void

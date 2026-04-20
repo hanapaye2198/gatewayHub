@@ -194,7 +194,13 @@ class CreatePaymentTest extends TestCase
         $response->assertSessionHasErrors([
             'gateway' => 'Coins.ph API error: Coins.ph account is not enabled for QR payment handling yet. Ask Coins support to enable QR integration for this account/API key.',
         ]);
-        $this->assertDatabaseCount('payments', 0);
+        $this->assertDatabaseCount('payments', 1);
+        $this->assertDatabaseHas('payments', [
+            'merchant_id' => $user->id,
+            'gateway_code' => 'coins',
+            'status' => 'provisioning_failed',
+            'provider_reference' => null,
+        ]);
     }
 
     public function test_create_payment_form_shows_qrph_when_enabled_for_merchant(): void

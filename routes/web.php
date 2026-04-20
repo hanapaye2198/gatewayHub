@@ -16,6 +16,7 @@ Route::get('/auth/google/callback', [GoogleController::class, 'callback'])->name
 
 Route::get('/', HomeController::class)->name('home');
 Route::get('/health', fn () => response('ok', 200))->name('health');
+Route::get('/api-docs', fn () => view('public.api-docs'))->name('public.api-docs');
 
 Route::get('/payment/success/{transaction}', [PaymentRedirectController::class, 'success'])->name('payment.success');
 Route::get('/payment/failure/{transaction}', [PaymentRedirectController::class, 'failure'])->name('payment.failure');
