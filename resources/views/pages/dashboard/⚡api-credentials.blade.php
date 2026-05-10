@@ -231,7 +231,8 @@ new class extends Component
                                             >
                                             <button
                                                 type="button"
-                                                onclick="copyToClipboardAndNotify('new-api-key-once')"
+                                                x-data
+                                                x-on:click.prevent="gatewayhubCopyText(document.getElementById('new-api-key-once')?.value ?? '').then(() => $dispatch('flux-toast', { message: @js(__('Copied to clipboard')), type: 'success' })).catch(() => $dispatch('flux-toast', { message: @js(__('Could not copy')), type: 'danger' }))"
                                                 class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-amber-200/80 px-3 py-1.5 text-sm font-medium text-amber-950 transition-colors hover:bg-amber-300/80 dark:bg-amber-500/20 dark:text-amber-100 dark:hover:bg-amber-500/30"
                                             >
                                                 {{ __('Copy') }}
@@ -349,7 +350,8 @@ new class extends Component
                                     >
                                     <button
                                         type="button"
-                                        onclick="copyToClipboardAndNotify('new-webhook-secret')"
+                                        x-data
+                                        x-on:click.prevent="gatewayhubCopyText(document.getElementById('new-webhook-secret')?.value ?? '').then(() => $dispatch('flux-toast', { message: @js(__('Copied to clipboard')), type: 'success' })).catch(() => $dispatch('flux-toast', { message: @js(__('Could not copy')), type: 'danger' }))"
                                         class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-amber-200/80 px-3 py-1 text-xs font-medium text-amber-950 transition-colors hover:bg-amber-300/80 dark:bg-amber-500/20 dark:text-amber-100 dark:hover:bg-amber-500/30"
                                     >
                                         {{ __('Copy') }}
@@ -398,7 +400,8 @@ new class extends Component
                             <span class="text-xs font-medium text-zinc-500">{{ __('HTTP Request') }}</span>
                             <button
                                 type="button"
-                                onclick="copyToClipboardAndNotifyText('Authorization: Bearer YOUR_API_KEY')"
+                                x-data
+                                x-on:click.prevent="gatewayhubCopyText('Authorization: Bearer YOUR_API_KEY').then(() => $dispatch('flux-toast', { message: @js(__('Copied to clipboard')), type: 'success' })).catch(() => $dispatch('flux-toast', { message: @js(__('Could not copy')), type: 'danger' }))"
                                 class="rounded-md bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-700"
                             >
                                 {{ __('Copy') }}
@@ -509,45 +512,6 @@ new class extends Component
         </div>
     </div>
 </div>
-
-<script>
-function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => {
-        showToast('Copied to clipboard', 'success');
-    });
-}
-
-function copyToClipboardAndNotify(elementId) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        navigator.clipboard.writeText(element.value).then(() => {
-            showToast('Copied to clipboard', 'success');
-        });
-    }
-}
-
-function copyToClipboardAndNotifyText(text) {
-    navigator.clipboard.writeText(text).then(() => {
-        showToast('Copied to clipboard', 'success');
-    });
-}
-
-function showToast(message, type = 'success') {
-    const toast = document.createElement('div');
-    toast.className =
-        'fixed bottom-4 right-4 z-[100] rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-all duration-300 ' +
-        (type === 'success'
-            ? 'border-emerald-500/30 bg-zinc-900 text-white dark:border-emerald-500/40 dark:bg-zinc-800'
-            : 'border-red-500/30 bg-zinc-900 text-white dark:border-red-500/40 dark:bg-zinc-800');
-    toast.textContent = message;
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-</script>
 
 <style>
 [x-cloak] { display: none !important; }

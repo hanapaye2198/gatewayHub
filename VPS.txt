@@ -1,0 +1,48 @@
+# VPS quick reference (GatewayHub)
+
+cd /var/www/gatewayhub
+
+## Test merchant callback URL from VPS (simulates GatewayHub webhook signing)
+
+Signing: hex HMAC-SHA256 of `timestamp + '.' + raw_body` (same as SendMerchantWebhookJob).
+Headers: Content-Type application/json, User-Agent GatewayHub-Webhooks/1.0,
+         X-Merchant-Timestamp, X-Merchant-Signature.
+
+Replace CALLBACK_URL and SECRET, then run on the VPS:
+
+CALLBACK_URL='https://your-merchant-server.example/webhooks/gatewayhub'
+SECRET='your-signing-secret-here'
+
+BODY='{"event":"payment.updated","timestamp":"'"$(date -Iseconds)"'","data":{"payment_id":"00000000-0000-0000-0000-000000000001","status":"paid","amount":100,"currency":"PHP","gateway":"gcash","reference":"TEST-REF","provider_reference":null,"paid_at":"'"$(date -Iseconds)"'","created_at":"'"$(date -Iseconds)"'","updated_at":"'"$(date -Iseconds)"'"}}'
+
+TS=$(date +%s)
+SIG=$(php -r '$ts=getenv("TS"); $body=getenv("BODY"); $sec=getenv("SECRET"); echo hash_hmac("sha256", $ts.".".$body, $sec);' TS="$TS" BODY="$BODY" SECRET="$SECRET")
+
+curl -sS -o /tmp/gh-webhook-test.out -w "\nHTTP %{http_code}\n" \
+  -X POST "$CALLBACK_URL" \
+  -H 'Content-Type: application/json' \
+  -H 'User-Agent: GatewayHub-Webhooks/1.0' \
+  -H "X-Merchant-Timestamp: $TS" \
+  -H "X-Merchant-Signature: $SIG" \
+  --data-binary "$BODY"
+
+echo "Response body:"; cat /tmp/gh-webhook-test.out
+
+Notes:
+- Use --data-binary so body bytes match what was signed.
+- 2xx = URL reachable and verifier accepted; 401 = wrong secret/body/timestamp; HTTP 000 = network/DNS/TLS.
+
+## Test locally (repo root)
+
+Uses PHP cURL; pick any echo URL if DNS blocks one host (httpbin.org failed on some networks; postman-echo.com worked):
+
+php scripts/test-webhook-post.php https://postman-echo.com/post
+
+Optional first argument overrides URL (e.g. your https://webhook.site/... UUID).
+
+## Queue worker (when not using QUEUE_CONNECTION=sync)
+
+From app directory:
+php artisan queue:work
+
+Supervisor was deferred; systemd is an alternative once disk/apt are healthy.
