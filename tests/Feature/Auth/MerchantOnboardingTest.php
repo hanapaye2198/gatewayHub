@@ -41,6 +41,35 @@ class MerchantOnboardingTest extends TestCase
         $this->assertTrue($merchant->hasApiKey());
         $this->assertNotNull($merchant->api_secret);
         $this->assertNotSame('', $merchant->api_secret);
+        $this->assertSame(48, strlen((string) $merchant->webhook_secret));
+    }
+
+    public function test_api_keys_step_shows_webhook_signing_secret_after_gateway_step(): void
+    {
+        $gateway = Gateway::query()->create([
+            'code' => 'onb-test-wh-'.uniqid(),
+            'name' => 'Onboarding Webhook Gateway',
+            'driver_class' => 'App\Services\Gateways\Drivers\CoinsDriver',
+            'is_global_enabled' => true,
+        ]);
+
+        $user = User::factory()->withoutMerchant()->create();
+
+        $this->actingAs($user)->post(route('onboarding.business.store'), [
+            'business_name' => 'Acme Co',
+            'business_email' => 'billing@acme-webhook.test',
+        ]);
+
+        $user->refresh();
+
+        $this->actingAs($user)->post(route('onboarding.gateways.store'), [
+            'gateway_ids' => [$gateway->id],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('onboarding.api-keys'));
+
+        $response->assertOk();
+        $response->assertSee('Webhook signing secret', false);
     }
 
     public function test_gateway_step_syncs_and_advances_to_api_keys(): void

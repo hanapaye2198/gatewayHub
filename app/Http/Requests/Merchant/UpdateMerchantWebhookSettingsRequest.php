@@ -23,7 +23,7 @@ class UpdateMerchantWebhookSettingsRequest extends FormRequest
     {
         return [
             'webhook_url' => ['nullable', 'url', 'max:255'],
-            'webhook_secret' => ['nullable', 'string', 'min:16', 'max:255'],
+            'webhook_secret' => ['nullable', 'string', 'max:65535'],
             'regenerate_secret' => ['sometimes', 'boolean'],
         ];
     }

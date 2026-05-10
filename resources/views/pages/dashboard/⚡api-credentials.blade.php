@@ -16,10 +16,14 @@ new class extends Component
     public bool $showWebhookSecret = false;
     public ?string $newWebhookSecret = null;
 
+    public bool $hasWebhookSecret = false;
+
     public function mount(): void
     {
         $merchant = auth()->user()?->merchant;
         $this->webhookUrl = $merchant?->webhook_url ?? '';
+        $ws = $merchant?->webhook_secret;
+        $this->hasWebhookSecret = is_string($ws) && trim($ws) !== '';
     }
 
     public function confirmRegenerate(): void
@@ -51,6 +55,12 @@ new class extends Component
         $this->showWebhookSecret = ! $this->showWebhookSecret;
     }
 
+    public function regenerateWebhookSecretNow(): void
+    {
+        $this->regenerateWebhookSecret = true;
+        $this->updateWebhookSettings();
+    }
+
     public function updateWebhookSettings(): void
     {
         $merchant = auth()->user()?->merchant;
@@ -60,20 +70,19 @@ new class extends Component
 
         $validated = $this->validate([
             'webhookUrl' => ['nullable', 'url', 'max:255'],
-            'webhookSecret' => ['nullable', 'string', 'min:16', 'max:255'],
-            'regenerateWebhookSecret' => ['boolean'],
+            'webhookSecret' => ['nullable', 'string', 'max:65535'],
         ]);
 
         $webhookUrl = trim((string) ($validated['webhookUrl'] ?? ''));
         $webhookUrl = $webhookUrl !== '' ? $webhookUrl : null;
 
         $secretInput = $validated['webhookSecret'] ?? null;
-        $regenerate = (bool) ($validated['regenerateWebhookSecret'] ?? false);
+        $regenerate = $this->regenerateWebhookSecret;
 
         $secret = null;
         if (is_string($secretInput) && trim($secretInput) !== '') {
             $secret = trim($secretInput);
-        } elseif ($regenerate || $merchant->webhook_secret === null) {
+        } elseif ($regenerate) {
             $secret = Str::random(48);
         }
 
@@ -87,6 +96,8 @@ new class extends Component
         $this->newWebhookSecret = $secret;
         $this->webhookSecret = '';
         $this->regenerateWebhookSecret = false;
+        $ws = $merchant->webhook_secret;
+        $this->hasWebhookSecret = is_string($ws) && trim($ws) !== '';
         $this->dispatch('webhook-updated');
     }
 }; ?>
@@ -142,15 +153,6 @@ new class extends Component
                                     @endif
                                 </svg>
                             </button>
-                            <button
-                                type="button"
-                                onclick="copyToClipboard('{{ $user->api_key }}')"
-                                class="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-                            >
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"/>
-                                </svg>
-                            </button>
                         </div>
                     @endif
                 </div>
@@ -179,6 +181,9 @@ new class extends Component
                                 </span>
                             </p>
                         @endif
+                        <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-500">
+                            {{ __('For security, the full API key is shown only once. Regenerate to copy it again.') }}
+                        </p>
                     </div>
                 @else
                     <div class="mt-6 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/80 p-8 text-center dark:border-zinc-600 dark:bg-zinc-800/30">
@@ -202,13 +207,55 @@ new class extends Component
                         {{ $user?->hasApiKey() ? __('Regenerate API Key') : __('Generate API Key') }}
                     </button>
                 </div>
+
+                @if (session('new_api_key'))
+                    <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50/90 shadow-sm dark:border-amber-500/25 dark:bg-amber-950/40 dark:shadow-none">
+                        <div class="p-5 sm:p-6">
+                            <div class="flex items-start gap-3">
+                                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-500/15">
+                                    <svg class="h-5 w-5 text-amber-700 dark:text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+                                    </svg>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <h3 class="text-base font-semibold text-amber-950 dark:text-amber-100">{{ __('Save your new API key now') }}</h3>
+                                    <p class="mt-1 text-sm text-amber-900/90 dark:text-amber-200/90">{{ __('This is the only time we will show it. Copy it and store it securely.') }}</p>
+                                    <div class="mt-4">
+                                        <div class="relative">
+                                            <input
+                                                type="text"
+                                                value="{{ e(session('new_api_key')) }}"
+                                                readonly
+                                                id="new-api-key-once"
+                                                class="w-full rounded-lg border border-amber-300/80 bg-white px-4 py-3 pr-24 font-mono text-sm text-zinc-900 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 dark:border-amber-600/50 dark:bg-zinc-900 dark:text-zinc-100"
+                                            >
+                                            <button
+                                                type="button"
+                                                onclick="copyToClipboardAndNotify('new-api-key-once')"
+                                                class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-amber-200/80 px-3 py-1.5 text-sm font-medium text-amber-950 transition-colors hover:bg-amber-300/80 dark:bg-amber-500/20 dark:text-amber-100 dark:hover:bg-amber-500/30"
+                                            >
+                                                {{ __('Copy') }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p class="mt-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300/90">
+                                        <svg class="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+                                        </svg>
+                                        <span>{{ __('If you lose this key, you will need to regenerate a new one. Your old key will no longer work.') }}</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
 
         {{-- Webhook settings --}}
         <div class="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900/90 dark:shadow-zinc-950/30">
             <div class="p-6 sm:p-8">
-                <div class="flex items-start justify-between gap-4">
+                <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="flex min-w-0 flex-1 items-start gap-3">
                         <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
                             <svg class="h-5 w-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
@@ -222,7 +269,46 @@ new class extends Component
                             </p>
                         </div>
                     </div>
+
+                    @if ($hasWebhookSecret)
+                        <div class="flex items-center gap-1">
+                            <button
+                                type="button"
+                                wire:click="toggleShowWebhookSecret"
+                                class="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                            >
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                                    @if($showWebhookSecret)
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/>
+                                    @else
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    @endif
+                                </svg>
+                            </button>
+                        </div>
+                    @endif
                 </div>
+
+                @if ($hasWebhookSecret && $user?->merchant)
+                    <div class="mt-6">
+                        <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
+                            <div class="flex items-start gap-3">
+                                <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.2)] dark:bg-emerald-400"></span>
+                                <div class="min-w-0 flex-1 break-all font-mono text-sm">
+                                    @if($showWebhookSecret)
+                                        <span class="text-zinc-900 dark:text-zinc-50">{{ $user->merchant->webhook_secret }}</span>
+                                    @else
+                                        <span class="text-zinc-600 dark:text-zinc-400">{{ $user->merchant->masked_webhook_secret }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                        <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-500">
+                            {{ __('Use the eye icon to show or hide the full signing secret.') }}
+                        </p>
+                    </div>
+                @endif
 
                 <form wire:submit="updateWebhookSettings" class="mt-6 space-y-6">
                     <flux:input
@@ -236,18 +322,42 @@ new class extends Component
                     <div>
                         <flux:input
                             wire:model.defer="webhookSecret"
-                            :label="__('Webhook Secret')"
-                            type="{{ $showWebhookSecret ? 'text' : 'password' }}"
-                            placeholder="{{ __('Leave blank to keep current secret') }}"
+                            :label="__('Replace signing secret (optional)')"
+                            type="password"
+                            :placeholder="$hasWebhookSecret ? __('Leave blank to keep the current secret') : __('Use Generate signing secret below. Saving without generating does not create a secret.')"
                             autocomplete="off"
                         />
                         <div class="mt-2 flex items-center gap-3">
-                            <flux:button type="button" variant="ghost" size="sm" wire:click="toggleShowWebhookSecret">
-                                {{ $showWebhookSecret ? __('Hide secret') : __('Show secret') }}
+                            <flux:button type="button" variant="ghost" size="sm" wire:click="regenerateWebhookSecretNow">
+                                {{ $hasWebhookSecret ? __('Regenerate signing secret') : __('Generate signing secret') }}
                             </flux:button>
-                            <flux:checkbox wire:model="regenerateWebhookSecret" :label="__('Regenerate secret')" />
                         </div>
                     </div>
+
+                    @if ($newWebhookSecret)
+                        <div class="rounded-xl border border-amber-200 bg-amber-50/90 shadow-sm dark:border-amber-500/25 dark:bg-amber-950/40">
+                            <div class="p-5">
+                                <h3 class="text-sm font-semibold text-amber-950 dark:text-amber-100">{{ __('Your new webhook secret') }}</h3>
+                                <p class="mt-1 text-xs text-amber-900/90 dark:text-amber-200/90">{{ __('Copy it now. This is the only time it will be shown.') }}</p>
+                                <div class="mt-3 relative">
+                                    <input
+                                        type="text"
+                                        value="{{ e($newWebhookSecret) }}"
+                                        readonly
+                                        id="new-webhook-secret"
+                                        class="w-full rounded-lg border border-amber-300/80 bg-white px-4 py-2.5 pr-24 font-mono text-xs text-zinc-900 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 dark:border-amber-600/50 dark:bg-zinc-900 dark:text-zinc-100"
+                                    >
+                                    <button
+                                        type="button"
+                                        onclick="copyToClipboardAndNotify('new-webhook-secret')"
+                                        class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-amber-200/80 px-3 py-1 text-xs font-medium text-amber-950 transition-colors hover:bg-amber-300/80 dark:bg-amber-500/20 dark:text-amber-100 dark:hover:bg-amber-500/30"
+                                    >
+                                        {{ __('Copy') }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
 
                     <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/40 dark:text-zinc-300">
                         <p class="font-medium text-zinc-900 dark:text-zinc-100">{{ __('Signature Headers') }}</p>
@@ -264,75 +374,8 @@ new class extends Component
                         </x-action-message>
                     </div>
                 </form>
-
-                @if ($newWebhookSecret)
-                    <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50/90 shadow-sm dark:border-amber-500/25 dark:bg-amber-950/40">
-                        <div class="p-5">
-                            <h3 class="text-sm font-semibold text-amber-950 dark:text-amber-100">{{ __('Your new webhook secret') }}</h3>
-                            <p class="mt-1 text-xs text-amber-900/90 dark:text-amber-200/90">{{ __('Copy it now. This is the only time it will be shown.') }}</p>
-                            <div class="mt-3 relative">
-                                <input
-                                    type="text"
-                                    value="{{ e($newWebhookSecret) }}"
-                                    readonly
-                                    id="new-webhook-secret"
-                                    class="w-full rounded-lg border border-amber-300/80 bg-white px-4 py-2.5 pr-24 font-mono text-xs text-zinc-900 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 dark:border-amber-600/50 dark:bg-zinc-900 dark:text-zinc-100"
-                                >
-                                <button
-                                    type="button"
-                                    onclick="copyToClipboardAndNotify('new-webhook-secret')"
-                                    class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-amber-200/80 px-3 py-1 text-xs font-medium text-amber-950 transition-colors hover:bg-amber-300/80 dark:bg-amber-500/20 dark:text-amber-100 dark:hover:bg-amber-500/30"
-                                >
-                                    {{ __('Copy') }}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                @endif
             </div>
         </div>
-
-        @if (session('new_api_key'))
-            <div class="rounded-xl border border-amber-200 bg-amber-50/90 shadow-sm dark:border-amber-500/25 dark:bg-amber-950/40 dark:shadow-none">
-                <div class="p-6 sm:p-8">
-                    <div class="flex items-start gap-4">
-                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-500/15">
-                            <svg class="h-5 w-5 text-amber-700 dark:text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
-                            </svg>
-                        </div>
-                        <div class="min-w-0 flex-1">
-                            <h3 class="text-lg font-semibold text-amber-950 dark:text-amber-100">{{ __('Save your new API key now') }}</h3>
-                            <p class="mt-1 text-sm text-amber-900/90 dark:text-amber-200/90">{{ __('This is the only time we will show it. Copy it and store it securely.') }}</p>
-                            <div class="mt-4">
-                                <div class="relative">
-                                    <input
-                                        type="text"
-                                        value="{{ e(session('new_api_key')) }}"
-                                        readonly
-                                        id="new-api-key-once"
-                                        class="w-full rounded-lg border border-amber-300/80 bg-white px-4 py-3 pr-24 font-mono text-sm text-zinc-900 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 dark:border-amber-600/50 dark:bg-zinc-900 dark:text-zinc-100"
-                                    >
-                                    <button
-                                        type="button"
-                                        onclick="copyToClipboardAndNotify('new-api-key-once')"
-                                        class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-amber-200/80 px-3 py-1.5 text-sm font-medium text-amber-950 transition-colors hover:bg-amber-300/80 dark:bg-amber-500/20 dark:text-amber-100 dark:hover:bg-amber-500/30"
-                                    >
-                                        {{ __('Copy') }}
-                                    </button>
-                                </div>
-                            </div>
-                            <p class="mt-3 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300/90">
-                                <svg class="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
-                                </svg>
-                                <span>{{ __('If you lose this key, you will need to regenerate a new one. Your old key will no longer work.') }}</span>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        @endif
 
         {{-- How to use --}}
         <div class="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900/90 dark:shadow-zinc-950/30">

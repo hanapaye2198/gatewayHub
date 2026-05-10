@@ -52,4 +52,16 @@ class PublicApiDocsTest extends TestCase
         $this->assertStringNotContainsString('APP_KEY', $content);
         $this->assertStringNotContainsString('APP_SECRET', $content);
     }
+
+    public function test_public_api_docs_documents_merchant_webhook_headers_and_signing(): void
+    {
+        $response = $this->get('/api-docs')->assertOk();
+
+        $content = $response->getContent() ?: '';
+
+        $this->assertStringContainsString('X-Merchant-Timestamp', $content);
+        $this->assertStringContainsString('X-Merchant-Signature', $content);
+        $this->assertStringContainsString("timestamp + '.' + body", $content);
+        $this->assertStringContainsString('GatewayHub-Webhooks/1.0', $content);
+    }
 }

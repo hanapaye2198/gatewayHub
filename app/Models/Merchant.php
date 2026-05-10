@@ -291,4 +291,26 @@ class Merchant extends Model
 
         return null;
     }
+
+    /**
+     * Masked webhook signing secret for dashboard display (full secret is encrypted at rest).
+     */
+    public function getMaskedWebhookSecretAttribute(): ?string
+    {
+        $secret = $this->webhook_secret;
+        if (! is_string($secret)) {
+            return null;
+        }
+
+        $trimmed = trim($secret);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        if (strlen($trimmed) <= 4) {
+            return str_repeat('•', 12);
+        }
+
+        return '****'.substr($trimmed, -4);
+    }
 }

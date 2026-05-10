@@ -48,8 +48,9 @@ class OnboardingController extends Controller
 
         $apiKey = Str::random(64);
         $apiSecretPlain = Str::random(64);
+        $webhookSecretPlain = Str::random(48);
 
-        DB::transaction(function () use ($user, $validated, $apiKey, $apiSecretPlain): void {
+        DB::transaction(function () use ($user, $validated, $apiKey, $apiSecretPlain, $webhookSecretPlain): void {
             $merchant = Merchant::create([
                 'name' => $validated['business_name'],
                 'email' => $validated['business_email'],
@@ -57,6 +58,7 @@ class OnboardingController extends Controller
                 'api_key' => $apiKey,
                 'api_key_generated_at' => now(),
                 'api_secret' => Hash::make($apiSecretPlain),
+                'webhook_secret' => $webhookSecretPlain,
             ]);
 
             $user->forceFill(['merchant_id' => $merchant->id])->save();
@@ -65,6 +67,7 @@ class OnboardingController extends Controller
         $request->session()->put([
             'onboarding.api_key' => $apiKey,
             'onboarding.api_secret' => $apiSecretPlain,
+            'onboarding.webhook_secret' => $webhookSecretPlain,
         ]);
 
         return redirect()->route('onboarding.gateways');
@@ -143,6 +146,7 @@ class OnboardingController extends Controller
 
         $apiKey = $request->session()->get('onboarding.api_key');
         $apiSecret = $request->session()->get('onboarding.api_secret');
+        $webhookSecret = $request->session()->get('onboarding.webhook_secret');
 
         $merchant = $user->merchant;
         $keysMissing = $apiKey === null || $apiSecret === null;
@@ -152,6 +156,7 @@ class OnboardingController extends Controller
             'totalSteps' => 4,
             'apiKey' => $apiKey,
             'apiSecret' => $apiSecret,
+            'webhookSecret' => $webhookSecret,
             'keysMissing' => $keysMissing,
             'merchantHasCredentials' => $merchant?->hasApiKey() ?? false,
         ]);
@@ -178,7 +183,7 @@ class OnboardingController extends Controller
 
         $user->forceFill(['onboarding_completed_at' => now()])->save();
 
-        $request->session()->forget(['onboarding.api_key', 'onboarding.api_secret']);
+        $request->session()->forget(['onboarding.api_key', 'onboarding.api_secret', 'onboarding.webhook_secret']);
 
         return redirect()->route('dashboard');
     }

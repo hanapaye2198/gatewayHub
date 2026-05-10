@@ -30,6 +30,24 @@ class ApiCredentialsPageTest extends TestCase
         $response->assertSee('****1234');
     }
 
+    public function test_webhook_signing_secret_show_toggle_displays_masked_then_full(): void
+    {
+        $user = User::factory()->create();
+        $user->merchant->forceFill([
+            'webhook_url' => 'https://merchant.example/webhooks',
+            'webhook_secret' => 'abcdefghijklmnop',
+        ])->save();
+
+        $this->actingAs($user);
+
+        Livewire::test('pages::dashboard.api-credentials')
+            ->assertSet('showWebhookSecret', false)
+            ->assertSee('****mnop', false)
+            ->call('toggleShowWebhookSecret')
+            ->assertSet('showWebhookSecret', true)
+            ->assertSee('abcdefghijklmnop', false);
+    }
+
     public function test_admin_cannot_access_api_credentials_page(): void
     {
         $admin = User::factory()->admin()->create();
@@ -89,5 +107,88 @@ class ApiCredentialsPageTest extends TestCase
         $response->assertOk();
         $response->assertDontSee('previous');
         $response->assertSee('****'.$m->api_key_last_four);
+    }
+
+    public function test_merchant_can_regenerate_webhook_secret(): void
+    {
+        $merchant = User::factory()->create();
+        $merchant->merchant->forceFill([
+            'webhook_url' => 'https://merchant.example/webhooks',
+            'webhook_secret' => 'old-secret-value',
+        ])->save();
+
+        $this->actingAs($merchant);
+
+        Livewire::test('pages::dashboard.api-credentials')
+            ->call('regenerateWebhookSecretNow')
+            ->assertSet('newWebhookSecret', fn ($value) => is_string($value) && $value !== '');
+
+        $merchant->refresh();
+        $this->assertNotSame('old-secret-value', $merchant->merchant?->webhook_secret);
+        $this->assertNotNull($merchant->merchant?->webhook_secret);
+    }
+
+    public function test_merchant_can_generate_webhook_secret_when_none_exists(): void
+    {
+        $merchant = User::factory()->create();
+        $merchant->merchant->forceFill([
+            'webhook_url' => 'https://merchant.example/webhooks',
+            'webhook_secret' => null,
+        ])->save();
+
+        $this->actingAs($merchant);
+
+        Livewire::test('pages::dashboard.api-credentials')
+            ->assertSet('hasWebhookSecret', false)
+            ->call('regenerateWebhookSecretNow')
+            ->assertSet('hasWebhookSecret', true)
+            ->assertSet('newWebhookSecret', fn ($value) => is_string($value) && strlen($value) === 48);
+
+        $merchant->refresh();
+        $this->assertSame(48, strlen((string) $merchant->merchant?->webhook_secret));
+    }
+
+    public function test_saving_webhook_url_does_not_generate_secret_when_absent(): void
+    {
+        $merchant = User::factory()->create();
+        $merchant->merchant->forceFill([
+            'webhook_url' => null,
+            'webhook_secret' => null,
+        ])->save();
+
+        $this->actingAs($merchant);
+
+        Livewire::test('pages::dashboard.api-credentials')
+            ->set('webhookUrl', 'https://merchant.example/webhooks')
+            ->call('updateWebhookSettings')
+            ->assertSet('newWebhookSecret', null);
+
+        $merchant->refresh();
+        $this->assertNull($merchant->merchant?->webhook_secret);
+    }
+
+    public function test_livewire_rejects_invalid_webhook_callback_url(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test('pages::dashboard.api-credentials')
+            ->set('webhookUrl', 'not-a-valid-callback')
+            ->call('updateWebhookSettings')
+            ->assertHasErrors(['webhookUrl']);
+    }
+
+    public function test_livewire_saves_valid_webhook_callback_url(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $url = 'https://hooks.example.test/api/v1/callback';
+
+        Livewire::test('pages::dashboard.api-credentials')
+            ->set('webhookUrl', $url)
+            ->call('updateWebhookSettings')
+            ->assertHasNoErrors();
+
+        $this->assertSame($url, $user->merchant->fresh()->webhook_url);
     }
 }

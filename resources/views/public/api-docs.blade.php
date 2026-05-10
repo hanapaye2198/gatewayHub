@@ -300,15 +300,17 @@
                 </div>
 
                 <h3 class="{{ $subHeading }}">Delivery</h3>
-                <p class="mt-1 text-sm text-zinc-700 dark:text-zinc-300">GatewayHub delivers webhooks to the URL you register in your merchant dashboard. The request looks like this:</p>
+                <p class="mt-1 text-sm text-zinc-700 dark:text-zinc-300">Register your HTTPS endpoint and signing secret on the API Credentials page. GatewayHub delivers webhooks with these headers:</p>
                 <pre class="{{ $codeCard }}"><span style="color:#34d399">POST</span> <span style="color:#f4f4f5">https://your-server.example.com/your-webhook-endpoint HTTP/1.1</span>
 <span style="color:#7dd3fc">Content-Type:</span> <span style="color:#f4f4f5">application/json</span>
 <span style="color:#7dd3fc">User-Agent:</span> <span style="color:#f4f4f5">GatewayHub-Webhooks/1.0</span>
-<span style="color:#7dd3fc">X-Signature:</span> <span style="color:#fcd34d">&lt;hmac-sha256-signature&gt;</span></pre>
+<span style="color:#7dd3fc">X-Merchant-Timestamp:</span> <span style="color:#fcd34d">1700000000</span>
+<span style="color:#7dd3fc">X-Merchant-Signature:</span> <span style="color:#fcd34d">&lt;hex-hmac-sha256&gt;</span></pre>
 
                 <h3 class="{{ $subHeading }}">How It Works</h3>
                 <ul class="mt-2 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
-                    <li>GatewayHub sends updates asynchronously — usually within seconds of the event, but network delays can happen.</li>
+                    <li>GatewayHub sends a POST whenever a payment’s <code class="{{ $fieldKey }}">status</code> changes (not only when it becomes paid).</li>
+                    <li>Deliveries are asynchronous — usually within seconds, but network delays can happen.</li>
                     <li>Your endpoint must respond with HTTP 200 quickly (under ~5 seconds). Do heavy work in a queue.</li>
                     <li>If your endpoint errors or times out, GatewayHub retries with backoff.</li>
                     <li>Duplicate deliveries are possible. Make your handler idempotent by keying on <code class="{{ $fieldKey }}">payment_id</code> and ignoring already-applied updates.</li>
@@ -317,24 +319,30 @@
                 <h3 class="{{ $subHeading }}">Example Payload</h3>
                 <pre class="{{ $codeCard }}">{
 <span style="color:#67e8f9">"event"</span>: <span style="color:#fcd34d">"payment.updated"</span>,
-<span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"paid"</span>,
+<span style="color:#67e8f9">"timestamp"</span>: <span style="color:#fcd34d">"2026-02-28T12:00:00+08:00"</span>,
 <span style="color:#67e8f9">"data"</span>: {
   <span style="color:#67e8f9">"payment_id"</span>: <span style="color:#fcd34d">"uuid-value"</span>,
+  <span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"paid"</span>,
   <span style="color:#67e8f9">"amount"</span>: <span style="color:#c4b5fd">500</span>,
   <span style="color:#67e8f9">"currency"</span>: <span style="color:#fcd34d">"PHP"</span>,
-  <span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"paid"</span>,
+  <span style="color:#67e8f9">"gateway"</span>: <span style="color:#fcd34d">"coins"</span>,
+  <span style="color:#67e8f9">"reference"</span>: <span style="color:#fcd34d">"ORDER-20260228-0001"</span>,
+  <span style="color:#67e8f9">"provider_reference"</span>: <span style="color:#fcd34d">"provider-ref-optional"</span>,
   <span style="color:#67e8f9">"paid_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:01:42+08:00"</span>,
-  <span style="color:#67e8f9">"reference"</span>: <span style="color:#fcd34d">"ORDER-20260228-0001"</span>
+  <span style="color:#67e8f9">"created_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:00:10+08:00"</span>,
+  <span style="color:#67e8f9">"updated_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:01:42+08:00"</span>
 }
 }</pre>
 
                 <h3 class="{{ $subHeading }}">Signature Verification</h3>
-                <p class="mt-1 text-sm text-zinc-700 dark:text-zinc-300">Each delivery is signed with your webhook secret so you can be sure it came from GatewayHub.</p>
+                <p class="mt-1 text-sm text-zinc-700 dark:text-zinc-300">Each delivery is signed with the same secret you configure for webhooks so you can verify it came from GatewayHub.</p>
                 <ul class="mt-2 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
-                    <li>Read the signature from the signature header sent with the request.</li>
-                    <li>Compute an HMAC-SHA256 of the raw request body using your webhook secret.</li>
-                    <li>Compare the two values using a constant-time comparison (e.g. <code class="{{ $fieldKey }}">hash_equals</code> in PHP).</li>
+                    <li>Use the raw request body bytes exactly as received (no re-encoding or whitespace changes).</li>
+                    <li>Let <code class="font-mono">timestamp</code> be the value of <code class="font-mono">X-Merchant-Timestamp</code> (Unix time as a decimal string).</li>
+                    <li>Compute the hex digest <code class="font-mono">hash_hmac('sha256', timestamp + '.' + body, your_secret)</code> — the signing input is the timestamp, a single dot, then the raw JSON body.</li>
+                    <li>Compare that digest to <code class="font-mono">X-Merchant-Signature</code> with a constant-time comparison (e.g. <code class="{{ $fieldKey }}">hash_equals</code> in PHP). Do not prefix with <code class="font-mono">sha256=</code>.</li>
                     <li>If they do not match, return 401 and do not act on the payload.</li>
+                    <li>Optionally reject requests whose timestamp is too far from your server clock to limit replay windows.</li>
                 </ul>
 
                 <div class="{{ $calloutInfo }}">
@@ -360,7 +368,7 @@
                     </li>
                     <li>
                         <span class="font-semibold text-zinc-900 dark:text-zinc-100">Verify webhook signatures on every request.</span>
-                        Reject any payload whose HMAC does not match. Rotate the webhook secret if you suspect it leaked.
+                        Reject any payload whose HMAC of <code class="font-mono">timestamp + "." + body</code> does not match. Generate a new signing secret on the API Credentials page if you suspect the old one leaked.
                     </li>
                     <li>
                         <span class="font-semibold text-zinc-900 dark:text-zinc-100">Use HTTPS everywhere.</span>

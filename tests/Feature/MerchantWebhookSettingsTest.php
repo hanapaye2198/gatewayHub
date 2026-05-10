@@ -16,6 +16,94 @@ class MerchantWebhookSettingsTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_patch_rejects_invalid_callback_url(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->patchJson(route('merchant.webhook.update'), [
+                'webhook_url' => 'not-a-valid-callback-url',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['webhook_url']);
+    }
+
+    public function test_patch_accepts_https_callback_url_with_path_and_query(): void
+    {
+        $user = User::factory()->create();
+        $url = 'https://api.merchant.example:8443/v1/payments/callback?source=gh';
+
+        $this->actingAs($user)
+            ->patchJson(route('merchant.webhook.update'), [
+                'webhook_url' => $url,
+            ])
+            ->assertOk();
+
+        $this->assertSame($url, $user->merchant->fresh()->webhook_url);
+    }
+
+    public function test_patch_accepts_null_callback_url_to_clear(): void
+    {
+        $user = User::factory()->create();
+        $user->merchant->forceFill([
+            'webhook_url' => 'https://old.example/callback',
+        ])->save();
+
+        $this->actingAs($user)
+            ->patchJson(route('merchant.webhook.update'), [
+                'webhook_url' => null,
+            ])
+            ->assertOk();
+
+        $this->assertNull($user->merchant->fresh()->webhook_url);
+    }
+
+    public function test_patch_rejects_callback_url_exceeding_max_length(): void
+    {
+        $user = User::factory()->create();
+        $tooLong = 'https://example.com/'.str_repeat('a', 250);
+
+        $this->actingAs($user)
+            ->patchJson(route('merchant.webhook.update'), [
+                'webhook_url' => $tooLong,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['webhook_url']);
+    }
+
+    public function test_merchant_can_set_short_webhook_secret_via_patch(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->patch(route('merchant.webhook.update'), [
+            'webhook_url' => 'https://merchant.example/webhooks',
+            'webhook_secret' => 'tiny',
+            'regenerate_secret' => false,
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('tiny', $user->merchant->fresh()->webhook_secret);
+    }
+
+    public function test_patch_webhook_url_without_regenerate_does_not_create_secret(): void
+    {
+        $user = User::factory()->create();
+        $user->merchant->forceFill(['webhook_secret' => null])->save();
+
+        $response = $this->actingAs($user)->patch(route('merchant.webhook.update'), [
+            'webhook_url' => 'https://merchant.example/webhooks',
+            'regenerate_secret' => false,
+        ]);
+
+        $response->assertOk();
+        $response->assertJson([
+            'success' => true,
+            'webhook_secret' => null,
+        ]);
+
+        $this->assertNull($user->merchant->fresh()->webhook_secret);
+    }
+
     public function test_merchant_can_update_webhook_settings(): void
     {
         $user = User::factory()->create();

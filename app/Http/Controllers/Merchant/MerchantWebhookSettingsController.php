@@ -24,7 +24,7 @@ class MerchantWebhookSettingsController extends Controller
         $secret = null;
         if (is_string($inputSecret) && trim($inputSecret) !== '') {
             $secret = trim($inputSecret);
-        } elseif ($regenerate || $merchant->webhook_secret === null) {
+        } elseif ($regenerate) {
             $secret = Str::random(48);
         }
 
