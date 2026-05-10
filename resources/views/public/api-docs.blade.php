@@ -113,7 +113,7 @@
                     <li>GatewayHub is a payment orchestration platform that lets you accept payments through multiple rails with a single integration.</li>
                     <li>Dynamic QR is the primary processing rail today. Additional rails may be enabled per merchant.</li>
                     <li>Authenticate merchant API calls with a Bearer token issued from your merchant dashboard. Keep this token server-side only.</li>
-                    <li>Final payment status is delivered by webhook. Treat the webhook as the source of truth.</li>
+                    <li>After you configure a callback URL, final payment status updates are delivered by webhook. Treat that webhook as the source of truth.</li>
                 </ul>
             </section>
 
@@ -152,7 +152,7 @@
                             <span class="inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-zinc-900 text-xs font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">3</span>
                             <div>
                                 <p class="font-semibold text-zinc-900 dark:text-zinc-100">Wait for Webhook</p>
-                                <p class="mt-1">GatewayHub notifies your server asynchronously when the payment is paid, failed, or expired. This is the source of truth.</p>
+                                <p class="mt-1">After you configure a webhook URL, GatewayHub notifies your server asynchronously whenever the payment <code class="{{ $fieldKey }}">status</code> changes (for example pending → paid). This callback is the source of truth — not the browser.</p>
                                 <div class="{{ $calloutWarn }}">Do NOT trust any status observed in the browser. The tab can be closed, reloaded, or tampered with. Only the webhook (or a backend status check) is authoritative.</div>
                             </div>
                         </div>
@@ -236,13 +236,20 @@
 <span style="color:#67e8f9">"success"</span>: <span style="color:#6ee7b7">true</span>,
 <span style="color:#67e8f9">"data"</span>: {
   <span style="color:#67e8f9">"payment_id"</span>: <span style="color:#fcd34d">"uuid-value"</span>,
+  <span style="color:#67e8f9">"transaction_id"</span>: <span style="color:#fcd34d">"uuid-value"</span>,
   <span style="color:#67e8f9">"gateway"</span>: <span style="color:#fcd34d">"gcash"</span>,
   <span style="color:#67e8f9">"amount"</span>: <span style="color:#c4b5fd">500</span>,
   <span style="color:#67e8f9">"currency"</span>: <span style="color:#fcd34d">"PHP"</span>,
   <span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"pending"</span>,
   <span style="color:#67e8f9">"qr_data"</span>: <span style="color:#fcd34d">"000201..."</span>,
   <span style="color:#67e8f9">"expires_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:00:00+08:00"</span>,
-  <span style="color:#67e8f9">"redirect_url"</span>: <span style="color:#fda4af">null</span>
+  <span style="color:#67e8f9">"redirect_url"</span>: <span style="color:#fda4af">null</span>,
+  <span style="color:#67e8f9">"checkout_url"</span>: <span style="color:#fda4af">null</span>,
+  <span style="color:#67e8f9">"merchant"</span>: {
+    <span style="color:#67e8f9">"name"</span>: <span style="color:#fcd34d">"Your business name"</span>,
+    <span style="color:#67e8f9">"logo"</span>: <span style="color:#fcd34d">"https://..."</span>,
+    <span style="color:#67e8f9">"theme_color"</span>: <span style="color:#fcd34d">"#1D4ED8"</span>
+  }
 },
 <span style="color:#67e8f9">"error"</span>: <span style="color:#fda4af">null</span>
 }</pre>
@@ -252,6 +259,10 @@
                     <div>
                         <dt class="{{ $fieldKey }}">payment_id</dt>
                         <dd class="mt-0.5">Unique identifier for this payment. Store it against your order and use it for every status check or webhook match.</dd>
+                    </div>
+                    <div>
+                        <dt class="{{ $fieldKey }}">transaction_id</dt>
+                        <dd class="mt-0.5">Same value as <code class="{{ $fieldKey }}">payment_id</code> for compatibility with clients that expect a transaction identifier.</dd>
                     </div>
                     <div>
                         <dt class="{{ $fieldKey }}">qr_data</dt>
@@ -264,6 +275,14 @@
                     <div>
                         <dt class="{{ $fieldKey }}">redirect_url</dt>
                         <dd class="mt-0.5">If the gateway returns a hosted checkout page or wallet deep link, send the customer here. When null, use qr_data.</dd>
+                    </div>
+                    <div>
+                        <dt class="{{ $fieldKey }}">checkout_url</dt>
+                        <dd class="mt-0.5">Same as <code class="{{ $fieldKey }}">redirect_url</code> when present; otherwise null.</dd>
+                    </div>
+                    <div>
+                        <dt class="{{ $fieldKey }}">merchant</dt>
+                        <dd class="mt-0.5">Branding for hosted checkout: display name, logo URL, and theme color.</dd>
                     </div>
                     <div>
                         <dt class="{{ $fieldKey }}">status</dt>

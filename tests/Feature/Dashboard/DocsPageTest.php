@@ -22,6 +22,8 @@ class DocsPageTest extends TestCase
         $response->assertSee('Basic Platform Docs');
         $response->assertSee('Get Enabled Gateways');
         $response->assertSee('Create Payment');
+        $response->assertSee('Your webhook endpoint');
+        $response->assertSee('Provider webhooks');
         $response->assertSee('Error Info');
         $response->assertSee('GET');
         $response->assertSee('/api/gateways/enabled');

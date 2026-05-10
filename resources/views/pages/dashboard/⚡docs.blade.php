@@ -69,7 +69,7 @@ new class extends Component {
                     <span class="inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-zinc-900 text-xs font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">3</span>
                     <div>
                         <p class="font-semibold text-zinc-900 dark:text-zinc-100">{{ __('Wait for Webhook') }}</p>
-                        <p class="mt-1">{{ __('GatewayHub notifies your server asynchronously when the payment is paid, failed, or expired. This is the source of truth.') }}</p>
+                        <p class="mt-1">{{ __('After you configure a webhook URL under API Credentials, GatewayHub notifies your server whenever the payment status changes (for example pending → paid). That callback is the source of truth — not the browser.') }}</p>
                         <div class="{{ $calloutWarn }}">{{ __('Do NOT trust any status that the frontend observed. The browser can be closed, reloaded, or tampered with. Only the webhook (or a backend status check) is authoritative.') }}</div>
                     </div>
                 </div>
@@ -146,7 +146,7 @@ new class extends Component {
 }</pre>
 
         <h3 class="{{ $subHeading }}">{{ __('cURL Example') }}</h3>
-        <pre class="{{ $endpointCardClasses }}" style="{{ $endpointCardStyle }}"><span style="color:#f4f4f5">curl -X POST https://your-domain/api/payments \
+        <pre class="{{ $endpointCardClasses }}" style="{{ $endpointCardStyle }}"><span style="color:#f4f4f5">curl -X POST {{ rtrim(config('app.url'), '/') }}/api/payments \
   -H </span><span style="color:#fcd34d">"Authorization: Bearer YOUR_API_KEY"</span><span style="color:#f4f4f5"> \
   -H </span><span style="color:#fcd34d">"Content-Type: application/json"</span><span style="color:#f4f4f5"> \
   -H </span><span style="color:#fcd34d">"Accept: application/json"</span><span style="color:#f4f4f5"> \
@@ -182,6 +182,18 @@ new class extends Component {
                 <dd class="mt-0.5">{{ __('Unique identifier for this payment. Store it against your order. Use it for every status check and to match incoming webhooks.') }}</dd>
             </div>
             <div>
+                <dt class="{{ $fieldKey }}">transaction_id</dt>
+                <dd class="mt-0.5">{{ __('Same value as payment_id for clients that expect a transaction identifier.') }}</dd>
+            </div>
+            <div>
+                <dt class="{{ $fieldKey }}">checkout_url</dt>
+                <dd class="mt-0.5">{{ __('Same as redirect_url when present; otherwise null.') }}</dd>
+            </div>
+            <div>
+                <dt class="{{ $fieldKey }}">merchant</dt>
+                <dd class="mt-0.5">{{ __('Branding for checkout: display name, logo URL, and theme color.') }}</dd>
+            </div>
+            <div>
                 <dt class="{{ $fieldKey }}">qr_data</dt>
                 <dd class="mt-0.5">{{ __('EMVCo-compatible QR payload string. Encode it as a QR code (e.g. via a QR library) and display the image to the customer. Do not modify the string.') }}</dd>
             </div>
@@ -201,8 +213,8 @@ new class extends Component {
     </div>
 
     <div class="{{ $cardWrap }}">
-        <h2 class="{{ $sectionHeading }}">{{ __('Merchant Webhooks') }}</h2>
-        <p class="{{ $bodyText }}">{{ __('Configure your webhook URL and secret in the API Credentials page to receive payment updates.') }}</p>
+        <h2 class="{{ $sectionHeading }}">{{ __('Your webhook endpoint (outbound to your server)') }}</h2>
+        <p class="{{ $bodyText }}">{{ __('Configure your HTTPS callback URL and signing secret on the API Credentials page. GatewayHub POSTs payment updates to your URL — this is what you implement in your backend.') }}</p>
 
         <h3 class="{{ $subHeading }}">{{ __('Event') }}</h3>
         <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">{{ __('payment.updated') }}</p>
@@ -214,7 +226,7 @@ new class extends Component {
         <h3 class="{{ $subHeading }}">{{ __('Signature Details') }}</h3>
         <ul class="mt-3 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
             <li>{{ __('Use the raw request body bytes exactly as received (no re-encoding or whitespace changes).') }}</li>
-            <li>{{ __('Signature is the hex output of HMAC-SHA256 for') }} <code class="font-mono">timestamp.body</code> {{ __('using your webhook secret.') }}</li>
+            <li>{{ __('Signature is the hex output of HMAC-SHA256 for') }} <code class="font-mono">timestamp + '.' + raw_body</code> {{ __('using the signing secret from API Credentials.') }}</li>
             <li>{{ __('Compare the signature with a constant-time check and do not prefix with "sha256=".') }}</li>
         </ul>
 
@@ -235,12 +247,13 @@ new class extends Component {
   <span style="color:#67e8f9">"updated_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:02:00+08:00"</span>
 }
 }</pre>
+        <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{{ __('The data.gateway field matches your payment gateway code (for example gcash, coins, or qrph).') }}</p>
     </div>
 
     <div class="{{ $cardWrap }}">
         <h2 class="{{ $sectionHeading }}">{{ __('Webhook Troubleshooting') }}</h2>
         <ul class="mt-3 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
-            <li>{{ __('Signature mismatch: confirm you hash timestamp + "." + raw body with your webhook secret.') }}</li>
+            <li>{{ __('Signature mismatch: confirm you hash timestamp + "." + raw body with the signing secret from API Credentials.') }}</li>
             <li>{{ __('Time skew: ensure your server clock is accurate when comparing X-Merchant-Timestamp.') }}</li>
             <li>{{ __('Retries: the platform retries failed deliveries; return 2xx to stop retries.') }}</li>
         </ul>
@@ -256,61 +269,18 @@ new class extends Component {
 <span style="color:#7dd3fc">Accept:</span> <span style="color:#f4f4f5">application/json</span></pre>
 
         <h3 class="{{ $subHeading }}">{{ __('cURL Example') }}</h3>
-        <pre class="{{ $endpointCardClasses }}" style="{{ $endpointCardStyle }}"><span style="color:#f4f4f5">curl -X GET https://your-domain/api/payments/</span><span style="color:#fcd34d">{payment_id}</span><span style="color:#f4f4f5">/status \
+        <pre class="{{ $endpointCardClasses }}" style="{{ $endpointCardStyle }}"><span style="color:#f4f4f5">curl -X GET {{ rtrim(config('app.url'), '/') }}/api/payments/</span><span style="color:#fcd34d">{payment_id}</span><span style="color:#f4f4f5">/status \
   -H </span><span style="color:#fcd34d">"Authorization: Bearer YOUR_API_KEY"</span><span style="color:#f4f4f5"> \
   -H </span><span style="color:#fcd34d">"Accept: application/json"</span></pre>
     </div>
 
     <div class="{{ $cardWrap }}">
-        <h2 class="{{ $sectionHeading }}">{{ __('Webhook Handling') }}</h2>
-        <p class="{{ $bodyText }}">{{ __('A webhook is a server-to-server notification. When the status of a payment changes, GatewayHub sends an HTTP POST to your endpoint so you do not have to poll.') }}</p>
-
-        <div class="{{ $calloutDanger }}">
-            <span class="font-semibold">{{ __('Rule of thumb:') }}</span>
-            {{ __('Always trust the webhook over any frontend polling. The browser can lie; the webhook cannot.') }}
-        </div>
-
-        <h3 class="{{ $subHeading }}">{{ __('Endpoint') }}</h3>
-        <pre class="{{ $endpointCardClasses }}" style="{{ $endpointCardStyle }}"><span style="color:#34d399">POST</span> <span style="color:#f4f4f5">/webhooks/coins HTTP/1.1</span>
-<span style="color:#7dd3fc">Content-Type:</span> <span style="color:#f4f4f5">application/json</span>
-<span style="color:#7dd3fc">X-COINS-SIGNATURE:</span> <span style="color:#fcd34d">&lt;hmac-sha256-signature&gt;</span></pre>
-
-        <h3 class="{{ $subHeading }}">{{ __('How It Works') }}</h3>
-        <ul class="mt-2 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
-            <li>{{ __('GatewayHub sends updates asynchronously — usually within seconds of the payment event, but network delays can happen.') }}</li>
-            <li>{{ __('Your endpoint must respond with HTTP 200 quickly (under ~5 seconds). Do heavy work in a queue.') }}</li>
-            <li>{{ __('If your endpoint errors or times out, GatewayHub retries with backoff.') }}</li>
-            <li>{{ __('Duplicate deliveries are possible. Make your handler idempotent by keying on payment_id (or the provider reference) and ignoring already-applied updates.') }}</li>
-        </ul>
-
-        <h3 class="{{ $subHeading }}">{{ __('Example Payload') }}</h3>
-        <pre class="{{ $jsonCardClasses }}" style="{{ $jsonCardStyle }}">{
-<span style="color:#67e8f9">"event"</span>: <span style="color:#fcd34d">"payment.updated"</span>,
-<span style="color:#67e8f9">"requestId"</span>: <span style="color:#fcd34d">"ORDER-20260228-0001"</span>,
-<span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"paid"</span>,
-<span style="color:#67e8f9">"data"</span>: {
-  <span style="color:#67e8f9">"payment_id"</span>: <span style="color:#fcd34d">"uuid-value"</span>,
-  <span style="color:#67e8f9">"gateway"</span>: <span style="color:#fcd34d">"coins"</span>,
-  <span style="color:#67e8f9">"amount"</span>: <span style="color:#c4b5fd">500</span>,
-  <span style="color:#67e8f9">"currency"</span>: <span style="color:#fcd34d">"PHP"</span>,
-  <span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"paid"</span>,
-  <span style="color:#67e8f9">"paid_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:01:42+08:00"</span>,
-  <span style="color:#67e8f9">"reference"</span>: <span style="color:#fcd34d">"ORDER-20260228-0001"</span>
-}
-}</pre>
-
-        <h3 class="{{ $subHeading }}">{{ __('Signature Verification') }}</h3>
-        <p class="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{{ __('Each delivery is signed with your webhook secret so you can be sure it came from GatewayHub.') }}</p>
-        <ul class="mt-2 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
-            <li>{{ __('Read the signature from the') }} <code class="{{ $fieldKey }}">X-COINS-SIGNATURE</code> {{ __('header.') }}</li>
-            <li>{{ __('Compute an HMAC-SHA256 of the raw request body using your webhook secret.') }}</li>
-            <li>{{ __('Compare the two values using a constant-time comparison (e.g.') }} <code class="{{ $fieldKey }}">hash_equals</code> {{ __('in PHP).') }}</li>
-            <li>{{ __('If they do not match, return 401 and do not act on the payload.') }}</li>
-        </ul>
+        <h2 class="{{ $sectionHeading }}">{{ __('Provider webhooks (not your integration)') }}</h2>
+        <p class="{{ $bodyText }}">{{ __('Payment networks send paid/failed events to GatewayHub on internal routes (for example Coins callbacks at /webhooks/coins). The platform verifies those using provider credentials — different from the signing secret you configure for your own callback URL.') }}</p>
 
         <div class="{{ $calloutInfo }}">
-            <span class="font-semibold">{{ __('Tip:') }}</span>
-            {{ __('After signature verification, re-check the payment with') }} <code class="font-mono">GET /api/payments/{payment_id}/status</code> {{ __('before releasing goods — this guards against replayed or spoofed payloads.') }}
+            <span class="font-semibold">{{ __('Implement only your merchant callback') }}</span>
+            {{ __('You do not host /webhooks/coins or verify X-COINS-* headers on your servers. Integrate the HTTPS URL under API Credentials and verify X-Merchant-Timestamp and X-Merchant-Signature as documented above.') }}
         </div>
     </div>
 
@@ -331,8 +301,8 @@ new class extends Component {
                 {{ __('A success screen in the browser is not proof of payment. The customer may have closed the tab, faked the redirect, or manipulated local state.') }}
             </li>
             <li>
-                <span class="font-semibold text-zinc-900 dark:text-zinc-100">{{ __('Verify webhook signatures on every request.') }}</span>
-                {{ __('Reject any payload whose HMAC does not match. Rotate the webhook secret if you suspect it leaked.') }}
+                <span class="font-semibold text-zinc-900 dark:text-zinc-100">{{ __('Verify your merchant callback signatures.') }}</span>
+                {{ __('On your registered webhook URL, reject any POST whose X-Merchant-Signature does not match an HMAC of timestamp + raw body. Rotate the signing secret from API Credentials if it may have leaked.') }}
             </li>
             <li>
                 <span class="font-semibold text-zinc-900 dark:text-zinc-100">{{ __('Use HTTPS everywhere.') }}</span>

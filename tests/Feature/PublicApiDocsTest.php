@@ -24,6 +24,8 @@ class PublicApiDocsTest extends TestCase
         $this->assertStringContainsString('curl -X POST https://gatewayhub.io/api/payments', $content);
         $this->assertStringContainsString('curl -X GET https://gatewayhub.io/api/payments/', $content);
         $this->assertStringNotContainsString('https://your-domain', $content);
+        $this->assertStringContainsString('transaction_id', $content);
+        $this->assertStringContainsString('checkout_url', $content);
     }
 
     public function test_public_api_docs_contains_core_developer_sections(): void
