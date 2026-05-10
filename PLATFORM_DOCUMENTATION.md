@@ -13,6 +13,7 @@ GatewayHub is not a bank, wallet, remittance provider, or direct payment process
 The platform allows multiple client organizations (merchants) to collect digital payments through one centralized SurePay-managed payment infrastructure.
 
 Examples of client organizations:
+
 - Foundations
 - Ride service platforms
 - Churches
@@ -25,6 +26,7 @@ Examples of client organizations:
 The platform uses Coins.ph dynamic QR as the processing rail for checkout.
 
 Customer-facing payment options that may appear in checkout:
+
 - GCash
 - Maya
 - Coins wallet
@@ -32,6 +34,7 @@ Customer-facing payment options that may appear in checkout:
 - QRPH-compatible wallets (including PayQRPH/QRPH option)
 
 Important:
+
 - These options are orchestrated through the Coins dynamic QR flow in the current model.
 - Gateway availability is configurable per merchant (on/off).
 - Platform credentials are managed centrally by SurePay (not by each merchant).
@@ -51,6 +54,7 @@ Important:
 - Creates and tracks payment records per merchant.
 - Generates dynamic QR checkout via Coins integration.
 - Verifies gateway webhooks securely.
+- Sends merchant webhooks when configured (signed HMAC payload).
 - Prevents invalid or replay webhook processing.
 - Stores transaction status and reference history.
 - Provides merchant and admin dashboards.
@@ -110,3 +114,9 @@ Important:
 - GatewayHub is positioned as an orchestration, visibility, and operations platform.
 - Financial movement is handled by gateway providers and external settlement operations.
 - Language in UI and APIs should avoid implying direct custodial banking functions by GatewayHub.
+
+## 12. Webhook Troubleshooting
+
+- Signature mismatch: verify HMAC uses timestamp + '.' + raw body with the merchant webhook secret.
+- Time skew: ensure your server clock is accurate when comparing request timestamps.
+- Retries: the platform retries failed deliveries; return 2xx to stop retries.

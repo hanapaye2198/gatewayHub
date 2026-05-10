@@ -7,6 +7,7 @@ use App\Http\Controllers\Dashboard\PaymentDetailController;
 use App\Http\Controllers\Dashboard\PaymentsExportController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Merchant\MerchantLogoController;
+use App\Http\Controllers\Merchant\MerchantWebhookSettingsController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\PaymentRedirectController;
 use Illuminate\Support\Facades\Route;
@@ -50,6 +51,7 @@ Route::middleware(['auth', 'verified', 'merchant.onboarding', \App\Http\Middlewa
     Route::get('dashboard/payments/{payment}/status', [PaymentDetailController::class, 'status'])->name('dashboard.payments.status');
 
     Route::post('merchant/logo', [MerchantLogoController::class, 'store'])->name('merchant.logo');
+    Route::patch('merchant/webhook', [MerchantWebhookSettingsController::class, 'update'])->name('merchant.webhook.update');
 });
 
 require __DIR__.'/settings.php';

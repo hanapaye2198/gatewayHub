@@ -39,6 +39,8 @@ class Merchant extends Model
         'api_key_last_four',
         'api_key_generated_at',
         'api_secret',
+        'webhook_url',
+        'webhook_secret',
         'is_active',
     ];
 
@@ -55,6 +57,7 @@ class Merchant extends Model
         return [
             'api_key_generated_at' => 'datetime',
             'is_active' => 'boolean',
+            'webhook_secret' => 'encrypted',
         ];
     }
 

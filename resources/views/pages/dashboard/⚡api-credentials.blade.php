@@ -2,6 +2,7 @@
 
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Illuminate\Support\Str;
 
 new class extends Component
 {
@@ -9,6 +10,17 @@ new class extends Component
 
     public bool $showRegenerateConfirm = false;
     public bool $showApiKey = false;
+    public string $webhookUrl = '';
+    public string $webhookSecret = '';
+    public bool $regenerateWebhookSecret = false;
+    public bool $showWebhookSecret = false;
+    public ?string $newWebhookSecret = null;
+
+    public function mount(): void
+    {
+        $merchant = auth()->user()?->merchant;
+        $this->webhookUrl = $merchant?->webhook_url ?? '';
+    }
 
     public function confirmRegenerate(): void
     {
@@ -32,6 +44,50 @@ new class extends Component
     public function toggleShowApiKey(): void
     {
         $this->showApiKey = ! $this->showApiKey;
+    }
+
+    public function toggleShowWebhookSecret(): void
+    {
+        $this->showWebhookSecret = ! $this->showWebhookSecret;
+    }
+
+    public function updateWebhookSettings(): void
+    {
+        $merchant = auth()->user()?->merchant;
+        if ($merchant === null) {
+            return;
+        }
+
+        $validated = $this->validate([
+            'webhookUrl' => ['nullable', 'url', 'max:255'],
+            'webhookSecret' => ['nullable', 'string', 'min:16', 'max:255'],
+            'regenerateWebhookSecret' => ['boolean'],
+        ]);
+
+        $webhookUrl = trim((string) ($validated['webhookUrl'] ?? ''));
+        $webhookUrl = $webhookUrl !== '' ? $webhookUrl : null;
+
+        $secretInput = $validated['webhookSecret'] ?? null;
+        $regenerate = (bool) ($validated['regenerateWebhookSecret'] ?? false);
+
+        $secret = null;
+        if (is_string($secretInput) && trim($secretInput) !== '') {
+            $secret = trim($secretInput);
+        } elseif ($regenerate || $merchant->webhook_secret === null) {
+            $secret = Str::random(48);
+        }
+
+        $updates = ['webhook_url' => $webhookUrl];
+        if ($secret !== null) {
+            $updates['webhook_secret'] = $secret;
+        }
+
+        $merchant->forceFill($updates)->save();
+
+        $this->newWebhookSecret = $secret;
+        $this->webhookSecret = '';
+        $this->regenerateWebhookSecret = false;
+        $this->dispatch('webhook-updated');
     }
 }; ?>
 
@@ -146,6 +202,93 @@ new class extends Component
                         {{ $user?->hasApiKey() ? __('Regenerate API Key') : __('Generate API Key') }}
                     </button>
                 </div>
+            </div>
+        </div>
+
+        {{-- Webhook settings --}}
+        <div class="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900/90 dark:shadow-zinc-950/30">
+            <div class="p-6 sm:p-8">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex min-w-0 flex-1 items-start gap-3">
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
+                            <svg class="h-5 w-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 6.75A2.25 2.25 0 015.25 4.5h13.5A2.25 2.25 0 0121 6.75v10.5A2.25 2.25 0 0118.75 19.5H5.25A2.25 2.25 0 013 17.25V6.75zm3 3.75h12m-12 4.5h6" />
+                            </svg>
+                        </div>
+                        <div class="min-w-0">
+                            <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{{ __('Webhook Settings') }}</h2>
+                            <p class="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
+                                {{ __('Receive server-to-server callbacks when payment status changes') }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <form wire:submit="updateWebhookSettings" class="mt-6 space-y-6">
+                    <flux:input
+                        wire:model.defer="webhookUrl"
+                        :label="__('Webhook URL')"
+                        type="url"
+                        placeholder="https://merchant.example/webhooks"
+                        autocomplete="url"
+                    />
+
+                    <div>
+                        <flux:input
+                            wire:model.defer="webhookSecret"
+                            :label="__('Webhook Secret')"
+                            type="{{ $showWebhookSecret ? 'text' : 'password' }}"
+                            placeholder="{{ __('Leave blank to keep current secret') }}"
+                            autocomplete="off"
+                        />
+                        <div class="mt-2 flex items-center gap-3">
+                            <flux:button type="button" variant="ghost" size="sm" wire:click="toggleShowWebhookSecret">
+                                {{ $showWebhookSecret ? __('Hide secret') : __('Show secret') }}
+                            </flux:button>
+                            <flux:checkbox wire:model="regenerateWebhookSecret" :label="__('Regenerate secret')" />
+                        </div>
+                    </div>
+
+                    <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/40 dark:text-zinc-300">
+                        <p class="font-medium text-zinc-900 dark:text-zinc-100">{{ __('Signature Headers') }}</p>
+                        <p class="mt-1">{{ __('We send X-Merchant-Timestamp and X-Merchant-Signature. Sign the request body as:') }}</p>
+                        <code class="mt-2 block rounded-lg bg-zinc-900 px-3 py-2 font-mono text-xs text-emerald-300">hash_hmac('sha256', timestamp + '.' + body, webhook_secret)</code>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3 pt-1">
+                        <flux:button variant="primary" type="submit" class="min-w-[140px]">
+                            {{ __('Save Webhook Settings') }}
+                        </flux:button>
+                        <x-action-message class="text-sm text-zinc-600 dark:text-zinc-400" on="webhook-updated">
+                            {{ __('Saved.') }}
+                        </x-action-message>
+                    </div>
+                </form>
+
+                @if ($newWebhookSecret)
+                    <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50/90 shadow-sm dark:border-amber-500/25 dark:bg-amber-950/40">
+                        <div class="p-5">
+                            <h3 class="text-sm font-semibold text-amber-950 dark:text-amber-100">{{ __('Your new webhook secret') }}</h3>
+                            <p class="mt-1 text-xs text-amber-900/90 dark:text-amber-200/90">{{ __('Copy it now. This is the only time it will be shown.') }}</p>
+                            <div class="mt-3 relative">
+                                <input
+                                    type="text"
+                                    value="{{ e($newWebhookSecret) }}"
+                                    readonly
+                                    id="new-webhook-secret"
+                                    class="w-full rounded-lg border border-amber-300/80 bg-white px-4 py-2.5 pr-24 font-mono text-xs text-zinc-900 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 dark:border-amber-600/50 dark:bg-zinc-900 dark:text-zinc-100"
+                                >
+                                <button
+                                    type="button"
+                                    onclick="copyToClipboardAndNotify('new-webhook-secret')"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-amber-200/80 px-3 py-1 text-xs font-medium text-amber-950 transition-colors hover:bg-amber-300/80 dark:bg-amber-500/20 dark:text-amber-100 dark:hover:bg-amber-500/30"
+                                >
+                                    {{ __('Copy') }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
 

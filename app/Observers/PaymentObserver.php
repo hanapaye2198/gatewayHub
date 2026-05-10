@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Jobs\ProcessPaymentPaidEffectsJob;
 use App\Jobs\ProcessPaymentReversalEffectsJob;
+use App\Jobs\SendMerchantWebhookJob;
 use App\Models\Payment;
 use Illuminate\Support\Facades\Log;
 
@@ -40,6 +41,17 @@ class PaymentObserver
         if ($payment->wasChanged('status') && in_array($payment->status, ['refunded', 'failed_after_paid'], true)) {
             $reason = $payment->status === 'refunded' ? 'Payment refunded' : 'Failed after paid';
             ProcessPaymentReversalEffectsJob::dispatch($payment->id, $reason)->afterCommit();
+        }
+
+        if ($payment->wasChanged('status')) {
+            $merchant = $payment->merchant ?? $payment->merchant()->first();
+            $webhookUrl = $merchant?->webhook_url;
+            $webhookSecret = $merchant?->webhook_secret;
+
+            if (is_string($webhookUrl) && trim($webhookUrl) !== ''
+                && is_string($webhookSecret) && trim($webhookSecret) !== '') {
+                SendMerchantWebhookJob::dispatch($payment->id)->afterCommit();
+            }
         }
     }
 
