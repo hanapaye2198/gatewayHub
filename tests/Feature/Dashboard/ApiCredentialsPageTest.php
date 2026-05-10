@@ -28,6 +28,7 @@ class ApiCredentialsPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('API Credentials');
         $response->assertSee('****1234');
+        $response->assertSee('Setting up your webhook / callback URL', false);
     }
 
     public function test_webhook_signing_secret_show_toggle_displays_masked_then_full(): void

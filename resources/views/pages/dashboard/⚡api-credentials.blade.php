@@ -311,6 +311,57 @@ new class extends Component
                     </div>
                 @endif
 
+                @php
+                    $inlineCode = 'rounded bg-indigo-100/80 px-1 font-mono text-[0.6875rem] text-indigo-950 dark:bg-indigo-900/50 dark:text-indigo-100';
+                @endphp
+                <div class="mt-6 rounded-xl border border-indigo-200/90 bg-indigo-50/80 p-5 dark:border-indigo-900/50 dark:bg-indigo-950/35">
+                    <h3 class="text-sm font-semibold text-indigo-950 dark:text-indigo-100">
+                        {{ __('Setting up your webhook / callback URL') }}
+                    </h3>
+                    <p class="mt-1.5 text-sm text-indigo-900/90 dark:text-indigo-200/90">
+                        {{ __('This is the server-to-server URL where GatewayHub posts payment status updates. It is not a browser redirect; your backend must accept our POST over HTTPS.') }}
+                    </p>
+                    <ol class="mt-3 list-decimal space-y-2.5 ps-5 text-sm text-indigo-900/95 dark:text-indigo-100/90">
+                        <li>
+                            {{ __('Implement a public HTTPS endpoint that accepts') }}
+                            <code class="{{ $inlineCode }}">POST</code>
+                            {{ __('requests with') }}
+                            <code class="{{ $inlineCode }}">application/json</code>.
+                            {{ __('You must read the raw body bytes; signature verification uses that exact string.') }}
+                        </li>
+                        <li>
+                            {{ __('Generate or paste your signing secret below. Each request includes') }}
+                            <code class="{{ $inlineCode }}">X-Merchant-Timestamp</code>
+                            {{ __('and') }}
+                            <code class="{{ $inlineCode }}">X-Merchant-Signature</code>
+                            — {{ __('validate them before trusting the payload (see Signature Headers below).') }}
+                        </li>
+                        <li>
+                            {{ __('Respond with an HTTP success status (for example') }}
+                            <code class="{{ $inlineCode }}">200 OK</code>
+                            {{ __('in the 200–299 range) without delaying too long. Offload slow work to a background job.') }}
+                        </li>
+                        <li>
+                            {{ __('Paste your full URL into') }}
+                            <span class="font-medium text-indigo-950 dark:text-indigo-50">{{ __('Webhook URL') }}</span>.
+                            {{ __('Use') }}
+                            <code class="{{ $inlineCode }}">https://</code>
+                            {{ __('for production. Leave the field empty if you are not ready to receive webhooks yet.') }}
+                        </li>
+                        <li>
+                            {{ __('Click') }}
+                            <span class="font-medium text-indigo-950 dark:text-indigo-50">{{ __('Save Webhook Settings') }}</span>.
+                            {{ __('After saving, run a test payment to confirm delivery. You may temporarily point at a request-inspector URL to verify connectivity, then switch to your real server.') }}
+                        </li>
+                    </ol>
+                    <p class="mt-4 text-xs text-indigo-800/90 dark:text-indigo-200/80">
+                        {{ __('More detail, example headers, and troubleshooting:') }}
+                        <flux:link :href="route('dashboard.docs')" class="text-indigo-800 underline decoration-indigo-400/60 underline-offset-2 hover:text-indigo-950 dark:text-indigo-200 dark:hover:text-white" wire:navigate>
+                            {{ __('Merchant Docs') }}
+                        </flux:link>
+                    </p>
+                </div>
+
                 <form wire:submit="updateWebhookSettings" class="mt-6 space-y-6">
                     <flux:input
                         wire:model.defer="webhookUrl"
