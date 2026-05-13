@@ -48,9 +48,19 @@ class PaymentObserver
             $webhookUrl = $merchant?->webhook_url;
             $webhookSecret = $merchant?->webhook_secret;
 
-            if (is_string($webhookUrl) && trim($webhookUrl) !== ''
-                && is_string($webhookSecret) && trim($webhookSecret) !== '') {
+            $hasUrl = is_string($webhookUrl) && trim($webhookUrl) !== '';
+            $hasSecret = is_string($webhookSecret) && trim($webhookSecret) !== '';
+
+            if ($hasUrl && $hasSecret) {
                 SendMerchantWebhookJob::dispatch($payment->id)->afterCommit();
+            } else {
+                Log::warning('Merchant webhook dispatch skipped: missing configuration', [
+                    'payment_id' => $payment->id,
+                    'merchant_id' => $merchant?->id,
+                    'has_webhook_url' => $hasUrl,
+                    'has_webhook_secret' => $hasSecret,
+                    'status_new' => $payment->status,
+                ]);
             }
         }
     }

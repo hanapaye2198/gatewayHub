@@ -143,6 +143,8 @@ class WebhookProcessor
      * is treated as terminal or pre-live and silently ignored (with a log).
      *
      * Rules enforced:
+     *  - provisioning -> paid : gateway confirmed before our status update committed
+     *  - provisioning -> failed : gateway rejected before our status update committed
      *  - pending -> paid    : normal success
      *  - pending -> failed  : normal failure (expired/cancelled/etc.)
      *  - paid   -> *        : BLOCKED. paid is financial finality; reversals
@@ -151,12 +153,13 @@ class WebhookProcessor
      *  - failed -> paid     : BLOCKED. We already decided this payment failed;
      *                         a later "SUCCEEDED" could be a replay, a misrouted
      *                         provider retry, or a compromised callback.
-     *  - refunded / failed_after_paid / provisioning / provisioning_failed
-     *                       : terminal or pre-live, webhook cannot mutate.
+     *  - refunded / failed_after_paid / provisioning_failed
+     *                       : terminal states, webhook cannot mutate.
      *
      * @var array<string, list<string>>
      */
     private const ALLOWED_WEBHOOK_TRANSITIONS = [
+        'provisioning' => ['paid', 'failed'],
         'pending' => ['paid', 'failed'],
     ];
 

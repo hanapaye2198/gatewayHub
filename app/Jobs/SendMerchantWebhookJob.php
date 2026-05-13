@@ -9,6 +9,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class SendMerchantWebhookJob implements ShouldQueue
 {
@@ -41,10 +42,20 @@ class SendMerchantWebhookJob implements ShouldQueue
         $webhookUrl = $merchant->webhook_url;
         $secret = $merchant->webhook_secret;
         if (! is_string($webhookUrl) || trim($webhookUrl) === '') {
+            Log::warning('SendMerchantWebhookJob: missing webhook_url', [
+                'payment_id' => $this->paymentId,
+                'merchant_id' => $merchant->id,
+            ]);
+
             return;
         }
 
         if (! is_string($secret) || trim($secret) === '') {
+            Log::warning('SendMerchantWebhookJob: missing webhook_secret', [
+                'payment_id' => $this->paymentId,
+                'merchant_id' => $merchant->id,
+            ]);
+
             return;
         }
 
@@ -82,5 +93,20 @@ class SendMerchantWebhookJob implements ShouldQueue
             ])
             ->post($webhookUrl, $payload)
             ->throw();
+
+        Log::info('Merchant webhook delivered', [
+            'payment_id' => $this->paymentId,
+            'merchant_id' => $merchant->id,
+            'webhook_url' => $webhookUrl,
+            'status' => $payment->status,
+        ]);
+    }
+
+    public function failed(\Throwable $exception): void
+    {
+        Log::error('SendMerchantWebhookJob failed after retries', [
+            'payment_id' => $this->paymentId,
+            'error' => $exception->getMessage(),
+        ]);
     }
 }
