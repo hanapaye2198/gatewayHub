@@ -9,9 +9,9 @@
     <body class="min-h-screen bg-zinc-100 dark:bg-zinc-950">
         @include('partials.admin-sidebar')
 
-        <x-layout-topbar />
+        <x-layout-topbar :title="$title ?? null" :context="__('Admin Panel')" />
 
-        <flux:main class="p-4 lg:p-6 lg:p-8">
+        <flux:main class="app-shell-main">
             @isset($slot)
                 {{ $slot }}
             @else

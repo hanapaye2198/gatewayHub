@@ -1,5 +1,6 @@
 @props([
     'title' => null,
+    'context' => null,
 ])
 
 <flux:header
@@ -21,8 +22,13 @@
         />
 
         @if ($title)
-            <div class="min-w-0 border-s border-zinc-200 ps-2 sm:ps-3 dark:border-zinc-700/80">
-                <flux:text class="truncate text-sm font-semibold text-zinc-800 sm:text-base dark:text-zinc-100">
+            <div class="app-shell-topbar-title min-w-0">
+                @if ($context)
+                    <p class="truncate text-[0.65rem] font-semibold tracking-[0.14em] text-zinc-500 uppercase dark:text-zinc-500">
+                        {{ $context }}
+                    </p>
+                @endif
+                <flux:text class="truncate text-sm font-semibold text-zinc-900 sm:text-[0.95rem] dark:text-zinc-50">
                     {{ $title }}
                 </flux:text>
             </div>
@@ -31,8 +37,17 @@
 
     <flux:spacer />
 
-    <div class="flex shrink-0 items-center gap-2 sm:gap-3">
+    <div class="flex shrink-0 items-center gap-1.5 sm:gap-2">
         {{ $slot }}
+        <x-header-theme-toggle />
         <x-header-user-menu />
     </div>
 </flux:header>
+
+<script>
+    document.querySelector('[data-app-shell-topbar] .theme-toggle')?.addEventListener('click', () => {
+        window.Flux?.applyAppearance?.(
+            document.documentElement.classList.contains('dark') ? 'light' : 'dark'
+        );
+    });
+</script>

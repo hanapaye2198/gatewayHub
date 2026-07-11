@@ -36,15 +36,15 @@ class RbacTest extends TestCase
 
         $this->actingAs($admin);
 
-        $this->get(route('dashboard'))->assertForbidden();
-        $this->get(route('dashboard.payments'))->assertForbidden();
-        $this->get(route('dashboard.api-credentials'))->assertForbidden();
-        $this->get(route('dashboard.gateways'))->assertForbidden();
+        $this->get(route('dashboard'))->assertRedirect(route('admin.index'));
+        $this->get(route('dashboard.payments'))->assertRedirect(route('admin.index'));
+        $this->get(route('dashboard.api-credentials'))->assertRedirect(route('admin.index'));
+        $this->get(route('dashboard.gateways'))->assertRedirect(route('admin.index'));
         $this->get(route('admin.surepay-wallets.dashboard'))->assertNotFound();
 
         $other = User::factory()->create();
         $payment = Payment::factory()->for($other->merchant)->create();
-        $this->get(route('dashboard.payments.show', $payment))->assertForbidden();
+        $this->get(route('dashboard.payments.show', $payment))->assertRedirect(route('admin.index'));
     }
 
     public function test_deactivated_merchant_cannot_access_dashboard(): void
@@ -77,11 +77,11 @@ class RbacTest extends TestCase
 
         $this->actingAs($merchant);
 
-        $this->get(route('admin.index'))->assertForbidden();
-        $this->get(route('admin.merchants.index'))->assertForbidden();
-        $this->get(route('admin.payments.index'))->assertForbidden();
-        $this->get(route('admin.surepay-wallets.index'))->assertForbidden();
-        $this->get(route('admin.surepay-wallets.dashboard'))->assertForbidden();
+        $this->get(route('admin.index'))->assertRedirect(url('/dashboard'));
+        $this->get(route('admin.merchants.index'))->assertRedirect(url('/dashboard'));
+        $this->get(route('admin.payments.index'))->assertRedirect(url('/dashboard'));
+        $this->get(route('admin.surepay-wallets.index'))->assertRedirect(url('/dashboard'));
+        $this->get(route('admin.surepay-wallets.dashboard'))->assertRedirect(url('/dashboard'));
     }
 
     public function test_new_users_default_to_merchant_user_role(): void

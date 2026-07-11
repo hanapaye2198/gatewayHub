@@ -10,28 +10,22 @@ class ForbiddenErrorPageTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_merchant_sees_friendly_admin_forbidden_page(): void
+    public function test_merchant_is_redirected_from_admin_to_dashboard(): void
     {
         $merchant = User::factory()->create();
 
         $response = $this->actingAs($merchant)->get(route('admin.index'));
 
-        $response->assertForbidden();
-        $response->assertSee(__('Access denied'));
-        $response->assertSee(__('You do not have permission to access the admin panel.'));
-        $response->assertSee(__('Go to merchant dashboard'));
+        $response->assertRedirect(url('/dashboard'));
     }
 
-    public function test_admin_sees_friendly_merchant_dashboard_forbidden_page(): void
+    public function test_admin_is_redirected_from_merchant_dashboard_to_admin(): void
     {
         $admin = User::factory()->admin()->create();
 
         $response = $this->actingAs($admin)->get(route('dashboard'));
 
-        $response->assertForbidden();
-        $response->assertSee(__('Access denied'));
-        $response->assertSee(__('Merchant dashboard access is limited to merchant accounts.'));
-        $response->assertSee(__('Go to admin panel'));
+        $response->assertRedirect(route('admin.index'));
     }
 
     public function test_deactivated_merchant_user_sees_account_status_message(): void

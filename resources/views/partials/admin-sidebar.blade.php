@@ -2,7 +2,7 @@
     sticky
     collapsible
     data-app-shell-sidebar
-    class="app-shell-sidebar"
+    class="app-shell-sidebar app-shell-sidebar--admin"
 >
     <flux:sidebar.header class="app-shell-sidebar-header">
         <a
@@ -11,8 +11,8 @@
             class="flex min-w-0 flex-1 items-center gap-3"
             data-flux-sidebar-brand
         >
-            <div class="app-shell-brand-icon">
-                <x-app-logo-icon class="size-5 fill-emerald-500 dark:fill-emerald-400" />
+            <div class="app-shell-brand-logo">
+                <x-app-logo-icon class="size-full" />
             </div>
             <div class="min-w-0 in-data-flux-sidebar-collapsed-desktop:hidden">
                 <div class="truncate text-sm font-semibold tracking-tight text-zinc-900 dark:text-white">
@@ -26,7 +26,7 @@
     </flux:sidebar.header>
 
     <flux:sidebar.nav class="app-shell-sidebar-nav">
-        <flux:sidebar.group class="grid gap-0.5">
+        <flux:sidebar.group :heading="__('Administration')" class="grid gap-1">
             <flux:sidebar.item icon="home" :href="route('admin.index')" :current="request()->routeIs('admin.index')" wire:navigate>
                 {{ __('Dashboard') }}
             </flux:sidebar.item>
@@ -49,4 +49,9 @@
             @endif
         </flux:sidebar.group>
     </flux:sidebar.nav>
+
+    <div class="app-shell-sidebar-footer in-data-flux-sidebar-collapsed-desktop:hidden">
+        <p class="text-[0.65rem] font-medium text-zinc-500 dark:text-zinc-500">{{ config('app.name') }}</p>
+        <p class="mt-0.5 text-[0.6rem] text-zinc-400 dark:text-zinc-600">{{ __('Admin Panel') }}</p>
+    </div>
 </flux:sidebar>

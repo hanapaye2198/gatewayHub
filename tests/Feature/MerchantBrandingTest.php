@@ -69,7 +69,7 @@ class MerchantBrandingTest extends TestCase
     {
         $merchant = Merchant::factory()->create(['logo_path' => null]);
 
-        $this->assertStringContainsString('images/default-logo.svg', $merchant->getLogoUrl());
+        $this->assertStringContainsString('logo.svg', $merchant->getLogoUrl());
     }
 
     public function test_get_qr_merchant_name_truncates_to_64_characters(): void

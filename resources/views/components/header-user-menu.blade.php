@@ -3,7 +3,7 @@
         :name="auth()->user()->name"
         :initials="auth()->user()->initials()"
         icon-trailing="chevron-down"
-        class="app-shell-profile"
+        class="app-shell-profile-trigger"
         data-test="header-user-menu"
     />
 

@@ -13,9 +13,7 @@
     <meta property="og:type" content="website">
     <link rel="canonical" href="https://gatewayhub.io/api-docs">
 
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon.png') }}?v=gh2">
-    <link rel="icon" href="{{ asset('favicon.ico') }}?v=gh2" sizes="any">
-    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}?v=gh2">
+    <link rel="icon" href="{{ asset('favicon.ico') }}?v=gh5" sizes="any">
 
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600|space-mono:400,700" rel="stylesheet" />

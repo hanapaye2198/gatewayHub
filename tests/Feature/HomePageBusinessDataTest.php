@@ -61,14 +61,19 @@ class HomePageBusinessDataTest extends TestCase
         $response = $this->get(route('home'));
 
         $response->assertOk();
-        $response->assertSee('2 active');
-        $response->assertSee('3 total');
-        $response->assertSee('PHP 350.50');
+        $response->assertSeeText('2 active');
+        $response->assertSeeText('3 total');
+        $response->assertSee('350.50');
         $response->assertSee('AlphaPay');
         $response->assertSee('BetaPay');
         $response->assertSee('GammaPay');
+        $response->assertSee('GCash');
+        $response->assertSee('How it works');
+        $response->assertSee('Built for platform operators');
+        $response->assertSee('Instant propagation to merchants');
+        $response->assertSee('Common questions');
+        $response->assertSee('logo.svg', false);
         $response->assertDontSee('No gateways configured yet.');
-        $response->assertDontSee('No gateways available yet.');
     }
 
     public function test_home_page_shows_empty_state_when_no_business_data_exists(): void
@@ -78,10 +83,31 @@ class HomePageBusinessDataTest extends TestCase
         $response = $this->get(route('home'));
 
         $response->assertOk();
-        $response->assertSee('0 active');
-        $response->assertSee('0 total');
-        $response->assertSee('PHP 0.00');
+        $response->assertSeeText('0 active');
+        $response->assertSeeText('0 total');
         $response->assertSee('No gateways configured yet.');
-        $response->assertSee('No gateways available yet.');
+        $response->assertSee('GCash');
+        $response->assertSee('Try live demo');
+    }
+
+    public function test_home_page_routes_authenticated_admin_to_admin_dashboard(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $response = $this->actingAs($admin)->get(route('home'));
+
+        $response->assertOk();
+        $response->assertSee('/admin', false);
+        $response->assertSee('Go to Dashboard');
+    }
+
+    public function test_home_page_routes_authenticated_merchant_to_dashboard(): void
+    {
+        $merchant = User::factory()->create();
+
+        $response = $this->actingAs($merchant)->get(route('home'));
+
+        $response->assertOk();
+        $response->assertSee('/dashboard', false);
     }
 }

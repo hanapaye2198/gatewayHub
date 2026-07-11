@@ -29,7 +29,7 @@
                             <img
                                 src="{{ $merchantBranding['logo'] }}"
                                 alt=""
-                                class="size-8 rounded-lg object-contain ring-1 ring-zinc-200/80 dark:ring-white/10"
+                                class="size-12 rounded-lg object-contain ring-1 ring-zinc-200/80 sm:size-14 dark:ring-white/10"
                             />
                         </x-slot>
                     </flux:sidebar.brand>
@@ -39,7 +39,7 @@
             </flux:sidebar.header>
 
             <flux:sidebar.nav class="app-shell-sidebar-nav">
-                <flux:sidebar.group class="grid gap-0.5">
+                <flux:sidebar.group :heading="__('Menu')" class="grid gap-1">
                     <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard') || request()->routeIs('dashboard.payments')" wire:navigate>
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
@@ -56,9 +56,14 @@
                     @endif
                 </flux:sidebar.group>
             </flux:sidebar.nav>
+
+            <div class="app-shell-sidebar-footer in-data-flux-sidebar-collapsed-desktop:hidden">
+                <p class="text-[0.65rem] font-medium text-zinc-500 dark:text-zinc-500">{{ config('app.name') }}</p>
+                <p class="mt-0.5 text-[0.6rem] text-zinc-400 dark:text-zinc-600">{{ __('Merchant workspace') }}</p>
+            </div>
         </flux:sidebar>
 
-        <x-layout-topbar :title="$title" />
+        <x-layout-topbar :title="$title" :context="config('app.name')" />
 
         {{ $slot }}
 

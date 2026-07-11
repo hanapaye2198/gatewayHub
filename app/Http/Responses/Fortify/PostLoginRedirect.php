@@ -20,7 +20,7 @@ class PostLoginRedirect
         $role = $user->role ?? null;
 
         if ($role === User::ROLE_ADMIN) {
-            return url('/admin');
+            return route('admin.index', absolute: false);
         }
 
         if ($role === User::ROLE_MERCHANT_USER) {

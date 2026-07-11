@@ -75,62 +75,147 @@ a[data-flux-button] {
 
 /* App shell — sidebar & topbar */
 .app-shell-sidebar {
-    @apply border-e border-zinc-200/80 bg-white shadow-xl shadow-zinc-900/5
-        dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-none;
+    @apply relative isolate overflow-hidden border-e border-zinc-200/70 bg-white
+        shadow-[4px_0_24px_-12px_rgba(0,0,0,0.08)]
+        dark:border-zinc-800/80 dark:bg-zinc-950 dark:shadow-none;
+}
+
+.app-shell-sidebar::before {
+    content: '';
+    @apply pointer-events-none absolute inset-0 opacity-60;
+    background-image:
+        radial-gradient(ellipse 80% 50% at 0% 0%, rgba(59, 130, 246, 0.07), transparent 55%),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(16, 185, 129, 0.05), transparent 50%);
+}
+
+.dark .app-shell-sidebar::before {
+    background-image:
+        radial-gradient(ellipse 80% 50% at 0% 0%, rgba(59, 130, 246, 0.12), transparent 55%),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(16, 185, 129, 0.08), transparent 50%);
 }
 
 .app-shell-sidebar-header {
-    @apply mb-1 min-h-14 border-b border-zinc-200/80 px-1 pb-4 pt-1
-        dark:border-zinc-800;
+    @apply relative z-[1] mb-2 min-h-[3.75rem] border-b border-zinc-200/70 px-2 pb-4 pt-2
+        dark:border-zinc-800/80;
 }
 
 .app-shell-sidebar-nav {
-    @apply mt-2 px-0.5;
+    @apply relative z-[1] mt-1 flex-1 px-1.5;
+}
+
+.app-shell-sidebar-footer {
+    @apply relative z-[1] mt-auto border-t border-zinc-200/70 px-4 py-3
+        dark:border-zinc-800/80;
 }
 
 .app-shell-brand-icon {
     @apply flex size-10 shrink-0 items-center justify-center rounded-xl
-        bg-gradient-to-br from-emerald-500/20 to-emerald-600/5
-        ring-1 ring-emerald-500/20;
+        bg-gradient-to-br from-blue-600 to-indigo-600 shadow-md shadow-blue-600/25
+        ring-1 ring-white/15;
+}
+
+.app-shell-brand-logo {
+    @apply flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl sm:size-14;
+}
+
+.app-shell-brand-icon--admin {
+    @apply from-emerald-600 to-teal-600 shadow-emerald-600/20;
 }
 
 .app-shell-topbar {
-    @apply z-20 flex min-h-14 items-center gap-2 border-b border-zinc-200/80
-        bg-white/80 px-3 shadow-sm shadow-zinc-900/5 backdrop-blur-xl
-        supports-[backdrop-filter]:bg-white/70
+    @apply z-20 flex min-h-[3.75rem] items-center gap-2 border-b border-zinc-200/70
+        bg-white/75 px-3 shadow-sm shadow-zinc-900/[0.04] backdrop-blur-xl backdrop-saturate-150
+        supports-[backdrop-filter]:bg-white/65
         sm:gap-3 sm:px-4 lg:px-6
-        dark:border-zinc-800/80 dark:bg-zinc-900/80
-        dark:shadow-zinc-950/50 dark:supports-[backdrop-filter]:bg-zinc-900/70;
+        dark:border-zinc-800/80 dark:bg-zinc-950/75 dark:shadow-black/20
+        dark:supports-[backdrop-filter]:bg-zinc-950/65;
+}
+
+.app-shell-topbar-title {
+    @apply border-s border-zinc-200/80 ps-2.5 sm:ps-3 dark:border-zinc-700/80;
 }
 
 .app-shell-toggle button,
 .app-shell-toggle [data-flux-button] {
-    @apply size-10 rounded-xl text-zinc-500 transition-colors
-        hover:bg-zinc-100 hover:text-zinc-800
+    @apply size-10 rounded-xl text-zinc-500 transition-all duration-150
+        hover:bg-zinc-100 hover:text-zinc-900
         dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white;
 }
 
-.app-shell-profile [data-flux-profile-name] {
-    @apply hidden sm:block;
+.app-shell-icon-btn {
+    @apply inline-flex size-10 shrink-0 items-center justify-center rounded-xl
+        border border-transparent text-zinc-500 transition-all duration-150
+        hover:border-zinc-200 hover:bg-zinc-100 hover:text-zinc-900
+        dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:bg-white/10 dark:hover:text-white;
+}
+
+.app-shell-profile-trigger {
+    @apply rounded-xl border border-transparent px-2 py-1.5 transition-all duration-150
+        hover:border-zinc-200 hover:bg-zinc-100/80
+        dark:hover:border-zinc-700 dark:hover:bg-white/8;
+}
+
+.app-shell-profile-trigger [data-flux-profile-name] {
+    @apply hidden text-sm font-medium text-zinc-700 sm:block dark:text-zinc-200;
+}
+
+.app-shell-main {
+    @apply relative min-h-[calc(100dvh-3.75rem)] p-4 lg:p-6 lg:p-8;
+    background-color: #f4f4f5;
+    background-image:
+        linear-gradient(to right, rgba(113, 113, 122, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(113, 113, 122, 0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+}
+
+.dark .app-shell-main {
+    background-color: #09090b;
+    background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+}
+
+[data-app-shell-sidebar] [data-flux-sidebar-group] > div:first-child .font-medium {
+    @apply text-[0.65rem] font-bold tracking-[0.16em] text-zinc-400 uppercase
+        dark:text-zinc-500;
 }
 
 [data-app-shell-sidebar] [data-flux-sidebar-item] {
-    @apply h-10 rounded-xl px-3 text-sm font-medium text-zinc-600 transition-all duration-150
+    @apply relative h-10 rounded-xl px-3 text-sm font-medium text-zinc-600 transition-all duration-150
         in-data-flux-sidebar-on-mobile:h-11
         dark:text-zinc-400;
 }
 
 [data-app-shell-sidebar] [data-flux-sidebar-item]:hover {
-    @apply bg-zinc-100 text-zinc-900 dark:bg-white/8 dark:text-zinc-100;
+    @apply bg-zinc-100/90 text-zinc-900 dark:bg-white/8 dark:text-zinc-100;
 }
 
 [data-app-shell-sidebar] [data-flux-sidebar-item][data-current] {
-    @apply border-transparent bg-emerald-500/10 font-semibold text-emerald-700 shadow-none
-        ring-1 ring-emerald-500/20
-        dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/25;
+    @apply border-transparent bg-blue-500/10 font-semibold text-blue-700 shadow-none
+        ring-1 ring-blue-500/15
+        dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/20;
+}
+
+[data-app-shell-sidebar] [data-flux-sidebar-item][data-current]::before {
+    content: '';
+    @apply absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-full bg-blue-600
+        dark:bg-blue-400;
 }
 
 [data-app-shell-sidebar] [data-flux-sidebar-item][data-current] svg {
+    @apply text-blue-600 dark:text-blue-400;
+}
+
+[data-app-shell-sidebar].app-shell-sidebar--admin [data-flux-sidebar-item][data-current] {
+    @apply bg-emerald-500/10 text-emerald-700 ring-emerald-500/15
+        dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/20;
+}
+
+[data-app-shell-sidebar].app-shell-sidebar--admin [data-flux-sidebar-item][data-current]::before {
+    @apply bg-emerald-600 dark:bg-emerald-400;
+}
+
+[data-app-shell-sidebar].app-shell-sidebar--admin [data-flux-sidebar-item][data-current] svg {
     @apply text-emerald-600 dark:text-emerald-400;
 }
 

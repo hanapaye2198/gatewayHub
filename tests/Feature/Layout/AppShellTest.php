@@ -23,6 +23,7 @@ class AppShellTest extends TestCase
         $response->assertSee('data-app-shell-sidebar', false);
         $response->assertSee('data-app-shell-topbar', false);
         $response->assertSee('header-user-menu', false);
+        $response->assertSee('data-test="theme-toggle"', false);
     }
 
     public function test_admin_dashboard_renders_collapsible_shell_controls(): void

@@ -118,7 +118,7 @@ class Merchant extends Model
             return Storage::disk('public')->url($path);
         }
 
-        return asset('images/default-logo.svg');
+        return asset('logo.svg');
     }
 
     public function getThemeColor(): string
