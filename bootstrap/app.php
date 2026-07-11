@@ -32,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($e instanceof \Illuminate\Http\Exceptions\HttpResponseException) {
                 return null;
             }
+
             if ($request instanceof \Illuminate\Http\Request
                 && str_starts_with($request->path(), 'api/webhooks')) {
                 \Illuminate\Support\Facades\Log::error('Webhook endpoint exception', [
@@ -41,6 +42,25 @@ return Application::configure(basePath: dirname(__DIR__))
 
                 return response()->json([
                     'message' => 'Webhook processing failed. Please retry.',
+                ], 500);
+            }
+
+            if ($request instanceof \Illuminate\Http\Request
+                && str_starts_with($request->path(), 'api/')
+                && ! str_starts_with($request->path(), 'api/webhooks')) {
+                if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                    return null;
+                }
+
+                \Illuminate\Support\Facades\Log::error('API exception', [
+                    'path' => $request->path(),
+                    'error' => $e->getMessage(),
+                ]);
+
+                return response()->json([
+                    'message' => app()->hasDebugModeEnabled()
+                        ? $e->getMessage()
+                        : 'An unexpected error occurred.',
                 ], 500);
             }
         });

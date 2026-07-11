@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Merchant;
 
+use App\Rules\PublicWebhookUrl;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateMerchantWebhookSettingsRequest extends FormRequest
@@ -22,7 +23,7 @@ class UpdateMerchantWebhookSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'webhook_url' => ['nullable', 'url', 'max:255'],
+            'webhook_url' => ['nullable', 'url', 'max:255', new PublicWebhookUrl],
             'webhook_secret' => ['nullable', 'string', 'max:65535'],
             'regenerate_secret' => ['sometimes', 'boolean'],
         ];

@@ -26,8 +26,10 @@ Route::get('/payment/default/{transaction}', [PaymentRedirectController::class, 
 
 Route::get('/demo/checkout', fn () => view('demo.checkout'))->name('demo.checkout');
 
-Route::get('/coins/qr', fn () => view('coins.qr'))->name('coins.qr');
-Route::post('/coins/generate-qr', [CoinsQrController::class, 'generate'])->name('coins.generate-qr');
+Route::middleware(['auth', 'verified'])->group(function (): void {
+    Route::get('/coins/qr', fn () => view('coins.qr'))->name('coins.qr');
+    Route::post('/coins/generate-qr', [CoinsQrController::class, 'generate'])->name('coins.generate-qr');
+});
 
 Route::middleware(['auth', 'verified'])->prefix('onboarding')->name('onboarding.')->group(function (): void {
     Route::get('business', [OnboardingController::class, 'business'])->name('business');

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,8 +18,8 @@ class EnsureAdmin
     {
         $user = $request->user();
 
-        if ($user === null || $user->role !== 'admin') {
-            abort(403);
+        if ($user === null || $user->role !== User::ROLE_ADMIN) {
+            abort(403, __('You do not have permission to access the admin panel.'));
         }
 
         return $next($request);

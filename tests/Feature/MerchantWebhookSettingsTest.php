@@ -16,6 +16,50 @@ class MerchantWebhookSettingsTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_patch_rejects_internal_callback_url(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->patchJson(route('merchant.webhook.update'), [
+                'webhook_url' => 'http://127.0.0.1/webhook',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['webhook_url']);
+    }
+
+    public function test_patch_rejects_metadata_callback_url(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->patchJson(route('merchant.webhook.update'), [
+                'webhook_url' => 'http://169.254.169.254/latest/meta-data',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['webhook_url']);
+    }
+
+    public function test_webhook_job_skips_internal_callback_url(): void
+    {
+        Http::fake();
+
+        $user = User::factory()->create();
+        $user->merchant->forceFill([
+            'webhook_url' => 'http://127.0.0.1/webhook',
+            'webhook_secret' => 'merchant-webhook-secret',
+        ])->save();
+
+        $payment = Payment::factory()->create([
+            'merchant_id' => $user->merchant_id,
+            'status' => 'paid',
+        ]);
+
+        (new SendMerchantWebhookJob($payment->id))->handle();
+
+        Http::assertNothingSent();
+    }
+
     public function test_patch_rejects_invalid_callback_url(): void
     {
         $user = User::factory()->create();

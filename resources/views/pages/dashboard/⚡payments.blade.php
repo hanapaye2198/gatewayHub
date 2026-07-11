@@ -9,8 +9,11 @@ use Illuminate\Support\Carbon;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 new class extends Component {
+    use WithPagination;
+
     #[Layout('layouts.app', ['title' => 'Payments'])]
 
     public ?string $selectedPaymentId = null;
@@ -46,26 +49,31 @@ new class extends Component {
         return $this->buildFilteredPaymentsQuery()
             ->with(['gateway', 'platformFee'])
             ->latest('created_at')
-            ->get();
+            ->paginate(25);
     }
 
     #[Computed]
     public function summary(): array
     {
-        $query = $this->buildFilteredPaymentsQuery();
+        $stats = $this->buildFilteredPaymentsQuery()
+            ->selectRaw('COUNT(*) as total_transactions')
+            ->selectRaw("COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as paid_collections")
+            ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_count")
+            ->selectRaw("SUM(CASE WHEN status IN ('failed', 'refunded', 'failed_after_paid') THEN 1 ELSE 0 END) as failed_refunded_count")
+            ->first();
 
         return [
-            'total_transactions' => (clone $query)->count(),
-            'paid_collections' => (float) (clone $query)
-                ->where('status', 'paid')
-                ->sum('amount'),
-            'pending_count' => (clone $query)
-                ->where('status', 'pending')
-                ->count(),
-            'failed_refunded_count' => (clone $query)
-                ->whereIn('status', ['failed', 'refunded', 'failed_after_paid'])
-                ->count(),
+            'total_transactions' => (int) ($stats->total_transactions ?? 0),
+            'paid_collections' => (float) ($stats->paid_collections ?? 0),
+            'pending_count' => (int) ($stats->pending_count ?? 0),
+            'failed_refunded_count' => (int) ($stats->failed_refunded_count ?? 0),
         ];
+    }
+
+    #[Computed]
+    public function shouldPollPendingSync(): bool
+    {
+        return $this->summary['pending_count'] > 0;
     }
 
     #[Computed]
@@ -101,8 +109,13 @@ new class extends Component {
             return null;
         }
 
+        $merchantId = auth()->user()?->merchant_id;
+        if ($merchantId === null || $merchantId === '') {
+            return null;
+        }
+
         $payment = Payment::query()
-            ->where('user_id', auth()->id())
+            ->where('merchant_id', (int) $merchantId)
             ->with('gateway')
             ->find($this->selectedPaymentId);
 
@@ -241,7 +254,7 @@ new class extends Component {
     }
 }; ?>
 
-<div wire:poll.12s="syncPendingFromProvider" class="flex h-full w-full flex-1 flex-col gap-6">
+<div @if ($this->shouldPollPendingSync) wire:poll.12s="syncPendingFromProvider" @endif class="flex h-full w-full flex-1 flex-col gap-6">
     {{-- Header Section with Stats Overview --}}
     <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white to-zinc-50/50 p-6 shadow-sm dark:from-zinc-800 dark:to-zinc-800/50 border border-zinc-200 dark:border-zinc-700">
         <div class="absolute -right-20 -top-20 size-40 rounded-full bg-gradient-to-br from-blue-500/5 to-purple-500/5 blur-3xl"></div>
@@ -397,7 +410,9 @@ new class extends Component {
                     <flux:icon name="table-cells" class="size-4 text-zinc-500" />
                     <span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{{ __('Transaction History') }}</span>
                 </div>
-                <span class="text-xs text-zinc-400">{{ __('Auto-refreshes every 12 seconds') }}</span>
+                @if ($this->shouldPollPendingSync)
+                    <span class="text-xs text-zinc-400">{{ __('Auto-refreshes every 12 seconds while payments are pending') }}</span>
+                @endif
             </div>
         </div>
         <div class="overflow-x-auto">
@@ -485,6 +500,11 @@ new class extends Component {
                 </tbody>
             </table>
         </div>
+        @if ($this->payments->hasPages())
+            <div class="border-t border-zinc-200 px-5 py-4 dark:border-zinc-700">
+                {{ $this->payments->links() }}
+            </div>
+        @endif
     </div>
 
     {{-- Enhanced Payment Detail Modal --}}

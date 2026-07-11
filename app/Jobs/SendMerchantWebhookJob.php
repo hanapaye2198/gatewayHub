@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Payment;
+use App\Support\WebhookUrlGuard;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -45,6 +46,16 @@ class SendMerchantWebhookJob implements ShouldQueue
             Log::warning('SendMerchantWebhookJob: missing webhook_url', [
                 'payment_id' => $this->paymentId,
                 'merchant_id' => $merchant->id,
+            ]);
+
+            return;
+        }
+
+        if (! WebhookUrlGuard::isAllowed($webhookUrl)) {
+            Log::warning('SendMerchantWebhookJob: blocked webhook_url', [
+                'payment_id' => $this->paymentId,
+                'merchant_id' => $merchant->id,
+                'webhook_url' => $webhookUrl,
             ]);
 
             return;

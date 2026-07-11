@@ -85,7 +85,7 @@ class PaymentsDashboardTest extends TestCase
         $response = $this->get(route('dashboard.payments'));
 
         $response->assertOk();
-        $response->assertSee(__('No payments yet.'));
+        $response->assertSee(__('No payments found.'));
     }
 
     public function test_qr_payment_shows_waiting_state_when_pending(): void
@@ -108,13 +108,32 @@ class PaymentsDashboardTest extends TestCase
             ->call('selectPayment', $payment->id);
 
         $response->assertSet('showPaymentDetail', true);
+        $response->assertSet('selectedPaymentId', $payment->id);
+        $this->assertNotNull($response->instance()->selectedPayment);
+        $this->assertSame($payment->id, $response->instance()->selectedPayment->id);
         $response->assertOk();
         $html = $response->html();
         $this->assertTrue(
-            str_contains($html, 'Scan with GCash, Maya, Coins wallet, or other QRPH-compatible apps.')
+            str_contains($html, 'Scan to Pay')
             || str_contains($html, 'QR code unavailable'),
             'Expected pending QR payment to show either scan instructions or unavailable message'
         );
+    }
+
+    public function test_selected_payment_is_null_for_other_merchant_payment(): void
+    {
+        $merchant = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $otherPayment = Payment::factory()->for($otherUser->merchant)->create([
+            'reference_id' => 'OTHER-MODAL-REF',
+            'status' => 'paid',
+        ]);
+
+        $response = Livewire::actingAs($merchant)->test('pages::dashboard.payments')
+            ->call('selectPayment', $otherPayment->id);
+
+        $response->assertSet('showPaymentDetail', true);
+        $this->assertNull($response->instance()->selectedPayment);
     }
 
     public function test_maya_labeled_payment_shows_qr_waiting_state_when_pending(): void
@@ -140,7 +159,7 @@ class PaymentsDashboardTest extends TestCase
         $response->assertOk();
         $html = $response->html();
         $this->assertTrue(
-            str_contains($html, 'Scan with GCash, Maya, Coins wallet, or other QRPH-compatible apps.')
+            str_contains($html, 'Scan to Pay')
             || str_contains($html, 'QR code unavailable'),
             'Expected Maya-labeled pending payment to show scan instructions or unavailable message'
         );
@@ -356,10 +375,10 @@ class PaymentsDashboardTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('Total transactions');
-        $response->assertSee('Paid collections');
-        $response->assertSee('Pending count');
-        $response->assertSee('Failed or refunded');
+        $response->assertSee('Total Transactions');
+        $response->assertSee('Paid Collections');
+        $response->assertSee('Pending Count');
+        $response->assertSee('Failed / Refunded');
         $response->assertSee('PHP 433.33');
     }
 

@@ -15,9 +15,7 @@ class PaymentDetailController extends Controller
 {
     public function __invoke(Payment $payment, QrCodeGenerator $qrGenerator): View|Response|RedirectResponse
     {
-        if ($payment->merchant_id !== auth()->user()?->merchant_id) {
-            abort(404);
-        }
+        abort_unless(auth()->user()?->can('view', $payment), 404);
 
         if ($payment->status === 'paid') {
             return redirect()->route('dashboard.payments');
@@ -31,8 +29,7 @@ class PaymentDetailController extends Controller
             if ($qrData['type'] === 'image') {
                 $qrImageUrl = $qrData['value'];
             } else {
-                $qrImageUrl = $qrGenerator->toDataUri($qrData['value'])
-                    ?? 'https://api.qrserver.com/v1/create-qr-code/?size=256x256&data='.urlencode($qrData['value']);
+                $qrImageUrl = $qrGenerator->toDataUri($qrData['value']);
             }
         }
 
@@ -51,9 +48,7 @@ class PaymentDetailController extends Controller
      */
     public function status(Payment $payment, PaymentStatusSyncService $paymentStatusSyncService): JsonResponse
     {
-        if ($payment->merchant_id !== auth()->user()?->merchant_id) {
-            abort(404);
-        }
+        abort_unless(auth()->user()?->can('view', $payment), 404);
 
         if ($payment->status === 'pending') {
             $paymentStatusSyncService->syncPendingPayment($payment);

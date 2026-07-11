@@ -9,6 +9,17 @@ class MayaWebhookTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_maya_webhook_route_rejects_invalid_signature(): void
+    {
+        $response = $this->postJson('/api/webhooks/maya', [
+            'id' => 'maya-test-event',
+            'status' => 'PAYMENT_SUCCESS',
+        ]);
+
+        $response->assertStatus(401);
+        $response->assertJson(['message' => 'Invalid signature.']);
+    }
+
     public function test_webhook_ingress_rejects_maya_provider_query(): void
     {
         $response = $this->postJson('/api/webhooks?provider=maya', [

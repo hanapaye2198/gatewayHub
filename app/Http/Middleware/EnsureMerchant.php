@@ -16,16 +16,16 @@ class EnsureMerchant
         $user = $request->user();
 
         if ($user === null || $user->role !== \App\Models\User::ROLE_MERCHANT_USER) {
-            abort(403);
+            abort(403, __('Merchant dashboard access is limited to merchant accounts.'));
         }
 
         $merchant = $user->merchant;
         if ($merchant === null || ! $merchant->is_active) {
-            abort(403);
+            abort(403, __('This merchant account is inactive. Contact support for assistance.'));
         }
 
         if (! $user->is_active) {
-            abort(403);
+            abort(403, __('Your account has been deactivated.'));
         }
 
         $request->attributes->set('current_merchant', $merchant);

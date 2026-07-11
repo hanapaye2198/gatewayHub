@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\CoinsTransaction;
 use App\Models\Gateway;
+use App\Models\User;
 use App\Services\Coins\CoinsGenerateQrSigner;
 use App\Services\Gateways\Drivers\CoinsDriver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,9 +15,13 @@ class CoinsQrGenerationTest extends TestCase
 {
     use RefreshDatabase;
 
+    private User $user;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->user = User::factory()->create();
 
         config([
             'coins.auth.generate_qr.strategy' => 'auto',
@@ -28,15 +33,22 @@ class CoinsQrGenerationTest extends TestCase
 
     public function test_generate_qr_page_loads(): void
     {
-        $response = $this->get(route('coins.qr'));
+        $response = $this->actingAs($this->user)->get(route('coins.qr'));
 
         $response->assertStatus(200);
         $response->assertViewIs('coins.qr');
     }
 
+    public function test_generate_qr_requires_authentication(): void
+    {
+        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 100]);
+
+        $this->assertContains($response->status(), [401, 403]);
+    }
+
     public function test_generate_qr_validates_amount_required(): void
     {
-        $response = $this->postJson(route('coins.generate-qr'), []);
+        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), []);
 
         $response->assertStatus(422);
         $response->assertJsonValidationErrors('amount');
@@ -44,7 +56,7 @@ class CoinsQrGenerationTest extends TestCase
 
     public function test_generate_qr_validates_amount_min_one(): void
     {
-        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 0.5]);
+        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 0.5]);
 
         $response->assertStatus(422);
         $response->assertJsonValidationErrors('amount');
@@ -67,7 +79,7 @@ class CoinsQrGenerationTest extends TestCase
             ], 200),
         ]);
 
-        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 100]);
+        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 100]);
 
         $response->assertStatus(200);
         $response->assertJson([
@@ -106,7 +118,7 @@ class CoinsQrGenerationTest extends TestCase
             ], 200),
         ]);
 
-        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 50]);
+        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 50]);
 
         $response->assertStatus(200);
         $response->assertJson(['success' => false, 'message' => 'Coins API error: Invalid API key']);
@@ -128,7 +140,7 @@ class CoinsQrGenerationTest extends TestCase
             ], 200),
         ]);
 
-        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 50]);
+        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 50]);
 
         $response->assertStatus(200);
         $response->assertJson([
@@ -184,7 +196,7 @@ class CoinsQrGenerationTest extends TestCase
             },
         ]);
 
-        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 55]);
+        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 55]);
 
         $response->assertStatus(200);
         $response->assertJson([
@@ -251,7 +263,7 @@ class CoinsQrGenerationTest extends TestCase
             },
         ]);
 
-        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 65]);
+        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 65]);
 
         $response->assertStatus(200);
         $response->assertJson([
@@ -290,7 +302,7 @@ class CoinsQrGenerationTest extends TestCase
             },
         ]);
 
-        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 65]);
+        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 65]);
 
         $response->assertStatus(200);
         $response->assertJson([
@@ -326,7 +338,7 @@ class CoinsQrGenerationTest extends TestCase
             },
         ]);
 
-        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 75]);
+        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 75]);
 
         $response->assertStatus(200);
         $response->assertJson([
@@ -351,7 +363,7 @@ class CoinsQrGenerationTest extends TestCase
             ], 200),
         ]);
 
-        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 10]);
+        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 10]);
 
         $response->assertStatus(403);
         $response->assertJson([
@@ -406,7 +418,7 @@ class CoinsQrGenerationTest extends TestCase
             },
         ]);
 
-        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 25]);
+        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 25]);
 
         $response->assertStatus(200);
         $response->assertJson([
@@ -428,7 +440,7 @@ class CoinsQrGenerationTest extends TestCase
             'api.9001.pl-qa.coinsxyz.me/*' => Http::response('error code: 1006', 403),
         ]);
 
-        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 10]);
+        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 10]);
 
         $response->assertStatus(403);
         $response->assertJson([

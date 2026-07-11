@@ -16,6 +16,8 @@ class MerchantWebhookSettingsController extends Controller
             abort(403);
         }
 
+        $this->authorize('update', $merchant);
+
         $validated = $request->validated();
         $webhookUrl = $validated['webhook_url'] ?? null;
         $inputSecret = $validated['webhook_secret'] ?? null;

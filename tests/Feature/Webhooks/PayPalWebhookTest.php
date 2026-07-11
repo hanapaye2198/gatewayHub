@@ -9,6 +9,17 @@ class PayPalWebhookTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_paypal_webhook_route_rejects_invalid_signature(): void
+    {
+        $response = $this->postJson('/api/webhooks/paypal', [
+            'id' => 'evt-paypal-test',
+            'event_type' => 'PAYMENT.CAPTURE.COMPLETED',
+        ]);
+
+        $response->assertStatus(401);
+        $response->assertJson(['message' => 'Invalid signature.']);
+    }
+
     public function test_webhook_ingress_rejects_paypal_provider_query(): void
     {
         $response = $this->postJson('/api/webhooks?provider=paypal', [

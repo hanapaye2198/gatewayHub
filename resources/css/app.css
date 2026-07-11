@@ -72,3 +72,68 @@ button[data-flux-button],
 a[data-flux-button] {
     @apply rounded-lg font-medium;
 }
+
+/* App shell — sidebar & topbar */
+.app-shell-sidebar {
+    @apply border-e border-zinc-200/80 bg-white shadow-xl shadow-zinc-900/5
+        dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-none;
+}
+
+.app-shell-sidebar-header {
+    @apply mb-1 min-h-14 border-b border-zinc-200/80 px-1 pb-4 pt-1
+        dark:border-zinc-800;
+}
+
+.app-shell-sidebar-nav {
+    @apply mt-2 px-0.5;
+}
+
+.app-shell-brand-icon {
+    @apply flex size-10 shrink-0 items-center justify-center rounded-xl
+        bg-gradient-to-br from-emerald-500/20 to-emerald-600/5
+        ring-1 ring-emerald-500/20;
+}
+
+.app-shell-topbar {
+    @apply z-20 flex min-h-14 items-center gap-2 border-b border-zinc-200/80
+        bg-white/80 px-3 shadow-sm shadow-zinc-900/5 backdrop-blur-xl
+        supports-[backdrop-filter]:bg-white/70
+        sm:gap-3 sm:px-4 lg:px-6
+        dark:border-zinc-800/80 dark:bg-zinc-900/80
+        dark:shadow-zinc-950/50 dark:supports-[backdrop-filter]:bg-zinc-900/70;
+}
+
+.app-shell-toggle button,
+.app-shell-toggle [data-flux-button] {
+    @apply size-10 rounded-xl text-zinc-500 transition-colors
+        hover:bg-zinc-100 hover:text-zinc-800
+        dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white;
+}
+
+.app-shell-profile [data-flux-profile-name] {
+    @apply hidden sm:block;
+}
+
+[data-app-shell-sidebar] [data-flux-sidebar-item] {
+    @apply h-10 rounded-xl px-3 text-sm font-medium text-zinc-600 transition-all duration-150
+        in-data-flux-sidebar-on-mobile:h-11
+        dark:text-zinc-400;
+}
+
+[data-app-shell-sidebar] [data-flux-sidebar-item]:hover {
+    @apply bg-zinc-100 text-zinc-900 dark:bg-white/8 dark:text-zinc-100;
+}
+
+[data-app-shell-sidebar] [data-flux-sidebar-item][data-current] {
+    @apply border-transparent bg-emerald-500/10 font-semibold text-emerald-700 shadow-none
+        ring-1 ring-emerald-500/20
+        dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/25;
+}
+
+[data-app-shell-sidebar] [data-flux-sidebar-item][data-current] svg {
+    @apply text-emerald-600 dark:text-emerald-400;
+}
+
+[data-app-shell-sidebar] [data-flux-sidebar-brand] {
+    @apply rounded-xl px-1 py-1 transition-opacity hover:opacity-90;
+}
