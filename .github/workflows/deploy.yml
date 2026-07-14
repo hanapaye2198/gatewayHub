@@ -185,11 +185,54 @@ jobs:
 
             php artisan up
 
-            HEALTH_BODY="$(curl --silent --show-error --fail --max-time 15 http://127.0.0.1/health)"
-            if [ "${HEALTH_BODY}" != "ok" ]; then
-              echo "Health check failed: expected 'ok', got '${HEALTH_BODY}'"
+            # Health check: nginx often only matches the real Host header, so
+            # curl 127.0.0.1 without Host can 404 even when the app is healthy.
+            APP_URL_VALUE="$(grep -E '^APP_URL=' .env | tail -n1 | cut -d= -f2- | tr -d '\r' | sed 's/^["'\'']//;s/["'\'']$//')"
+            APP_HOST="$(php -r 'echo parse_url($argv[1] ?? "", PHP_URL_HOST) ?: "127.0.0.1";' "${APP_URL_VALUE:-http://127.0.0.1}")"
+            HEALTH_BODY=""
+            HEALTH_OK=0
+
+            for ATTEMPT in 1 2 3 4 5; do
+              # Prefer HTTP through the local web server with the production Host.
+              if HEALTH_BODY="$(curl --silent --show-error --fail --max-time 10 \
+                -H "Host: ${APP_HOST}" \
+                -H "X-Forwarded-Proto: https" \
+                "http://127.0.0.1/health" 2>/dev/null)"; then
+                if [ "${HEALTH_BODY}" = "ok" ]; then
+                  HEALTH_OK=1
+                  break
+                fi
+              fi
+
+              # Fallback: hit Laravel kernel directly (does not depend on nginx vhost).
+              if HEALTH_BODY="$(php -r '
+                require "vendor/autoload.php";
+                $app = require "bootstrap/app.php";
+                $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
+                $request = Illuminate\Http\Request::create("/health", "GET");
+                $response = $kernel->handle($request);
+                echo $response->getContent();
+                $kernel->terminate($request, $response);
+                exit($response->getStatusCode() === 200 ? 0 : 1);
+              ' 2>/dev/null)"; then
+                if [ "${HEALTH_BODY}" = "ok" ]; then
+                  HEALTH_OK=1
+                  break
+                fi
+              fi
+
+              echo "Health check attempt ${ATTEMPT}/5 failed (host=${APP_HOST}, body=${HEALTH_BODY:-<empty>}). Retrying..."
+              sleep 2
+            done
+
+            if [ "${HEALTH_OK}" -ne 1 ]; then
+              echo "Health check failed after retries: expected 'ok', got '${HEALTH_BODY:-<empty>}' (Host: ${APP_HOST})"
+              echo "Diagnostic: route:list health"
+              php artisan route:list --path=health --columns=method,uri,name,action || true
               exit 1
             fi
+
+            echo "Health check passed (body=ok, host=${APP_HOST})."
 
             trap - EXIT
           REMOTE_SCRIPT
