@@ -24,11 +24,10 @@ class DashboardTest extends TestCase
 
         $response = $this->get(route('dashboard'));
         $response->assertOk();
-        $response->assertSee('Track payments collected through Coins dynamic QR.');
+        $response->assertSee('Track and manage all payment transactions from your gateways.');
         $response->assertSee('Create Payment');
-        $response->assertDontSee('View payment history');
-        $response->assertDontSee('Manage your API key');
-        $response->assertDontSee('Review gateway availability');
+        $response->assertSee('Total Transactions');
+        $response->assertSee('Paid Collections');
         $response->assertDontSee('Use the sidebar to navigate');
         $response->assertDontSee('configure gateways');
         $response->assertDontSee('Repository');
@@ -64,7 +63,7 @@ class DashboardTest extends TestCase
         $response = $this->actingAs($merchant)->get(route('dashboard'));
 
         $response->assertOk();
-        $response->assertSee('Paid collections');
+        $response->assertSee('Paid Collections');
         $response->assertSee('PHP 150.75');
     }
 }

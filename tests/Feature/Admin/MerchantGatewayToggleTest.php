@@ -89,7 +89,7 @@ class MerchantGatewayToggleTest extends TestCase
             'is_enabled' => true,
         ]);
 
-        $response->assertForbidden();
+        $response->assertRedirect(url('/dashboard'));
         $this->assertDatabaseHas('merchant_gateways', [
             'merchant_id' => $merchant->id,
             'gateway_id' => $gateway->id,

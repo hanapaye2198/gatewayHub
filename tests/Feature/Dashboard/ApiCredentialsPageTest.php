@@ -56,7 +56,7 @@ class ApiCredentialsPageTest extends TestCase
         $this->actingAs($admin);
         $response = $this->get(route('dashboard.api-credentials'));
 
-        $response->assertForbidden();
+        $response->assertRedirect(route('admin.index'));
     }
 
     public function test_merchant_can_regenerate_api_key(): void

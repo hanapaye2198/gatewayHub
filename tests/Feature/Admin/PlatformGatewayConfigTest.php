@@ -93,7 +93,7 @@ class PlatformGatewayConfigTest extends TestCase
             ],
         ]);
 
-        $response->assertForbidden();
+        $response->assertRedirect(url('/dashboard'));
     }
 
     public function test_admin_cannot_save_placeholder_coins_credentials(): void

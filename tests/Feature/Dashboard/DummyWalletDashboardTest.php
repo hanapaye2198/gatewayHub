@@ -39,7 +39,7 @@ class DummyWalletDashboardTest extends TestCase
 
         $response = $this->actingAs($merchant)->get(route('admin.surepay-wallets.dashboard'));
 
-        $response->assertForbidden();
+        $response->assertRedirect(url('/dashboard'));
     }
 
     public function test_tunnel_wallet_dashboard_reads_merchant_data_from_database(): void

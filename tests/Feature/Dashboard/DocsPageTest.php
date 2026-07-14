@@ -52,6 +52,6 @@ class DocsPageTest extends TestCase
 
         $response = $this->actingAs($admin)->get(route('dashboard.docs'));
 
-        $response->assertForbidden();
+        $response->assertRedirect(route('admin.index'));
     }
 }
