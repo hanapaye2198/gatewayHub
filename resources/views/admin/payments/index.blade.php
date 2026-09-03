@@ -171,9 +171,9 @@
                         <th class="px-7 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Reference</th>
                         <th class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Merchant</th>
                         <th class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Gateway</th>
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Amount</th>
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Platform Fee</th>
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Net</th>
+                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Gross Amount</th>
+                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">GatewayHub Fee</th>
+                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Net After GatewayHub Fee</th>
                         <th class="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Status</th>
                         <th class="px-7 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Created</th>
                     </tr>

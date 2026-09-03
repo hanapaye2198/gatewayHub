@@ -604,7 +604,7 @@
                     <h2 class="landing-section-title">Integrate in minutes</h2>
                     <p class="landing-section-subtitle mt-4">RESTful endpoints, per-merchant API keys, and signed webhooks. Full docs included.</p>
                     <ul class="mt-8 space-y-3">
-                        @foreach (['Payment creation & status APIs', 'Scoped API credentials per merchant', 'HMAC webhook signature verification', 'CSV payment exports'] as $point)
+                        @foreach (['Payment creation & status APIs', 'Scoped API credentials per merchant', 'HMAC webhook signature verification', 'Excel transaction exports'] as $point)
                         <li class="flex items-center gap-3 text-sm landing-card-text">
                             <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400">
                                 <svg class="size-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
@@ -657,7 +657,7 @@
                     ['q' => 'Do I need to redeploy when toggling a gateway?', 'a' => 'No. Gateway toggles take effect instantly across the platform. Merchants see the change on their next payment request without any code or config changes on their end.'],
                     ['q' => 'Which payment providers are supported?', 'a' => 'GatewayHub supports GCash, Maya, PayPal, Coins.ph, and QRPh out of the box. Additional providers can be added through the driver architecture.'],
                     ['q' => 'How are webhooks signed?', 'a' => 'Each merchant receives a webhook secret during onboarding. GatewayHub signs outbound notifications with HMAC so you can verify the payload before processing it.'],
-                    ['q' => 'Can I use GatewayHub as a merchant only?', 'a' => 'Yes. Merchants get their own dashboard with API credentials, webhook settings, payment history, and CSV exports. Platform admin features are separate.'],
+                    ['q' => 'Can I use GatewayHub as a merchant only?', 'a' => 'Yes. Merchants get their own dashboard with API credentials, webhook settings, payment history, and Excel transaction exports. Platform admin features are separate.'],
                     ['q' => 'Is there a free tier?', 'a' => 'You can create a free account and start integrating immediately. Check the dashboard for current usage limits and pricing details.'],
                 ] as $faq)
                 <details class="landing-faq group">

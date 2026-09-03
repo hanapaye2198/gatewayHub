@@ -10,6 +10,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
+use ZipArchive;
 
 class PaymentsDashboardTest extends TestCase
 {
@@ -40,6 +41,7 @@ class PaymentsDashboardTest extends TestCase
         $response->assertSee('500.00');
         $response->assertSee('PHP');
         $response->assertSee('Paid');
+        $response->assertSee('Download Excel');
     }
 
     public function test_merchant_does_not_see_other_merchants_payments(): void
@@ -382,7 +384,7 @@ class PaymentsDashboardTest extends TestCase
         $response->assertSee('PHP 433.33');
     }
 
-    public function test_merchant_can_export_filtered_payments_and_export_is_isolated_to_own_records(): void
+    public function test_merchant_can_download_filtered_payments_as_excel_and_download_is_isolated_to_own_records(): void
     {
         $merchant = User::factory()->create();
         $otherMerchant = User::factory()->create();
@@ -393,6 +395,8 @@ class PaymentsDashboardTest extends TestCase
             'provider_reference' => 'M-EXPORT-PROV-001',
             'status' => 'paid',
             'amount' => 200,
+            'platform_fee' => 3.00,
+            'net_amount' => 197.00,
             'created_at' => Carbon::parse('2026-02-14 10:00:00'),
             'updated_at' => Carbon::parse('2026-02-14 10:00:00'),
         ]);
@@ -423,44 +427,30 @@ class PaymentsDashboardTest extends TestCase
         ]));
 
         $response->assertOk();
-        $this->assertStringContainsString('text/csv', (string) $response->headers->get('content-type'));
-        $this->assertStringContainsString('merchant-payments-', (string) $response->headers->get('content-disposition'));
+        $this->assertStringContainsString(
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            (string) $response->headers->get('content-type')
+        );
+        $this->assertStringContainsString('.xlsx', (string) $response->headers->get('content-disposition'));
 
-        $csv = $response->streamedContent();
-        $this->assertStringStartsWith("\xEF\xBB\xBF", $csv);
-        $csvWithoutBom = substr($csv, 3);
+        $workbook = $response->streamedContent();
+        $this->assertStringStartsWith('PK', $workbook);
 
-        $rows = array_values(array_filter(
-            preg_split('/\r\n|\r|\n/', trim($csvWithoutBom)) ?: [],
-            static fn (string $line): bool => $line !== ''
-        ));
+        $worksheet = $this->readExcelEntry($workbook, 'xl/worksheets/sheet1.xml');
 
-        $this->assertCount(2, $rows);
-
-        $header = str_getcsv($rows[0]);
-        $this->assertSame([
-            'Created At',
-            'Reference',
-            'Provider Reference',
-            'Gateway',
-            'Amount',
-            'Currency',
-            'Platform Fee',
-            'Net Amount',
-            'Status',
-        ], $header);
-
-        $data = str_getcsv($rows[1]);
-        $this->assertSame('2026-02-14 10:00:00', $data[0] ?? null);
-        $this->assertSame('M-EXPORT-PAID-001', $data[1] ?? null);
-        $this->assertSame('200.00', $data[4] ?? null);
-        $this->assertSame('paid', $data[8] ?? null);
-
-        $this->assertStringNotContainsString('M-EXPORT-PENDING-002', $csvWithoutBom);
-        $this->assertStringNotContainsString('OTHER-EXPORT-PAID-003', $csvWithoutBom);
+        $this->assertStringContainsString('Created At', $worksheet);
+        $this->assertStringContainsString('GatewayHub Platform Fee (%)', $worksheet);
+        $this->assertStringContainsString('Net After GatewayHub Fee', $worksheet);
+        $this->assertStringContainsString('M-EXPORT-PAID-001', $worksheet);
+        $this->assertStringContainsString('200.00', $worksheet);
+        $this->assertStringContainsString('1.50', $worksheet);
+        $this->assertStringContainsString('3.00', $worksheet);
+        $this->assertStringContainsString('197.00', $worksheet);
+        $this->assertStringNotContainsString('M-EXPORT-PENDING-002', $worksheet);
+        $this->assertStringNotContainsString('OTHER-EXPORT-PAID-003', $worksheet);
     }
 
-    public function test_merchant_export_sanitizes_formula_like_cells(): void
+    public function test_merchant_excel_download_keeps_formula_like_cells_as_text(): void
     {
         $merchant = User::factory()->create();
 
@@ -477,17 +467,11 @@ class PaymentsDashboardTest extends TestCase
         $response = $this->actingAs($merchant)->get(route('dashboard.payments.export'));
 
         $response->assertOk();
-        $csv = $response->streamedContent();
-        $csvWithoutBom = substr($csv, 3);
-        $rows = array_values(array_filter(
-            preg_split('/\r\n|\r|\n/', trim($csvWithoutBom)) ?: [],
-            static fn (string $line): bool => $line !== ''
-        ));
-        $this->assertCount(2, $rows);
+        $worksheet = $this->readExcelEntry($response->streamedContent(), 'xl/worksheets/sheet1.xml');
 
-        $data = str_getcsv($rows[1]);
-        $this->assertSame("'=INJECT-001", $data[1] ?? null);
-        $this->assertSame("'@RAW-002", $data[2] ?? null);
+        $this->assertStringContainsString('=INJECT-001', $worksheet);
+        $this->assertStringContainsString('@RAW-002', $worksheet);
+        $this->assertStringNotContainsString('<f>', $worksheet);
     }
 
     public function test_dashboard_payments_token_query_does_not_trigger_external_sync(): void
@@ -510,5 +494,28 @@ class PaymentsDashboardTest extends TestCase
         $this->assertSame('pending', $targetPayment->status);
         $this->assertNull($targetPayment->paid_at);
         Http::assertNothingSent();
+    }
+
+    private function readExcelEntry(string $workbook, string $entry): string
+    {
+        $temporaryPath = tempnam(sys_get_temp_dir(), 'gatewayhub-test-xlsx-');
+        $this->assertNotFalse($temporaryPath);
+
+        try {
+            $this->assertNotFalse(file_put_contents($temporaryPath, $workbook));
+
+            $archive = new ZipArchive;
+            $this->assertTrue($archive->open($temporaryPath) === true);
+            $contents = $archive->getFromName($entry);
+            $archive->close();
+
+            $this->assertIsString($contents);
+
+            return $contents;
+        } finally {
+            if (is_file($temporaryPath)) {
+                unlink($temporaryPath);
+            }
+        }
     }
 }

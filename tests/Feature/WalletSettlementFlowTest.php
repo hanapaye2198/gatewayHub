@@ -31,7 +31,7 @@ class WalletSettlementFlowTest extends TestCase
 
     public function test_paid_webhook_creates_clearing_flow_and_holds_net_in_tunnel_for_batch(): void
     {
-        config(['platform.fees' => ['percentage' => 1.5, 'fixed' => 5]]);
+        config(['platform.fees' => ['percentage' => 1.5]]);
         \App\Models\PlatformFeeRule::query()->delete();
 
         $gateway = Gateway::query()->create([
@@ -86,8 +86,8 @@ class WalletSettlementFlowTest extends TestCase
 
         $payment->refresh();
         $this->assertSame('paid', $payment->status);
-        $this->assertSame('20.00', (string) $payment->platform_fee);
-        $this->assertSame('980.00', (string) $payment->net_amount);
+        $this->assertSame('15.00', (string) $payment->platform_fee);
+        $this->assertSame('985.00', (string) $payment->net_amount);
 
         $clearingWallet = Wallet::query()
             ->where('merchant_id', $user->id)
@@ -108,9 +108,9 @@ class WalletSettlementFlowTest extends TestCase
         $this->assertNotNull($clearingWallet);
         $this->assertNotNull($taxWallet);
 
-        $this->assertSame('980.00', (string) $clearingWallet->balance);
+        $this->assertSame('985.00', (string) $clearingWallet->balance);
         $this->assertNull($realWallet);
-        $this->assertSame('20.00', (string) $taxWallet->balance);
+        $this->assertSame('15.00', (string) $taxWallet->balance);
 
         $this->assertSame(4, WalletTransaction::query()->where('payment_id', $payment->id)->count());
         $this->assertDatabaseHas('wallet_transactions', [
@@ -127,19 +127,19 @@ class WalletSettlementFlowTest extends TestCase
             'payment_id' => $payment->id,
             'entry_type' => 'surepay_tax_collected',
             'direction' => 'debit',
-            'amount' => 20,
+            'amount' => 15,
         ]);
         $this->assertDatabaseHas('wallet_transactions', [
             'payment_id' => $payment->id,
             'entry_type' => 'surepay_tax_collected',
             'direction' => 'credit',
-            'amount' => 20,
+            'amount' => 15,
         ]);
         $this->assertDatabaseHas('wallet_transactions', [
             'payment_id' => $payment->id,
             'entry_type' => 'tunnel_net_available',
             'direction' => 'credit',
-            'amount' => 980,
+            'amount' => 985,
             'is_settled' => false,
         ]);
     }
@@ -336,8 +336,8 @@ class WalletSettlementFlowTest extends TestCase
             'amount' => 1000,
             'currency' => 'PHP',
             'status' => 'paid',
-            'platform_fee' => 20,
-            'net_amount' => 980,
+            'platform_fee' => 15,
+            'net_amount' => 985,
             'paid_at' => now(),
         ]);
 
@@ -353,11 +353,11 @@ class WalletSettlementFlowTest extends TestCase
         $this->assertNotNull($tunnel);
         $this->assertNotNull($real);
         $this->assertSame('0.00', (string) $tunnel->balance);
-        $this->assertSame('980.00', (string) $real->balance);
+        $this->assertSame('985.00', (string) $real->balance);
         $this->assertDatabaseHas('wallet_transactions', [
             'payment_id' => $payment->id,
             'entry_type' => WalletTransaction::ENTRY_REAL_WALLET_NET_CREDIT,
-            'amount' => 980,
+            'amount' => 985,
             'is_settled' => true,
         ]);
 
@@ -422,8 +422,8 @@ class WalletSettlementFlowTest extends TestCase
             'amount' => 1000,
             'currency' => 'PHP',
             'status' => 'paid',
-            'platform_fee' => 20,
-            'net_amount' => 980,
+            'platform_fee' => 15,
+            'net_amount' => 985,
             'paid_at' => now(),
         ]);
 

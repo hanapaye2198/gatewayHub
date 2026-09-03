@@ -238,6 +238,10 @@
   <span style="color:#67e8f9">"gateway"</span>: <span style="color:#fcd34d">"gcash"</span>,
   <span style="color:#67e8f9">"amount"</span>: <span style="color:#c4b5fd">500</span>,
   <span style="color:#67e8f9">"currency"</span>: <span style="color:#fcd34d">"PHP"</span>,
+  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">500</span>,
+  <span style="color:#67e8f9">"gatewayhub_platform_fee_percent"</span>: <span style="color:#c4b5fd">1.5</span>,
+  <span style="color:#67e8f9">"gatewayhub_platform_fee"</span>: <span style="color:#fda4af">null</span>,
+  <span style="color:#67e8f9">"gatewayhub_net_amount"</span>: <span style="color:#fda4af">null</span>,
   <span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"pending"</span>,
   <span style="color:#67e8f9">"qr_data"</span>: <span style="color:#fcd34d">"000201..."</span>,
   <span style="color:#67e8f9">"expires_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:00:00+08:00"</span>,
@@ -286,6 +290,22 @@
                         <dt class="{{ $fieldKey }}">status</dt>
                         <dd class="mt-0.5">Current payment state. On creation this is always <code class="{{ $fieldKey }}">pending</code>. Final states arrive via webhook.</dd>
                     </div>
+                    <div>
+                        <dt class="{{ $fieldKey }}">gross_amount</dt>
+                        <dd class="mt-0.5">The original amount before the GatewayHub platform fee.</dd>
+                    </div>
+                    <div>
+                        <dt class="{{ $fieldKey }}">gatewayhub_platform_fee_percent</dt>
+                        <dd class="mt-0.5">The GatewayHub platform fee rate: 1.5% of gross_amount.</dd>
+                    </div>
+                    <div>
+                        <dt class="{{ $fieldKey }}">gatewayhub_platform_fee</dt>
+                        <dd class="mt-0.5">The GatewayHub deduction, rounded to two decimals. It is null until the payment is paid and fee processing is complete. Provider fees are not included.</dd>
+                    </div>
+                    <div>
+                        <dt class="{{ $fieldKey }}">gatewayhub_net_amount</dt>
+                        <dd class="mt-0.5">gross_amount minus gatewayhub_platform_fee. It is null until the payment is paid and fee processing is complete.</dd>
+                    </div>
                 </dl>
             </section>
 
@@ -304,6 +324,18 @@
 <pre id="curl-status" class="{{ $codeCard }}"><span style="color:#f4f4f5">curl -X GET https://gatewayhub.io/api/payments/</span><span style="color:#fcd34d">{payment_id}</span><span style="color:#f4f4f5">/status \
   -H </span><span style="color:#fcd34d">"Authorization: Bearer YOUR_API_KEY"</span><span style="color:#f4f4f5"> \
   -H </span><span style="color:#fcd34d">"Accept: application/json"</span></pre>
+                <h3 class="{{ $subHeading }}">Sample Response</h3>
+                <pre class="{{ $codeCard }}">{
+<span style="color:#67e8f9">"success"</span>: <span style="color:#6ee7b7">true</span>,
+<span style="color:#67e8f9">"data"</span>: {
+  <span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"success"</span>,
+  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">500</span>,
+  <span style="color:#67e8f9">"gatewayhub_platform_fee_percent"</span>: <span style="color:#c4b5fd">1.5</span>,
+  <span style="color:#67e8f9">"gatewayhub_platform_fee"</span>: <span style="color:#c4b5fd">7.5</span>,
+  <span style="color:#67e8f9">"gatewayhub_net_amount"</span>: <span style="color:#c4b5fd">492.5</span>
+},
+<span style="color:#67e8f9">"error"</span>: <span style="color:#fda4af">null</span>
+}</pre>
                 </div>
             </section>
 
@@ -344,12 +376,18 @@
   <span style="color:#67e8f9">"currency"</span>: <span style="color:#fcd34d">"PHP"</span>,
   <span style="color:#67e8f9">"gateway"</span>: <span style="color:#fcd34d">"coins"</span>,
   <span style="color:#67e8f9">"reference"</span>: <span style="color:#fcd34d">"ORDER-20260228-0001"</span>,
+  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">500</span>,
+  <span style="color:#67e8f9">"gatewayhub_platform_fee_percent"</span>: <span style="color:#c4b5fd">1.5</span>,
+  <span style="color:#67e8f9">"gatewayhub_platform_fee"</span>: <span style="color:#c4b5fd">7.5</span>,
+  <span style="color:#67e8f9">"gatewayhub_net_amount"</span>: <span style="color:#c4b5fd">492.5</span>,
   <span style="color:#67e8f9">"provider_reference"</span>: <span style="color:#fcd34d">"provider-ref-optional"</span>,
   <span style="color:#67e8f9">"paid_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:01:42+08:00"</span>,
   <span style="color:#67e8f9">"created_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:00:10+08:00"</span>,
   <span style="color:#67e8f9">"updated_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:01:42+08:00"</span>
 }
 }</pre>
+
+                <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">The gatewayhub_* fields are the only fee values GatewayHub sends to merchants. They represent the GatewayHub 1.5% platform fee and exclude provider processing or conversion fees.</p>
 
                 <h3 class="{{ $subHeading }}">Signature Verification</h3>
                 <p class="mt-1 text-sm text-zinc-700 dark:text-zinc-300">Each delivery is signed with the same secret you configure for webhooks so you can verify it came from GatewayHub.</p>

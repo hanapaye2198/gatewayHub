@@ -217,7 +217,10 @@ class MerchantWebhookSettingsTest extends TestCase
 
         $payment = Payment::factory()->create([
             'merchant_id' => $user->merchant_id,
+            'amount' => 1000,
             'status' => 'paid',
+            'platform_fee' => 15,
+            'net_amount' => 985,
         ]);
 
         (new SendMerchantWebhookJob($payment->id))->handle();
@@ -238,6 +241,10 @@ class MerchantWebhookSettingsTest extends TestCase
             $payload = json_decode($body, true);
             $this->assertIsArray($payload);
             $this->assertSame($payment->id, $payload['data']['payment_id'] ?? null);
+            $this->assertSame(1000, $payload['data']['gross_amount'] ?? null);
+            $this->assertSame(1.5, $payload['data']['gatewayhub_platform_fee_percent'] ?? null);
+            $this->assertSame(15, $payload['data']['gatewayhub_platform_fee'] ?? null);
+            $this->assertSame(985, $payload['data']['gatewayhub_net_amount'] ?? null);
 
             return true;
         });

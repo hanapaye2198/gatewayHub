@@ -94,10 +94,10 @@ class PaymentsController extends Controller
                 'Provider Reference',
                 'Merchant',
                 'Gateway',
-                'Amount',
+                'Gross Amount',
                 'Currency',
-                'Platform Fee',
-                'Net Amount',
+                'GatewayHub Platform Fee',
+                'Net After GatewayHub Fee',
                 'Status',
             ]);
 

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Single, safe entry point for platform revenue.
- * Accepts Payment; resolves rule, calculates fee_amount/net_amount, creates platform_fees record.
+ * Accepts Payment; calculates the GatewayHub 1.5% fee from gross amount and creates platform_fees record.
  * Idempotent; uses transaction and payment row lock. No UI or gateway logic.
  */
 class PlatformFeeService
@@ -41,16 +41,7 @@ class PlatformFeeService
 
             $gross = (float) $locked->amount;
 
-            $paymentDate = $locked->paid_at ?? $locked->created_at ?? now();
-            $rule = app(FeeRuleResolver::class)->resolve(
-                (int) $locked->merchant_id,
-                $locked->gateway_code,
-                $paymentDate
-            );
-
-            $calculated = $rule !== null
-                ? $this->calculateFromRule($gross, $rule)
-                : $this->calculateFromConfig($gross);
+            $calculated = $this->calculateFromConfig($gross);
 
             PlatformFee::query()->create([
                 'payment_id' => $locked->id,
@@ -88,15 +79,14 @@ class PlatformFeeService
     }
 
     /**
-     * Calculate from config (percentage + fixed). Formula: (gross * percentage/100) + fixed.
+     * Calculate the GatewayHub platform fee from gross amount. Formula: gross * 1.5%.
      *
      * @return array{fee_rate: float, fee_amount: float, net_amount: float}
      */
     public function calculateFromConfig(float $grossAmount): array
     {
-        $percentage = config('platform.fees.percentage', 0);
-        $fixed = config('platform.fees.fixed', 0);
-        $feeAmount = round(($grossAmount * $percentage / 100) + $fixed, 2);
+        $percentage = config('platform.fees.percentage', 1.5);
+        $feeAmount = round($grossAmount * $percentage / 100, 2);
         $netAmount = round($grossAmount - $feeAmount, 2);
 
         return [

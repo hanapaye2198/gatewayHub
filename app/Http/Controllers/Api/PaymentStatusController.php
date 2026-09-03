@@ -23,6 +23,7 @@ class PaymentStatusController extends Controller
         }
 
         $payment = Payment::query()
+            ->with('platformFee')
             ->where('id', $id)
             ->where('merchant_id', $merchant->id)
             ->first();
@@ -49,9 +50,9 @@ class PaymentStatusController extends Controller
             default => 'pending',
         };
 
-        return ApiResponse::success([
+        return ApiResponse::success(array_merge([
             'status' => $status,
             'merchant' => $merchant->brandingForApi(),
-        ]);
+        ], $payment->gatewayHubFeeData()));
     }
 }

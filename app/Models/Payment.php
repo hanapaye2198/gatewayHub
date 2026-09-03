@@ -69,6 +69,31 @@ class Payment extends Model
     }
 
     /**
+     * Return only GatewayHub-owned financial fields for API and webhook payloads.
+     * Provider response fields such as conversion fees are intentionally excluded.
+     *
+     * @return array{gross_amount: float, gatewayhub_platform_fee_percent: float, gatewayhub_platform_fee: float|null, gatewayhub_net_amount: float|null}
+     */
+    public function gatewayHubFeeData(): array
+    {
+        $ledger = $this->relationLoaded('platformFee') ? $this->getRelation('platformFee') : null;
+        $hasLedger = $ledger instanceof PlatformFee;
+
+        return [
+            'gross_amount' => (float) $this->amount,
+            'gatewayhub_platform_fee_percent' => $hasLedger
+                ? (float) $ledger->fee_rate * 100
+                : (float) config('platform.fees.percentage', 1.5),
+            'gatewayhub_platform_fee' => $hasLedger
+                ? (float) $ledger->fee_amount
+                : ($this->platform_fee !== null ? (float) $this->platform_fee : null),
+            'gatewayhub_net_amount' => $hasLedger
+                ? (float) $ledger->net_amount
+                : ($this->net_amount !== null ? (float) $this->net_amount : null),
+        ];
+    }
+
+    /**
      * @return BelongsTo<Merchant, $this>
      */
     public function merchant(): BelongsTo

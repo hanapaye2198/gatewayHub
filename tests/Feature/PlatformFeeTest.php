@@ -26,9 +26,20 @@ class PlatformFeeTest extends TestCase
         config()->set('coins.webhook.secret', self::WEBHOOK_SECRET);
     }
 
-    public function test_platform_fee_applied_when_payment_becomes_paid_via_webhook(): void
+    public function test_platform_fee_is_exactly_one_point_five_percent_without_a_fixed_charge(): void
     {
         config(['platform.fees' => ['percentage' => 1.5, 'fixed' => 5]]);
+
+        $calculated = app(BillingPlatformFeeService::class)->calculateFromConfig(2852.53);
+
+        $this->assertSame('42.79', number_format($calculated['fee_amount'], 2, '.', ''));
+        $this->assertSame('2809.74', number_format($calculated['net_amount'], 2, '.', ''));
+        $this->assertSame(0.015, $calculated['fee_rate']);
+    }
+
+    public function test_platform_fee_applied_when_payment_becomes_paid_via_webhook(): void
+    {
+        config(['platform.fees' => ['percentage' => 1.5]]);
         \App\Models\PlatformFeeRule::query()->delete();
 
         $gateway = Gateway::query()->create([
@@ -83,14 +94,14 @@ class PlatformFeeTest extends TestCase
         $this->assertSame('paid', $payment->status);
         $this->assertNotNull($payment->platform_fee);
         $this->assertNotNull($payment->net_amount);
-        $this->assertSame('20.00', (string) $payment->platform_fee); // (1000 * 1.5/100) + 5 = 15 + 5
-        $this->assertSame('980.00', (string) $payment->net_amount);
+        $this->assertSame('15.00', (string) $payment->platform_fee); // 1000 * 1.5%
+        $this->assertSame('985.00', (string) $payment->net_amount);
 
         $ledger = $payment->platformFee;
         $this->assertNotNull($ledger);
         $this->assertSame('1000.00', (string) $ledger->gross_amount);
-        $this->assertSame('20.00', (string) $ledger->fee_amount);
-        $this->assertSame('980.00', (string) $ledger->net_amount);
+        $this->assertSame('15.00', (string) $ledger->fee_amount);
+        $this->assertSame('985.00', (string) $ledger->net_amount);
         $this->assertSame(PlatformFeeStatus::Posted, $ledger->status);
     }
 

@@ -339,7 +339,7 @@ new class extends Component {
                         </a>
                         <a href="{{ $this->exportUrl }}" class="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-300 px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-700 whitespace-nowrap">
                             <flux:icon name="arrow-down-tray" class="mr-1 size-4" />
-                            {{ __('Export') }}
+                            {{ __('Download Excel') }}
                         </a>
                     </div>
                 </div>
@@ -421,9 +421,9 @@ new class extends Component {
                     <tr>
                         <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Reference</th>
                         <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Gateway</th>
-                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Amount</th>
-                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Platform Fee</th>
-                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Net</th>
+                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Gross Amount</th>
+                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">GatewayHub Fee</th>
+                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Net After GatewayHub Fee</th>
                         <th class="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Status</th>
                         <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Created</th>
                         <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Actions</th>
@@ -543,15 +543,16 @@ new class extends Component {
                             <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ number_format($this->selectedPayment->amount, 2) }} {{ $this->selectedPayment->currency }}</span>
                         </div>
                         <div class="flex items-center justify-between text-sm">
-                            <span class="text-zinc-600 dark:text-zinc-400">{{ __('Platform Fee') }}</span>
+                            <span class="text-zinc-600 dark:text-zinc-400">{{ __('GatewayHub Platform Fee') }}</span>
                             <span class="font-medium text-rose-600 dark:text-rose-400">-{{ number_format($this->selectedPayment->platform_fee, 2) }} {{ $this->selectedPayment->currency }}</span>
                         </div>
                         <div class="mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-700">
                             <div class="flex items-center justify-between text-sm font-semibold">
-                                <span class="text-zinc-900 dark:text-zinc-100">{{ __('Net Amount') }}</span>
+                                <span class="text-zinc-900 dark:text-zinc-100">{{ __('Net After GatewayHub Fee') }}</span>
                                 <span class="text-emerald-600 dark:text-emerald-400">{{ number_format($this->selectedPayment->net_amount, 2) }} {{ $this->selectedPayment->currency }}</span>
                             </div>
                         </div>
+                        <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">{{ __('GatewayHub fee is 1.5% of the gross amount. Provider processing or conversion fees are not included.') }}</p>
                     </div>
                 @endif
 

@@ -59,7 +59,7 @@ class PaymentObserverQueueTest extends TestCase
 
     public function test_paid_and_reversal_jobs_process_platform_fee_without_wallet_settlement_when_feature_disabled(): void
     {
-        config(['platform.fees' => ['percentage' => 1.5, 'fixed' => 5]]);
+        config(['platform.fees' => ['percentage' => 1.5]]);
 
         $payment = Payment::factory()->create([
             'amount' => 1000,

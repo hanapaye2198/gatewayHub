@@ -79,6 +79,7 @@ class PaymentController extends Controller
                 'checkout_url' => $redirectUrl,
                 'merchant' => $merchant->brandingForApi(),
             ];
+            $data = array_merge($data, $payment->gatewayHubFeeData());
 
             if ($cacheKey !== null) {
                 $idempotencyService->store($cacheKey, $data);

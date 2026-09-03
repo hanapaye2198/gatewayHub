@@ -43,7 +43,7 @@ class PaymentDetailController extends Controller
     }
 
     /**
-     * Return payment status for polling. Same format as API; uses session auth.
+     * Return payment status and GatewayHub-owned fee fields for polling. Uses session auth.
      * Marks expired pending payments as failed.
      */
     public function status(Payment $payment, PaymentStatusSyncService $paymentStatusSyncService): JsonResponse
@@ -68,6 +68,8 @@ class PaymentDetailController extends Controller
             default => 'pending',
         };
 
-        return response()->json(['status' => $status]);
+        return response()->json(array_merge([
+            'status' => $status,
+        ], $payment->gatewayHubFeeData()));
     }
 }

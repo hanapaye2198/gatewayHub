@@ -5,6 +5,7 @@ namespace Tests\Feature\Api;
 use App\Models\Gateway;
 use App\Models\MerchantGateway;
 use App\Models\Payment;
+use App\Models\PlatformFee;
 use App\Models\User;
 use App\Services\Gateways\Drivers\CoinsDriver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,7 +38,12 @@ class PaymentStatusTest extends TestCase
             'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
         ]);
 
-        $payment = Payment::factory()->paid()->create(['merchant_id' => $user->id]);
+        $payment = Payment::factory()->paid()->create([
+            'merchant_id' => $user->id,
+            'amount' => 1000,
+            'platform_fee' => 15,
+            'net_amount' => 985,
+        ]);
 
         $response = $this->getJson('/api/payments/'.$payment->id.'/status', [
             'Authorization' => 'Bearer key-1',
@@ -45,9 +51,17 @@ class PaymentStatusTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.status', 'success');
+        $response->assertJsonPath('data.gross_amount', 1000);
+        $response->assertJsonPath('data.gatewayhub_platform_fee_percent', 1.5);
+        $response->assertJsonPath('data.gatewayhub_platform_fee', 15);
+        $response->assertJsonPath('data.gatewayhub_net_amount', 985);
         $response->assertJsonStructure([
             'data' => [
                 'status',
+                'gross_amount',
+                'gatewayhub_platform_fee_percent',
+                'gatewayhub_platform_fee',
+                'gatewayhub_net_amount',
                 'merchant' => [
                     'name',
                     'logo',
@@ -75,6 +89,53 @@ class PaymentStatusTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.status', 'pending');
+        $response->assertJsonPath('data.gatewayhub_platform_fee_percent', 1.5);
+        $response->assertJsonPath('data.gatewayhub_platform_fee', null);
+        $response->assertJsonPath('data.gatewayhub_net_amount', null);
+    }
+
+    public function test_status_uses_gatewayhub_ledger_and_excludes_provider_fee_fields(): void
+    {
+        $user = User::factory()->withMerchantApiKey('key-ledger')->create();
+        $payment = Payment::factory()->create([
+            'merchant_id' => $user->id,
+            'gateway_code' => 'coins',
+            'amount' => 2852.53,
+            'status' => 'paid',
+            'platform_fee' => 42.79,
+            'net_amount' => 2809.74,
+            'raw_response' => [
+                'platform_fee' => 69.09,
+                'conv_fee' => 20,
+            ],
+        ]);
+
+        PlatformFee::query()->create([
+            'payment_id' => $payment->id,
+            'merchant_id' => $user->merchant_id,
+            'gateway_code' => 'coins',
+            'gross_amount' => 2852.53,
+            'fee_rate' => 0.015,
+            'fee_amount' => 42.79,
+            'net_amount' => 2809.74,
+            'status' => 'posted',
+        ]);
+
+        $response = $this->getJson('/api/payments/'.$payment->id.'/status', [
+            'Authorization' => 'Bearer key-ledger',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.status', 'success')
+            ->assertJsonPath('data.gross_amount', 2852.53)
+            ->assertJsonPath('data.gatewayhub_platform_fee_percent', 1.5)
+            ->assertJsonPath('data.gatewayhub_platform_fee', 42.79)
+            ->assertJsonPath('data.gatewayhub_net_amount', 2809.74);
+
+        $data = $response->json('data');
+        $this->assertIsArray($data);
+        $this->assertArrayNotHasKey('platform_fee', $data);
+        $this->assertArrayNotHasKey('conv_fee', $data);
     }
 
     public function test_status_reconciles_pending_coins_payment_from_provider_status(): void

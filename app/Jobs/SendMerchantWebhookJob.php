@@ -30,7 +30,7 @@ class SendMerchantWebhookJob implements ShouldQueue
      */
     public function handle(): void
     {
-        $payment = Payment::query()->with('merchant')->find($this->paymentId);
+        $payment = Payment::query()->with(['merchant', 'platformFee'])->find($this->paymentId);
         if ($payment === null) {
             return;
         }
@@ -86,6 +86,7 @@ class SendMerchantWebhookJob implements ShouldQueue
                 'updated_at' => $payment->updated_at?->toIso8601String(),
             ],
         ];
+        $payload['data'] = array_merge($payload['data'], $payment->gatewayHubFeeData());
 
         $body = json_encode($payload, JSON_UNESCAPED_SLASHES);
         if (! is_string($body)) {

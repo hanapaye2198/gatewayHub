@@ -161,6 +161,10 @@ new class extends Component {
   <span style="color:#67e8f9">"gateway"</span>: <span style="color:#fcd34d">"gcash"</span>,
   <span style="color:#67e8f9">"amount"</span>: <span style="color:#c4b5fd">500</span>,
   <span style="color:#67e8f9">"currency"</span>: <span style="color:#fcd34d">"PHP"</span>,
+  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">500</span>,
+  <span style="color:#67e8f9">"gatewayhub_platform_fee_percent"</span>: <span style="color:#c4b5fd">1.5</span>,
+  <span style="color:#67e8f9">"gatewayhub_platform_fee"</span>: <span style="color:#fda4af">null</span>,
+  <span style="color:#67e8f9">"gatewayhub_net_amount"</span>: <span style="color:#fda4af">null</span>,
   <span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"pending"</span>,
   <span style="color:#67e8f9">"qr_data"</span>: <span style="color:#fcd34d">"000201..."</span>,
   <span style="color:#67e8f9">"expires_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:00:00+08:00"</span>,
@@ -209,6 +213,22 @@ new class extends Component {
                 <dt class="{{ $fieldKey }}">status</dt>
                 <dd class="mt-0.5">{{ __('Current payment state. On creation this is always "pending". Final states arrive via webhook.') }}</dd>
             </div>
+            <div>
+                <dt class="{{ $fieldKey }}">gross_amount</dt>
+                <dd class="mt-0.5">{{ __('The original payment amount before the GatewayHub platform fee.') }}</dd>
+            </div>
+            <div>
+                <dt class="{{ $fieldKey }}">gatewayhub_platform_fee_percent</dt>
+                <dd class="mt-0.5">{{ __('The GatewayHub platform fee rate: 1.5% of gross_amount.') }}</dd>
+            </div>
+            <div>
+                <dt class="{{ $fieldKey }}">gatewayhub_platform_fee</dt>
+                <dd class="mt-0.5">{{ __('The GatewayHub deduction, rounded to two decimals. Null until the payment is paid and fee processing is complete. Provider fees are not included.') }}</dd>
+            </div>
+            <div>
+                <dt class="{{ $fieldKey }}">gatewayhub_net_amount</dt>
+                <dd class="mt-0.5">{{ __('gross_amount minus gatewayhub_platform_fee. Null until the payment is paid and fee processing is complete.') }}</dd>
+            </div>
         </dl>
     </div>
 
@@ -241,6 +261,10 @@ new class extends Component {
   <span style="color:#67e8f9">"currency"</span>: <span style="color:#fcd34d">"PHP"</span>,
   <span style="color:#67e8f9">"gateway"</span>: <span style="color:#fcd34d">"gcash"</span>,
   <span style="color:#67e8f9">"reference"</span>: <span style="color:#fcd34d">"ORDER-20260228-0001"</span>,
+  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">500</span>,
+  <span style="color:#67e8f9">"gatewayhub_platform_fee_percent"</span>: <span style="color:#c4b5fd">1.5</span>,
+  <span style="color:#67e8f9">"gatewayhub_platform_fee"</span>: <span style="color:#c4b5fd">7.5</span>,
+  <span style="color:#67e8f9">"gatewayhub_net_amount"</span>: <span style="color:#c4b5fd">492.5</span>,
   <span style="color:#67e8f9">"provider_reference"</span>: <span style="color:#fcd34d">"provider-id"</span>,
   <span style="color:#67e8f9">"paid_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:02:00+08:00"</span>,
   <span style="color:#67e8f9">"created_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:00:00+08:00"</span>,
@@ -248,6 +272,7 @@ new class extends Component {
 }
 }</pre>
         <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{{ __('The data.gateway field matches your payment gateway code (for example gcash, coins, or qrph).') }}</p>
+        <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ __('The gatewayhub_* fields are the only fee values GatewayHub sends to merchants. They represent the GatewayHub 1.5% platform fee and exclude provider processing or conversion fees.') }}</p>
     </div>
 
     <div class="{{ $cardWrap }}">
@@ -262,6 +287,7 @@ new class extends Component {
     <div class="{{ $cardWrap }}">
         <h2 class="{{ $sectionHeading }}">{{ __('Get Payment Status') }}</h2>
         <p class="{{ $bodyText }}">{{ __('Fetch the current status of a payment from your backend. Call this before fulfilling an order, or as a fallback when a webhook is delayed.') }}</p>
+        <p class="mt-2 text-sm text-zinc-700 dark:text-zinc-300">{{ __('The response includes gross_amount, gatewayhub_platform_fee_percent, gatewayhub_platform_fee, and gatewayhub_net_amount. Use gatewayhub_platform_fee as the authoritative GatewayHub deduction; provider payload fee fields are not part of this API response.') }}</p>
 
         <h3 class="{{ $subHeading }}">{{ __('Sample Request') }}</h3>
         <pre class="{{ $endpointCardClasses }}" style="{{ $endpointCardStyle }}"><span style="color:#34d399">GET</span> <span style="color:#f4f4f5">/api/payments/{payment_id}/status HTTP/1.1</span>
@@ -272,6 +298,18 @@ new class extends Component {
         <pre class="{{ $endpointCardClasses }}" style="{{ $endpointCardStyle }}"><span style="color:#f4f4f5">curl -X GET {{ rtrim(config('app.url'), '/') }}/api/payments/</span><span style="color:#fcd34d">{payment_id}</span><span style="color:#f4f4f5">/status \
   -H </span><span style="color:#fcd34d">"Authorization: Bearer YOUR_API_KEY"</span><span style="color:#f4f4f5"> \
   -H </span><span style="color:#fcd34d">"Accept: application/json"</span></pre>
+        <h3 class="{{ $subHeading }}">{{ __('Sample Response') }}</h3>
+        <pre class="{{ $jsonCardClasses }}" style="{{ $jsonCardStyle }}">{
+<span style="color:#67e8f9">"success"</span>: <span style="color:#6ee7b7">true</span>,
+<span style="color:#67e8f9">"data"</span>: {
+  <span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"success"</span>,
+  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">500</span>,
+  <span style="color:#67e8f9">"gatewayhub_platform_fee_percent"</span>: <span style="color:#c4b5fd">1.5</span>,
+  <span style="color:#67e8f9">"gatewayhub_platform_fee"</span>: <span style="color:#c4b5fd">7.5</span>,
+  <span style="color:#67e8f9">"gatewayhub_net_amount"</span>: <span style="color:#c4b5fd">492.5</span>
+},
+<span style="color:#67e8f9">"error"</span>: <span style="color:#fda4af">null</span>
+}</pre>
     </div>
 
     <div class="{{ $cardWrap }}">

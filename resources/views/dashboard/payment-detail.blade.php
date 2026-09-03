@@ -78,16 +78,16 @@
                             <flux:text class="mt-1 block">{{ $payment->gateway?->name ?? ucfirst($payment->gateway_code) }}</flux:text>
                         </div>
                         <div>
-                            <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Amount (gross)') }}</flux:text>
+                            <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Gross Amount') }}</flux:text>
                             <flux:text class="mt-1 block">{{ number_format($payment->amount, 2) }} {{ $payment->currency }}</flux:text>
                         </div>
                         @if ($payment->status === 'paid' && $payment->platform_fee !== null)
                             <div>
-                                <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Platform fee') }}</flux:text>
+                                <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('GatewayHub Platform Fee') }}</flux:text>
                                 <flux:text class="mt-1 block">-{{ number_format($payment->platform_fee, 2) }} {{ $payment->currency }}</flux:text>
                             </div>
                             <div>
-                                <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Net amount') }}</flux:text>
+                                <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Net After GatewayHub Fee') }}</flux:text>
                                 <flux:text class="mt-1 block">{{ number_format($payment->net_amount, 2) }} {{ $payment->currency }}</flux:text>
                             </div>
                         @endif
@@ -238,4 +238,3 @@
         });
     </script>
 </x-layouts::app>
-

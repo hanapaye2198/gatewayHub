@@ -36,8 +36,7 @@ class PaymentFactory extends Factory
         return $this->state(function (array $attributes) {
             $amount = (float) ($attributes['amount'] ?? 100);
             $percentage = config('platform.fees.percentage', 1.5);
-            $fixed = config('platform.fees.fixed', 5);
-            $fee = round(($amount * $percentage / 100) + $fixed, 2);
+            $fee = round($amount * $percentage / 100, 2);
             $net = round($amount - $fee, 2);
 
             return [
