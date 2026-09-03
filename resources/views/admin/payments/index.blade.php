@@ -134,7 +134,7 @@
                     </a>
                     <a href="{{ route('admin.payments.export', $exportFilters) }}" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
                         <flux:icon name="arrow-down-tray" class="size-4" />
-                        Export CSV
+                        {{ ! empty($exportFilters['merchant_id']) ? 'Download Excel' : 'Download Excel ZIP' }}
                     </a>
                 </div>
             </form>

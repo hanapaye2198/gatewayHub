@@ -9,13 +9,21 @@ use App\Models\Gateway;
 use App\Models\Merchant;
 use App\Models\Payment;
 use App\Models\PlatformFee;
-use DateTimeInterface;
+use App\Services\Exports\MerchantPaymentsExcelExporter;
+use App\Services\Exports\MerchantPaymentsZipExporter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PaymentsController extends Controller
 {
+    public function __construct(
+        private MerchantPaymentsExcelExporter $excelExporter,
+        private MerchantPaymentsZipExporter $zipExporter,
+    ) {}
+
     public function index(FilterAdminPaymentsRequest $request): View
     {
         $filters = $request->validated();
@@ -76,49 +84,46 @@ class PaymentsController extends Controller
     {
         $filters = $request->validated();
 
-        $fileName = 'admin-payments-'.now()->format('Ymd-His').'.csv';
         $payments = $this->buildFilteredPaymentsQuery($filters)
-            ->with(['merchant:id,name', 'gateway:code,name', 'platformFee:id,payment_id,fee_amount,net_amount'])
+            ->with(['gateway:code,name', 'platformFee:id,payment_id,fee_amount,net_amount'])
             ->latest('created_at')
-            ->get();
+            ->get()
+            ->groupBy('merchant_id');
 
-        return response()->streamDownload(function () use ($payments): void {
-            $handle = fopen('php://output', 'w');
-            if ($handle === false) {
-                return;
-            }
+        $merchants = Merchant::query()
+            ->when(isset($filters['merchant_id']), static function (Builder $query) use ($filters): void {
+                $query->where('id', (int) $filters['merchant_id']);
+            })
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
-            fputcsv($handle, [
-                'Created At',
-                'Reference',
-                'Provider Reference',
-                'Merchant',
-                'Gateway',
-                'Gross Amount',
-                'Currency',
-                'GatewayHub Platform Fee',
-                'Net After GatewayHub Fee',
-                'Status',
+        if (isset($filters['merchant_id'])) {
+            $merchant = $merchants->firstOrFail();
+            $workbook = $this->excelExporter->generate($payments->get($merchant->id, new EloquentCollection));
+            $fileName = $this->merchantFileName((string) $merchant->name, (int) $merchant->id);
+
+            return response()->streamDownload(function () use ($workbook): void {
+                echo $workbook;
+            }, $fileName, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             ]);
+        }
 
-            foreach ($payments as $payment) {
-                fputcsv($handle, [
-                    $this->formatCsvDate($payment->created_at),
-                    $payment->reference_id,
-                    $payment->provider_reference ?? '',
-                    $payment->merchant?->name ?? '',
-                    $payment->gateway?->name ?? $payment->gateway_code,
-                    number_format((float) $payment->amount, 2, '.', ''),
-                    $payment->currency,
-                    $payment->platformFee !== null ? number_format((float) $payment->platformFee->fee_amount, 2, '.', '') : '',
-                    $payment->platformFee !== null ? number_format((float) $payment->platformFee->net_amount, 2, '.', '') : '',
-                    $payment->status,
-                ]);
-            }
+        $merchantFiles = [];
+        foreach ($merchants as $merchant) {
+            $merchantFiles[(int) $merchant->id] = [
+                'name' => (string) $merchant->name,
+                'payments' => $payments->get($merchant->id, new EloquentCollection),
+            ];
+        }
 
-            fclose($handle);
+        $archive = $this->zipExporter->generate($merchantFiles);
+        $fileName = 'merchant-payments-'.now()->format('Ymd-His').'.zip';
+
+        return response()->streamDownload(function () use ($archive): void {
+            echo $archive;
         }, $fileName, [
-            'Content-Type' => 'text/csv',
+            'Content-Type' => 'application/zip',
         ]);
     }
 
@@ -154,8 +159,10 @@ class PaymentsController extends Controller
             });
     }
 
-    private function formatCsvDate(?DateTimeInterface $date): string
+    private function merchantFileName(string $merchantName, int $merchantId): string
     {
-        return $date?->format('Y-m-d H:i:s') ?? '';
+        $slug = Str::slug($merchantName);
+
+        return 'merchant-'.($slug === '' ? 'transactions' : $slug).'-'.$merchantId.'-transactions.xlsx';
     }
 }

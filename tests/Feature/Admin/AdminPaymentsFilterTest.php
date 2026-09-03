@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
+use ZipArchive;
 
 class AdminPaymentsFilterTest extends TestCase
 {
@@ -39,6 +40,7 @@ class AdminPaymentsFilterTest extends TestCase
         $response->assertOk();
         $response->assertSee('FILTER-MERCHANT-A');
         $response->assertDontSee('FILTER-MERCHANT-B');
+        $response->assertSee('Download Excel');
     }
 
     public function test_admin_can_filter_payments_by_gateway_and_status(): void
@@ -187,7 +189,7 @@ class AdminPaymentsFilterTest extends TestCase
         });
     }
 
-    public function test_admin_can_export_filtered_payments_to_csv(): void
+    public function test_admin_can_download_selected_merchant_payments_as_excel(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $merchant = User::factory()->create(['name' => 'CSV Merchant']);
@@ -206,6 +208,8 @@ class AdminPaymentsFilterTest extends TestCase
             'gateway_code' => 'coins',
             'status' => 'paid',
             'amount' => 321.25,
+            'platform_fee' => 4.82,
+            'net_amount' => 316.43,
             'created_at' => Carbon::parse('2026-02-10 09:00:00'),
             'updated_at' => Carbon::parse('2026-02-10 09:00:00'),
         ]);
@@ -230,39 +234,85 @@ class AdminPaymentsFilterTest extends TestCase
         ]));
 
         $response->assertOk();
-        $this->assertStringContainsString('text/csv', (string) $response->headers->get('content-type'));
-        $this->assertStringContainsString('admin-payments-', (string) $response->headers->get('content-disposition'));
+        $this->assertStringContainsString(
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            (string) $response->headers->get('content-type')
+        );
+        $this->assertStringContainsString('.xlsx', (string) $response->headers->get('content-disposition'));
 
-        $csv = $response->streamedContent();
+        $worksheet = $this->readZipEntry($response->streamedContent(), 'xl/worksheets/sheet1.xml');
 
-        $rows = array_values(array_filter(
-            preg_split('/\r\n|\r|\n/', trim($csv)) ?: [],
-            static fn (string $line): bool => $line !== ''
-        ));
+        $this->assertStringContainsString('CSV-PAID-001', $worksheet);
+        $this->assertStringContainsString('321.25', $worksheet);
+        $this->assertStringContainsString('4.82', $worksheet);
+        $this->assertStringContainsString('316.43', $worksheet);
+        $this->assertStringNotContainsString('CSV-PENDING-002', $worksheet);
+    }
 
-        $this->assertCount(2, $rows);
+    public function test_admin_can_download_all_merchants_as_separate_excel_workbooks_in_a_zip(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $merchantA = User::factory()->create(['name' => 'Merchant Alpha']);
+        $merchantB = User::factory()->create(['name' => 'Merchant Beta']);
 
-        $header = str_getcsv($rows[0]);
-        $this->assertSame([
-            'Created At',
-            'Reference',
-            'Provider Reference',
-            'Merchant',
-            'Gateway',
-            'Gross Amount',
-            'Currency',
-            'GatewayHub Platform Fee',
-            'Net After GatewayHub Fee',
-            'Status',
-        ], $header);
+        Payment::factory()->create([
+            'merchant_id' => $merchantA->id,
+            'reference_id' => 'ALL-MERCHANTS-ALPHA',
+            'status' => 'paid',
+            'amount' => 100,
+            'platform_fee' => 1.50,
+            'net_amount' => 98.50,
+        ]);
+        Payment::factory()->create([
+            'merchant_id' => $merchantB->id,
+            'reference_id' => 'ALL-MERCHANTS-BETA',
+            'status' => 'paid',
+            'amount' => 200,
+            'platform_fee' => 3.00,
+            'net_amount' => 197.00,
+        ]);
 
-        $data = str_getcsv($rows[1]);
-        $this->assertSame('2026-02-10 09:00:00', $data[0] ?? null);
-        $this->assertSame('CSV-PAID-001', $data[1] ?? null);
-        $this->assertSame('CSV Merchant', $data[3] ?? null);
-        $this->assertSame('321.25', $data[5] ?? null);
-        $this->assertSame('paid', $data[9] ?? null);
+        $response = $this->actingAs($admin)->get(route('admin.payments.export'));
 
-        $this->assertStringNotContainsString('CSV-PENDING-002', $csv);
+        $response->assertOk();
+        $this->assertSame('application/zip', $response->headers->get('content-type'));
+        $this->assertStringContainsString('.zip', (string) $response->headers->get('content-disposition'));
+
+        $archive = $response->streamedContent();
+        $alphaPath = 'merchants/merchant-alpha-'.$merchantA->id.'/transactions.xlsx';
+        $betaPath = 'merchants/merchant-beta-'.$merchantB->id.'/transactions.xlsx';
+
+        $alphaWorkbook = $this->readZipEntry($archive, $alphaPath);
+        $betaWorkbook = $this->readZipEntry($archive, $betaPath);
+        $alphaWorksheet = $this->readZipEntry($alphaWorkbook, 'xl/worksheets/sheet1.xml');
+        $betaWorksheet = $this->readZipEntry($betaWorkbook, 'xl/worksheets/sheet1.xml');
+
+        $this->assertStringContainsString('ALL-MERCHANTS-ALPHA', $alphaWorksheet);
+        $this->assertStringNotContainsString('ALL-MERCHANTS-BETA', $alphaWorksheet);
+        $this->assertStringContainsString('ALL-MERCHANTS-BETA', $betaWorksheet);
+        $this->assertStringNotContainsString('ALL-MERCHANTS-ALPHA', $betaWorksheet);
+    }
+
+    private function readZipEntry(string $archiveContent, string $entry): string
+    {
+        $temporaryPath = tempnam(sys_get_temp_dir(), 'gatewayhub-test-archive-');
+        $this->assertNotFalse($temporaryPath);
+
+        try {
+            $this->assertNotFalse(file_put_contents($temporaryPath, $archiveContent));
+
+            $archive = new ZipArchive;
+            $this->assertTrue($archive->open($temporaryPath) === true);
+            $contents = $archive->getFromName($entry);
+            $archive->close();
+
+            $this->assertIsString($contents);
+
+            return $contents;
+        } finally {
+            if (is_file($temporaryPath)) {
+                unlink($temporaryPath);
+            }
+        }
     }
 }
