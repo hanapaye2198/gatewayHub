@@ -15,7 +15,7 @@ final class MerchantPaymentsZipExporter
     /**
      * @param  array<int, array{name: string, payments: Collection<int, Payment>}>  $merchantFiles
      */
-    public function generate(array $merchantFiles): string
+    public function generate(array $merchantFiles, bool $includeCoinsProviderFees = false): string
     {
         $temporaryPath = tempnam(sys_get_temp_dir(), 'gatewayhub-merchant-payments-');
         if ($temporaryPath === false) {
@@ -36,7 +36,7 @@ final class MerchantPaymentsZipExporter
 
                 foreach ($merchantFiles as $merchantId => $merchantFile) {
                     $path = 'merchants/'.$this->folderName($merchantFile['name'], $merchantId).'/transactions.xlsx';
-                    $workbook = $this->excelExporter->generate($merchantFile['payments']);
+                    $workbook = $this->excelExporter->generate($merchantFile['payments'], $includeCoinsProviderFees);
 
                     if ($archive->addFromString($path, $workbook) === false) {
                         throw new RuntimeException('Unable to add a merchant workbook to the archive.');

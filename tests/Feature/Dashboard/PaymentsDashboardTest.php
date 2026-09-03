@@ -397,6 +397,11 @@ class PaymentsDashboardTest extends TestCase
             'amount' => 200,
             'platform_fee' => 3.00,
             'net_amount' => 197.00,
+            'raw_response' => [
+                'platform_fee' => 5.00,
+                'conv_fee' => 20,
+                'bill_amount' => 175,
+            ],
             'created_at' => Carbon::parse('2026-02-14 10:00:00'),
             'updated_at' => Carbon::parse('2026-02-14 10:00:00'),
         ]);
@@ -441,6 +446,10 @@ class PaymentsDashboardTest extends TestCase
         $this->assertStringContainsString('Created At', $worksheet);
         $this->assertStringContainsString('GatewayHub Platform Fee (%)', $worksheet);
         $this->assertStringContainsString('Net After GatewayHub Fee', $worksheet);
+        $this->assertStringNotContainsString('Coins.ph Provider Fee', $worksheet);
+        $this->assertStringNotContainsString('Coins.ph Total Deduction', $worksheet);
+        $this->assertStringNotContainsString('5.00', $worksheet);
+        $this->assertStringNotContainsString('20.00', $worksheet);
         $this->assertStringContainsString('M-EXPORT-PAID-001', $worksheet);
         $this->assertStringContainsString('200.00', $worksheet);
         $this->assertStringContainsString('1.50', $worksheet);

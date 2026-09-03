@@ -107,6 +107,7 @@ class PaymentStatusTest extends TestCase
             'raw_response' => [
                 'platform_fee' => 69.09,
                 'conv_fee' => 20,
+                'bill_amount' => 2763.44,
             ],
         ]);
 
@@ -136,6 +137,7 @@ class PaymentStatusTest extends TestCase
         $this->assertIsArray($data);
         $this->assertArrayNotHasKey('platform_fee', $data);
         $this->assertArrayNotHasKey('conv_fee', $data);
+        $this->assertArrayNotHasKey('bill_amount', $data);
     }
 
     public function test_status_reconciles_pending_coins_payment_from_provider_status(): void
