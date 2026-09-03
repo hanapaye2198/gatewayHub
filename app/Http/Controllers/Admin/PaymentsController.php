@@ -99,10 +99,7 @@ class PaymentsController extends Controller
 
         if (isset($filters['merchant_id'])) {
             $merchant = $merchants->firstOrFail();
-            $workbook = $this->excelExporter->generate(
-                $payments->get($merchant->id, new EloquentCollection),
-                includeCoinsProviderFees: true,
-            );
+            $workbook = $this->excelExporter->generate($payments->get($merchant->id, new EloquentCollection));
             $fileName = $this->merchantFileName((string) $merchant->name, (int) $merchant->id);
 
             return response()->streamDownload(function () use ($workbook): void {
@@ -120,7 +117,7 @@ class PaymentsController extends Controller
             ];
         }
 
-        $archive = $this->zipExporter->generate($merchantFiles, includeCoinsProviderFees: true);
+        $archive = $this->zipExporter->generate($merchantFiles);
         $fileName = 'merchant-payments-'.now()->format('Ymd-His').'.zip';
 
         return response()->streamDownload(function () use ($archive): void {

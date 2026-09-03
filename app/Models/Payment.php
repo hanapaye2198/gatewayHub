@@ -15,13 +15,6 @@ use Illuminate\Support\Str;
  */
 class Payment extends Model
 {
-    /**
-     * Payment options that use Coins.ph for provider processing.
-     *
-     * @var list<string>
-     */
-    private const COINS_PROVIDER_GATEWAYS = ['coins', 'gcash', 'maya', 'qrph'];
-
     /** @use HasFactory<\Database\Factories\PaymentFactory> */
     use HasFactory;
 
@@ -98,77 +91,6 @@ class Payment extends Model
                 ? (float) $ledger->net_amount
                 : ($this->net_amount !== null ? (float) $this->net_amount : null),
         ];
-    }
-
-    /**
-     * Return Coins.ph provider-reported deductions for the admin reconciliation view.
-     * These values remain excluded from merchant API and webhook payloads.
-     *
-     * @return array{coins_provider_fee: float|null, coins_conversion_fee: float|null, coins_total_deduction: float|null, coins_bill_amount: float|null}
-     */
-    public function coinsProviderFeeData(): array
-    {
-        $empty = [
-            'coins_provider_fee' => null,
-            'coins_conversion_fee' => null,
-            'coins_total_deduction' => null,
-            'coins_bill_amount' => null,
-        ];
-
-        if (! in_array((string) $this->gateway_code, self::COINS_PROVIDER_GATEWAYS, true)) {
-            return $empty;
-        }
-
-        $raw = $this->raw_response;
-        if (! is_array($raw)) {
-            return $empty;
-        }
-
-        $sources = [$raw];
-        if (is_array($raw['data'] ?? null)) {
-            $sources[] = $raw['data'];
-        }
-
-        $providerFee = $this->firstNumericValue($sources, ['platform_fee', 'platformFee']);
-        $conversionFee = $this->firstNumericValue($sources, ['conv_fee', 'convFee', 'conversion_fee', 'conversionFee']);
-        $billAmount = $this->firstNumericValue($sources, ['bill_amount', 'billAmount']);
-
-        $totalDeduction = null;
-        if ($billAmount !== null && $this->amount !== null) {
-            $totalDeduction = round((float) $this->amount - $billAmount, 2);
-        } elseif ($providerFee !== null || $conversionFee !== null) {
-            $totalDeduction = round(($providerFee ?? 0) + ($conversionFee ?? 0), 2);
-        }
-
-        return [
-            'coins_provider_fee' => $providerFee,
-            'coins_conversion_fee' => $conversionFee,
-            'coins_total_deduction' => $totalDeduction,
-            'coins_bill_amount' => $billAmount,
-        ];
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $sources
-     * @param  list<string>  $keys
-     */
-    private function firstNumericValue(array $sources, array $keys): ?float
-    {
-        foreach ($sources as $source) {
-            foreach ($keys as $key) {
-                $value = $source[$key] ?? null;
-
-                if (is_int($value) || is_float($value)) {
-                    return (float) $value;
-                }
-
-                if (is_string($value) && is_numeric(trim($value))) {
-                    return (float) trim($value);
-                }
-            }
-        }
-
-        return null;
     }
 
     /**

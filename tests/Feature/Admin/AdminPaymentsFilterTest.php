@@ -4,7 +4,6 @@ namespace Tests\Feature\Admin;
 
 use App\Models\Gateway;
 use App\Models\Payment;
-use App\Models\PlatformFee;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -190,53 +189,6 @@ class AdminPaymentsFilterTest extends TestCase
         });
     }
 
-    public function test_admin_transaction_log_displays_coins_provider_deductions_separately(): void
-    {
-        $admin = User::factory()->create(['role' => 'admin']);
-        $merchant = User::factory()->create();
-
-        $payment = Payment::factory()->create([
-            'merchant_id' => $merchant->id,
-            'gateway_code' => 'coins',
-            'status' => 'paid',
-            'amount' => 2852.53,
-            'platform_fee' => 42.79,
-            'net_amount' => 2809.74,
-            'raw_response' => [
-                'platform_fee' => 69.09,
-                'conv_fee' => 20,
-                'bill_amount' => 2763.44,
-            ],
-        ]);
-
-        PlatformFee::query()->create([
-            'payment_id' => $payment->id,
-            'merchant_id' => $merchant->id,
-            'gateway_code' => 'coins',
-            'gross_amount' => 2852.53,
-            'fee_rate' => 0.015,
-            'fee_amount' => 42.79,
-            'net_amount' => 2809.74,
-            'status' => 'posted',
-        ]);
-
-        $response = $this->actingAs($admin)->get(route('admin.payments.index'));
-
-        $response->assertOk();
-        $response->assertSee('GatewayHub Fee (1.5%)');
-        $response->assertSee('Coins.ph Provider Fee');
-        $response->assertSee('Coins.ph Conversion Fee');
-        $response->assertSee('Coins.ph Total Deduction');
-        $response->assertSee('Coins.ph Bill Amount');
-        $response->assertSee('GatewayHub Net Before Coins.ph Fees');
-        $response->assertSee('Net After Recorded Fees');
-        $response->assertSee('69.09');
-        $response->assertSee('20.00');
-        $response->assertSee('89.09');
-        $response->assertSee('2,763.44');
-        $response->assertSee('2,720.65');
-    }
-
     public function test_admin_can_download_selected_merchant_payments_as_excel(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -258,11 +210,6 @@ class AdminPaymentsFilterTest extends TestCase
             'amount' => 321.25,
             'platform_fee' => 4.82,
             'net_amount' => 316.43,
-            'raw_response' => [
-                'platform_fee' => 8.03,
-                'conv_fee' => 20,
-                'bill_amount' => 293.22,
-            ],
             'created_at' => Carbon::parse('2026-02-10 09:00:00'),
             'updated_at' => Carbon::parse('2026-02-10 09:00:00'),
         ]);
@@ -298,18 +245,7 @@ class AdminPaymentsFilterTest extends TestCase
         $this->assertStringContainsString('CSV-PAID-001', $worksheet);
         $this->assertStringContainsString('321.25', $worksheet);
         $this->assertStringContainsString('4.82', $worksheet);
-        $this->assertStringContainsString('Coins.ph Provider Fee', $worksheet);
-        $this->assertStringContainsString('Coins.ph Conversion Fee', $worksheet);
-        $this->assertStringContainsString('Coins.ph Total Deduction', $worksheet);
-        $this->assertStringContainsString('Coins.ph Bill Amount', $worksheet);
-        $this->assertStringContainsString('GatewayHub Net Before Coins.ph Fees', $worksheet);
-        $this->assertStringContainsString('Net After Recorded Fees', $worksheet);
-        $this->assertStringContainsString('8.03', $worksheet);
-        $this->assertStringContainsString('20.00', $worksheet);
-        $this->assertStringContainsString('28.03', $worksheet);
-        $this->assertStringContainsString('293.22', $worksheet);
         $this->assertStringContainsString('316.43', $worksheet);
-        $this->assertStringContainsString('288.40', $worksheet);
         $this->assertStringNotContainsString('CSV-PENDING-002', $worksheet);
     }
 
@@ -326,11 +262,6 @@ class AdminPaymentsFilterTest extends TestCase
             'amount' => 100,
             'platform_fee' => 1.50,
             'net_amount' => 98.50,
-            'raw_response' => [
-                'platform_fee' => 1.50,
-                'conv_fee' => 8.50,
-                'bill_amount' => 90,
-            ],
         ]);
         Payment::factory()->create([
             'merchant_id' => $merchantB->id,
@@ -357,9 +288,6 @@ class AdminPaymentsFilterTest extends TestCase
         $betaWorksheet = $this->readZipEntry($betaWorkbook, 'xl/worksheets/sheet1.xml');
 
         $this->assertStringContainsString('ALL-MERCHANTS-ALPHA', $alphaWorksheet);
-        $this->assertStringContainsString('Coins.ph Total Deduction', $alphaWorksheet);
-        $this->assertStringContainsString('10.00', $alphaWorksheet);
-        $this->assertStringContainsString('90.00', $alphaWorksheet);
         $this->assertStringNotContainsString('ALL-MERCHANTS-BETA', $alphaWorksheet);
         $this->assertStringContainsString('ALL-MERCHANTS-BETA', $betaWorksheet);
         $this->assertStringNotContainsString('ALL-MERCHANTS-ALPHA', $betaWorksheet);

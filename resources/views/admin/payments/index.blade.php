@@ -163,32 +163,23 @@
                 </span>
             @endif
         </div>
-        <div class="border-b border-zinc-100 bg-zinc-50/50 px-7 py-3 text-xs text-zinc-500 dark:border-zinc-700/60 dark:bg-zinc-900/20 dark:text-zinc-400">
-            GatewayHub charges 1.5% separately. Coins.ph amounts are provider-reported and are shown only when available.
-        </div>
 
         <div class="overflow-x-auto">
-            <table class="w-full min-w-[1450px]">
+            <table class="w-full min-w-[900px]">
                 <thead>
                     <tr class="border-b border-zinc-100 bg-zinc-50/70 dark:border-zinc-700/60 dark:bg-zinc-900/30">
                         <th class="px-7 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Reference</th>
                         <th class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Merchant</th>
                         <th class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Gateway</th>
                         <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Gross Amount</th>
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">GatewayHub Fee (1.5%)</th>
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Coins.ph Provider Fee</th>
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Coins.ph Conversion Fee</th>
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Coins.ph Total Deduction</th>
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Coins.ph Bill Amount</th>
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">GatewayHub Net Before Coins.ph Fees</th>
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Net After Recorded Fees</th>
+                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">GatewayHub Fee</th>
+                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Net After GatewayHub Fee</th>
                         <th class="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Status</th>
                         <th class="px-7 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Created</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-zinc-100 dark:divide-zinc-700/60">
                     @forelse ($payments as $payment)
-                        @php($coinsFeeData = $payment->coinsProviderFeeData())
                         <tr class="transition-colors duration-100 hover:bg-zinc-50/80 dark:hover:bg-zinc-700/25">
                             <td class="px-7 py-4">
                                 <code class="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs font-mono font-medium text-zinc-600 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">{{ $payment->reference_id }}</code>
@@ -217,51 +208,11 @@
                                 @endif
                             </td>
                             <td class="px-5 py-4 text-right">
-                                @if ($coinsFeeData['coins_provider_fee'] !== null)
-                                    <span class="font-mono text-sm tabular-nums text-zinc-700 dark:text-zinc-300">{{ number_format($coinsFeeData['coins_provider_fee'], 2) }}</span>
-                                    <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
-                                @else
-                                    <span class="text-xs text-zinc-400 dark:text-zinc-500">Not reported</span>
-                                @endif
-                            </td>
-                            <td class="px-5 py-4 text-right">
-                                @if ($coinsFeeData['coins_conversion_fee'] !== null)
-                                    <span class="font-mono text-sm tabular-nums text-zinc-700 dark:text-zinc-300">{{ number_format($coinsFeeData['coins_conversion_fee'], 2) }}</span>
-                                    <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
-                                @else
-                                    <span class="text-xs text-zinc-400 dark:text-zinc-500">Not reported</span>
-                                @endif
-                            </td>
-                            <td class="px-5 py-4 text-right">
-                                @if ($coinsFeeData['coins_total_deduction'] !== null)
-                                    <span class="font-mono text-sm font-semibold tabular-nums text-amber-700 dark:text-amber-400">{{ number_format($coinsFeeData['coins_total_deduction'], 2) }}</span>
-                                    <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
-                                @else
-                                    <span class="text-xs text-zinc-400 dark:text-zinc-500">Not reported</span>
-                                @endif
-                            </td>
-                            <td class="px-5 py-4 text-right">
-                                @if ($coinsFeeData['coins_bill_amount'] !== null)
-                                    <span class="font-mono text-sm tabular-nums text-zinc-700 dark:text-zinc-300">{{ number_format($coinsFeeData['coins_bill_amount'], 2) }}</span>
-                                    <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
-                                @else
-                                    <span class="text-xs text-zinc-400 dark:text-zinc-500">Not reported</span>
-                                @endif
-                            </td>
-                            <td class="px-5 py-4 text-right">
                                 @if ($payment->platformFee)
                                     <span class="font-mono text-sm font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">{{ number_format($payment->platformFee->net_amount, 2) }}</span>
                                     <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
                                 @else
                                     <span class="text-sm text-zinc-400 dark:text-zinc-500">—</span>
-                                @endif
-                            </td>
-                            <td class="px-5 py-4 text-right">
-                                @if ($payment->platformFee && $coinsFeeData['coins_total_deduction'] !== null)
-                                    <span class="font-mono text-sm font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">{{ number_format((float) $payment->platformFee->net_amount - $coinsFeeData['coins_total_deduction'], 2) }}</span>
-                                    <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
-                                @else
-                                    <span class="text-xs text-zinc-400 dark:text-zinc-500">Not reported</span>
                                 @endif
                             </td>
                             <td class="px-5 py-4 text-center">
@@ -274,7 +225,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="13" class="px-7 py-16 text-center">
+                            <td colspan="8" class="px-7 py-16 text-center">
                                 <div class="flex flex-col items-center gap-3">
                                     <div class="flex size-14 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-700/50">
                                         <flux:icon name="banknotes" class="size-7 text-zinc-400" />

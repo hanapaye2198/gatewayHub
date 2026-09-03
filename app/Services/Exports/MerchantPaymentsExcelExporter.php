@@ -27,21 +27,9 @@ final class MerchantPaymentsExcelExporter
     ];
 
     /**
-     * @var list<string>
-     */
-    private const ADMIN_COINS_HEADERS = [
-        'Coins.ph Provider Fee',
-        'Coins.ph Conversion Fee',
-        'Coins.ph Total Deduction',
-        'Coins.ph Bill Amount',
-        'GatewayHub Net Before Coins.ph Fees',
-        'Net After Recorded Fees',
-    ];
-
-    /**
      * @param  Collection<int, Payment>  $payments
      */
-    public function generate(Collection $payments, bool $includeCoinsProviderFees = false): string
+    public function generate(Collection $payments): string
     {
         $temporaryPath = tempnam(sys_get_temp_dir(), 'gatewayhub-payments-');
         if ($temporaryPath === false) {
@@ -56,7 +44,7 @@ final class MerchantPaymentsExcelExporter
             }
 
             try {
-                foreach ($this->workbookFiles($payments, $includeCoinsProviderFees) as $fileName => $contents) {
+                foreach ($this->workbookFiles($payments) as $fileName => $contents) {
                     if ($archive->addFromString($fileName, $contents) === false) {
                         throw new RuntimeException('Unable to add a file to the Excel workbook.');
                     }
@@ -82,7 +70,7 @@ final class MerchantPaymentsExcelExporter
      * @param  Collection<int, Payment>  $payments
      * @return array<string, string>
      */
-    private function workbookFiles(Collection $payments, bool $includeCoinsProviderFees): array
+    private function workbookFiles(Collection $payments): array
     {
         return [
             '[Content_Types].xml' => $this->contentTypesXml(),
@@ -90,7 +78,7 @@ final class MerchantPaymentsExcelExporter
             'xl/workbook.xml' => $this->workbookXml(),
             'xl/_rels/workbook.xml.rels' => $this->workbookRelationshipsXml(),
             'xl/styles.xml' => $this->stylesXml(),
-            'xl/worksheets/sheet1.xml' => $this->worksheetXml($payments, $includeCoinsProviderFees),
+            'xl/worksheets/sheet1.xml' => $this->worksheetXml($payments),
         ];
     }
 
@@ -182,15 +170,14 @@ XML;
     /**
      * @param  Collection<int, Payment>  $payments
      */
-    private function worksheetXml(Collection $payments, bool $includeCoinsProviderFees): string
+    private function worksheetXml(Collection $payments): string
     {
-        $rows = [$this->headerRow($includeCoinsProviderFees)];
+        $rows = [$this->headerRow()];
         foreach ($payments as $payment) {
-            $rows[] = $this->paymentRow($payment, $includeCoinsProviderFees);
+            $rows[] = $this->paymentRow($payment);
         }
 
         $lastRow = count($rows);
-        $lastColumn = $this->columnName(count($this->headers($includeCoinsProviderFees)));
         $xmlRows = [];
         foreach ($rows as $rowIndex => $row) {
             $excelRow = $rowIndex + 1;
@@ -214,73 +201,40 @@ XML;
 
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-            .'<dimension ref="A1:'.$lastColumn.$lastRow.'"/>'
+            .'<dimension ref="A1:J'.$lastRow.'"/>'
             .'<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView></sheetViews>'
             .'<sheetFormatPr defaultRowHeight="15"/>'
-            .$this->columnWidthsXml($includeCoinsProviderFees)
-            .'<sheetData>'.implode('', $xmlRows).'</sheetData>'
-            .'<autoFilter ref="A1:'.$lastColumn.$lastRow.'"/>'
-            .'<pageMargins left="0.25" right="0.25" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>'
-            .'</worksheet>';
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function headers(bool $includeCoinsProviderFees): array
-    {
-        if (! $includeCoinsProviderFees) {
-            return self::HEADERS;
-        }
-
-        return array_merge(
-            array_slice(self::HEADERS, 0, 8),
-            self::ADMIN_COINS_HEADERS,
-            ['Status'],
-        );
-    }
-
-    private function columnWidthsXml(bool $includeCoinsProviderFees): string
-    {
-        if (! $includeCoinsProviderFees) {
-            return '<cols>'
-                .'<col min="1" max="1" width="21" customWidth="1"/>'
-                .'<col min="2" max="3" width="28" customWidth="1"/>'
-                .'<col min="4" max="4" width="18" customWidth="1"/>'
-                .'<col min="5" max="5" width="15" customWidth="1"/>'
-                .'<col min="6" max="6" width="10" customWidth="1"/>'
-                .'<col min="7" max="9" width="23" customWidth="1"/>'
-                .'<col min="10" max="10" width="16" customWidth="1"/>'
-                .'</cols>';
-        }
-
-        return '<cols>'
+            .'<cols>'
             .'<col min="1" max="1" width="21" customWidth="1"/>'
             .'<col min="2" max="3" width="28" customWidth="1"/>'
             .'<col min="4" max="4" width="18" customWidth="1"/>'
             .'<col min="5" max="5" width="15" customWidth="1"/>'
             .'<col min="6" max="6" width="10" customWidth="1"/>'
-            .'<col min="7" max="14" width="25" customWidth="1"/>'
-            .'<col min="15" max="15" width="16" customWidth="1"/>'
-            .'</cols>';
+            .'<col min="7" max="9" width="23" customWidth="1"/>'
+            .'<col min="10" max="10" width="16" customWidth="1"/>'
+            .'</cols>'
+            .'<sheetData>'.implode('', $xmlRows).'</sheetData>'
+            .'<autoFilter ref="A1:J'.$lastRow.'"/>'
+            .'<pageMargins left="0.25" right="0.25" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>'
+            .'</worksheet>';
     }
 
     /**
      * @return list<array{value: string, type: 'inlineStr'|'n'}>
      */
-    private function headerRow(bool $includeCoinsProviderFees): array
+    private function headerRow(): array
     {
-        return array_map(fn (string $header): array => $this->textCell($header), $this->headers($includeCoinsProviderFees));
+        return array_map(fn (string $header): array => $this->textCell($header), self::HEADERS);
     }
 
     /**
      * @return list<array{value: string, type: 'inlineStr'|'n'}>
      */
-    private function paymentRow(Payment $payment, bool $includeCoinsProviderFees): array
+    private function paymentRow(Payment $payment): array
     {
         $feeData = $payment->gatewayHubFeeData();
 
-        $row = [
+        return [
             $this->textCell($this->formatDate($payment->created_at)),
             $this->textCell($payment->reference_id),
             $this->textCell($payment->provider_reference),
@@ -289,30 +243,9 @@ XML;
             $this->textCell($payment->currency),
             $this->numberCell($feeData['gatewayhub_platform_fee_percent']),
             $this->nullableNumberCell($feeData['gatewayhub_platform_fee']),
-        ];
-
-        if ($includeCoinsProviderFees) {
-            $coinsFeeData = $payment->coinsProviderFeeData();
-            $gatewayHubNet = $feeData['gatewayhub_net_amount'];
-            $netAfterRecordedFees = $gatewayHubNet !== null && $coinsFeeData['coins_total_deduction'] !== null
-                ? round($gatewayHubNet - $coinsFeeData['coins_total_deduction'], 2)
-                : null;
-
-            return array_merge($row, [
-                $this->nullableNumberCell($coinsFeeData['coins_provider_fee']),
-                $this->nullableNumberCell($coinsFeeData['coins_conversion_fee']),
-                $this->nullableNumberCell($coinsFeeData['coins_total_deduction']),
-                $this->nullableNumberCell($coinsFeeData['coins_bill_amount']),
-                $this->nullableNumberCell($gatewayHubNet),
-                $this->nullableNumberCell($netAfterRecordedFees),
-                $this->textCell($payment->status),
-            ]);
-        }
-
-        return array_merge($row, [
             $this->nullableNumberCell($feeData['gatewayhub_net_amount']),
             $this->textCell($payment->status),
-        ]);
+        ];
     }
 
     /**
