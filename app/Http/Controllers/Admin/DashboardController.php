@@ -6,11 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\FilterAdminDashboardRequest;
 use App\Models\Merchant;
 use App\Models\Payment;
+use App\Support\ServerStorageMetrics;
 use Illuminate\Contracts\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(FilterAdminDashboardRequest $request): View
+    public function __invoke(FilterAdminDashboardRequest $request, ServerStorageMetrics $serverStorageMetrics): View
     {
         $validated = $request->validated();
         $selectedClientId = isset($validated['client_id']) ? (int) $validated['client_id'] : null;
@@ -40,6 +41,7 @@ class DashboardController extends Controller
         $selectedClientName = $selectedClientId === null
             ? null
             : $clients->firstWhere('id', $selectedClientId)?->name;
+        $vpsStorage = $serverStorageMetrics->forPath(base_path());
 
         return view('admin.dashboard', [
             'title' => 'Dashboard',
@@ -48,6 +50,7 @@ class DashboardController extends Controller
             'selectedClientId' => $selectedClientId,
             'selectedClientName' => $selectedClientName,
             'clientRows' => $clientRows,
+            'vpsStorage' => $vpsStorage,
         ]);
     }
 }

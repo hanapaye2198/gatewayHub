@@ -52,7 +52,7 @@
     @endif
 
     {{-- Stats Grid --}}
-    <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
+    <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
         {{-- Total Collections Card --}}
         <div class="group relative overflow-hidden rounded-xl border border-zinc-200 bg-white p-6 transition-all hover:shadow-lg hover:shadow-emerald-500/5 dark:border-zinc-700 dark:bg-zinc-800">
             <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-emerald-500/10 transition-transform group-hover:scale-150"></div>
@@ -100,6 +100,69 @@
                     PHP {{ count($clientRows) > 0 ? number_format($totalCollections / count($clientRows), 2) : '0.00' }}
                 </p>
                 <p class="mt-2 text-xs text-zinc-400">Average per client</p>
+            </div>
+        </div>
+
+        {{-- VPS Storage Card --}}
+        <div @class([
+            'group relative overflow-hidden rounded-xl border bg-white p-6 transition-all hover:shadow-lg dark:bg-zinc-800',
+            'border-emerald-200 hover:shadow-emerald-500/5 dark:border-emerald-800/60' => $vpsStorage['status'] === 'healthy',
+            'border-amber-200 hover:shadow-amber-500/5 dark:border-amber-800/60' => $vpsStorage['status'] === 'warning',
+            'border-red-200 hover:shadow-red-500/5 dark:border-red-800/60' => $vpsStorage['status'] === 'critical',
+        ])>
+            <div @class([
+                'absolute -right-6 -top-6 h-24 w-24 rounded-full transition-transform group-hover:scale-150',
+                'bg-emerald-500/10' => $vpsStorage['status'] === 'healthy',
+                'bg-amber-500/10' => $vpsStorage['status'] === 'warning',
+                'bg-red-500/10' => $vpsStorage['status'] === 'critical',
+            ])></div>
+            <div class="relative">
+                <div class="flex items-center justify-between">
+                    <div @class([
+                        'rounded-lg p-2.5',
+                        'bg-emerald-100 dark:bg-emerald-900/30' => $vpsStorage['status'] === 'healthy',
+                        'bg-amber-100 dark:bg-amber-900/30' => $vpsStorage['status'] === 'warning',
+                        'bg-red-100 dark:bg-red-900/30' => $vpsStorage['status'] === 'critical',
+                    ])>
+                        <flux:icon name="circle-stack" @class([
+                            'h-6 w-6',
+                            'text-emerald-600 dark:text-emerald-400' => $vpsStorage['status'] === 'healthy',
+                            'text-amber-600 dark:text-amber-400' => $vpsStorage['status'] === 'warning',
+                            'text-red-600 dark:text-red-400' => $vpsStorage['status'] === 'critical',
+                        ]) />
+                    </div>
+                    <span @class([
+                        'text-xs font-medium',
+                        'text-emerald-600 dark:text-emerald-400' => $vpsStorage['status'] === 'healthy',
+                        'text-amber-600 dark:text-amber-400' => $vpsStorage['status'] === 'warning',
+                        'text-red-600 dark:text-red-400' => $vpsStorage['status'] === 'critical',
+                    ])>
+                        {{ $vpsStorage['status'] === 'critical' ? 'Critical' : ($vpsStorage['status'] === 'warning' ? 'Needs attention' : 'Healthy') }}
+                    </span>
+                </div>
+                <p class="mt-4 text-sm font-medium text-zinc-500 dark:text-zinc-400">VPS Storage</p>
+                <p class="text-2xl font-bold text-zinc-900 dark:text-white">{{ $vpsStorage['usage_percentage'] }}% used</p>
+                <p class="mt-2 text-xs text-zinc-400">
+                    {{ number_format($vpsStorage['available_bytes'] / 1_073_741_824, 1) }} GB free of {{ number_format($vpsStorage['total_bytes'] / 1_073_741_824, 1) }} GB
+                </p>
+                <div
+                    class="mt-4 h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700"
+                    role="progressbar"
+                    aria-label="VPS storage usage"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="{{ $vpsStorage['usage_percentage'] }}"
+                >
+                    <div
+                        @class([
+                            'h-full rounded-full transition-all',
+                            'bg-emerald-500' => $vpsStorage['status'] === 'healthy',
+                            'bg-amber-500' => $vpsStorage['status'] === 'warning',
+                            'bg-red-500' => $vpsStorage['status'] === 'critical',
+                        ])
+                        style="width: {{ $vpsStorage['usage_percentage'] }}%"
+                    ></div>
+                </div>
             </div>
         </div>
     </div>

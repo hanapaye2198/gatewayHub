@@ -32,6 +32,8 @@ class AdminDashboardMetricsTest extends TestCase
         $response->assertSee($merchant2->name);
         $response->assertSee($merchant3->name);
         $response->assertSee('Configure Gateways');
+        $response->assertSee('VPS Storage');
+        $response->assertSee('free of');
         $response->assertDontSee('Platform Revenue');
         $response->assertDontSee('Net Volume');
         $response->assertDontSee('Revenue by Gateway');
