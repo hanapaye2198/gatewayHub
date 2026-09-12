@@ -34,11 +34,36 @@ class ServerStorageMetricsTest extends TestCase
         (new ServerStorageMetrics)->forPath(__DIR__.'/missing-storage-path');
     }
 
-    public function test_it_throws_when_storage_counters_are_unavailable(): void
+    public function test_it_returns_unavailable_when_storage_counters_cannot_be_read(): void
     {
-        $this->expectException(RuntimeException::class);
+        $metrics = $this->storageMetrics(totalSpace: false, availableSpace: false)->forPath(__DIR__);
 
-        $this->storageMetrics(totalSpace: false, availableSpace: false)->forPath(__DIR__);
+        $this->assertSame(0, $metrics['total_bytes']);
+        $this->assertSame(0, $metrics['used_bytes']);
+        $this->assertSame(0, $metrics['available_bytes']);
+        $this->assertSame(0, $metrics['usage_percentage']);
+        $this->assertSame('unavailable', $metrics['status']);
+    }
+
+    public function test_it_returns_unavailable_when_disk_functions_throw(): void
+    {
+        $metrics = new class extends ServerStorageMetrics
+        {
+            protected function totalSpace(string $path): float|false
+            {
+                throw new RuntimeException('disk_total_space has been disabled');
+            }
+
+            protected function availableSpace(string $path): float|false
+            {
+                throw new RuntimeException('disk_free_space has been disabled');
+            }
+        };
+
+        $result = $metrics->forPath(__DIR__);
+
+        $this->assertSame('unavailable', $result['status']);
+        $this->assertSame(0, $result['usage_percentage']);
     }
 
     private function storageMetrics(float|false $totalSpace, float|false $availableSpace): ServerStorageMetrics

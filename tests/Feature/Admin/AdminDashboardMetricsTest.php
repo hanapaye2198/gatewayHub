@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin;
 
 use App\Models\Payment;
 use App\Models\User;
+use App\Support\ServerStorageMetrics;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -38,6 +39,25 @@ class AdminDashboardMetricsTest extends TestCase
         $response->assertDontSee('Net Volume');
         $response->assertDontSee('Revenue by Gateway');
         $response->assertDontSee('Total Payments');
+    }
+
+    public function test_admin_dashboard_renders_when_vps_storage_metrics_cannot_be_read(): void
+    {
+        $this->mock(ServerStorageMetrics::class, function ($mock): void {
+            $mock->shouldReceive('forPath')
+                ->once()
+                ->andThrow(new \RuntimeException('disk_total_space has been disabled'));
+        });
+
+        $admin = User::factory()->admin()->create();
+
+        $response = $this->actingAs($admin)->get(route('admin.index'));
+
+        $response->assertOk();
+        $response->assertSee('VPS Storage');
+        $response->assertSee('Usage unknown');
+        $response->assertSee('Storage usage could not be read on this server.');
+        $response->assertDontSee('free of');
     }
 
     public function test_admin_dashboard_filters_total_collections_per_client(): void

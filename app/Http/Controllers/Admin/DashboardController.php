@@ -8,6 +8,7 @@ use App\Models\Merchant;
 use App\Models\Payment;
 use App\Support\ServerStorageMetrics;
 use Illuminate\Contracts\View\View;
+use Throwable;
 
 class DashboardController extends Controller
 {
@@ -41,7 +42,12 @@ class DashboardController extends Controller
         $selectedClientName = $selectedClientId === null
             ? null
             : $clients->firstWhere('id', $selectedClientId)?->name;
-        $vpsStorage = $serverStorageMetrics->forPath(base_path());
+        try {
+            $vpsStorage = $serverStorageMetrics->forPath(base_path());
+        } catch (Throwable $e) {
+            report($e);
+            $vpsStorage = ServerStorageMetrics::unavailable();
+        }
 
         return view('admin.dashboard', [
             'title' => 'Dashboard',
