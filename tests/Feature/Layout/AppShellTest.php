@@ -24,6 +24,8 @@ class AppShellTest extends TestCase
         $response->assertSee('data-app-shell-topbar', false);
         $response->assertSee('header-user-menu', false);
         $response->assertSee('data-test="theme-toggle"', false);
+        $response->assertSee('x-on:click="$flux.dark = ! $flux.dark"', false);
+        $response->assertDontSee('window.Flux?.applyAppearance', false);
     }
 
     public function test_admin_dashboard_renders_collapsible_shell_controls(): void
@@ -38,6 +40,9 @@ class AppShellTest extends TestCase
         $response->assertSee('data-flux-header', false);
         $response->assertSee('data-app-shell-sidebar', false);
         $response->assertSee(__('Admin Panel'), false);
+        $response->assertSee('data-test="theme-toggle"', false);
+        $response->assertSee('x-on:click="$flux.dark = ! $flux.dark"', false);
+        $response->assertDontSee('window.Flux?.applyAppearance', false);
         $response->assertDontSee(__('Back to site'), false);
         $response->assertDontSee(__('Log out'), false);
     }

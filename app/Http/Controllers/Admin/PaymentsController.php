@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\PaymentDisplayStatus;
 use App\Enums\PlatformFeeStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\FilterAdminPaymentsRequest;
@@ -11,9 +12,11 @@ use App\Models\Payment;
 use App\Models\PlatformFee;
 use App\Services\Exports\MerchantPaymentsExcelExporter;
 use App\Services\Exports\MerchantPaymentsZipExporter;
+use App\Services\Payments\PaymentDisplayStatusResolver;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -22,6 +25,7 @@ class PaymentsController extends Controller
     public function __construct(
         private MerchantPaymentsExcelExporter $excelExporter,
         private MerchantPaymentsZipExporter $zipExporter,
+        private PaymentDisplayStatusResolver $displayStatusResolver,
     ) {}
 
     public function index(FilterAdminPaymentsRequest $request): View
@@ -31,23 +35,17 @@ class PaymentsController extends Controller
         $filteredPaymentsQuery = $this->buildFilteredPaymentsQuery($filters);
 
         $payments = (clone $filteredPaymentsQuery)
-            ->with(['merchant', 'gateway', 'platformFee'])
+            ->with([
+                'merchant',
+                'gateway',
+                'platformFee',
+                'webhookEvents' => static fn (HasMany $query) => $query->orderByDesc('received_at'),
+            ])
             ->latest('created_at')
             ->paginate(25)
             ->withQueryString();
 
-        $summary = [
-            'total_transactions' => (clone $filteredPaymentsQuery)->count(),
-            'paid_collections' => (float) (clone $filteredPaymentsQuery)
-                ->where('status', 'paid')
-                ->sum('amount'),
-            'pending_count' => (clone $filteredPaymentsQuery)
-                ->where('status', 'pending')
-                ->count(),
-            'failed_refunded_count' => (clone $filteredPaymentsQuery)
-                ->whereIn('status', ['failed', 'refunded', 'failed_after_paid'])
-                ->count(),
-        ];
+        $summary = $this->displayStatusResolver->summarize($filteredPaymentsQuery);
 
         $totalPlatformRevenue = PlatformFee::query()
             ->where('status', PlatformFeeStatus::Posted)
@@ -68,7 +66,8 @@ class PaymentsController extends Controller
             'summary' => $summary,
             'merchants' => $merchants,
             'gateways' => $gateways,
-            'statuses' => ['pending', 'paid', 'failed', 'refunded', 'failed_after_paid'],
+            'statuses' => PaymentDisplayStatus::filterOptions(),
+            'displayStatusResolver' => $this->displayStatusResolver,
             'activeFilters' => [
                 'merchant_id' => $filters['merchant_id'] ?? null,
                 'gateway_code' => $filters['gateway_code'] ?? null,
@@ -85,7 +84,11 @@ class PaymentsController extends Controller
         $filters = $request->validated();
 
         $payments = $this->buildFilteredPaymentsQuery($filters)
-            ->with(['gateway:code,name', 'platformFee:id,payment_id,fee_amount,net_amount'])
+            ->with([
+                'gateway:code,name',
+                'platformFee:id,payment_id,fee_amount,net_amount',
+                'webhookEvents' => static fn (HasMany $query) => $query->orderByDesc('received_at'),
+            ])
             ->latest('created_at')
             ->get()
             ->groupBy('merchant_id');
@@ -140,8 +143,8 @@ class PaymentsController extends Controller
             ->when(isset($filters['gateway_code']), static function (Builder $query) use ($filters): void {
                 $query->where('gateway_code', (string) $filters['gateway_code']);
             })
-            ->when(isset($filters['status']), static function (Builder $query) use ($filters): void {
-                $query->where('status', (string) $filters['status']);
+            ->when(isset($filters['status']), function (Builder $query) use ($filters): void {
+                $this->displayStatusResolver->applyFilter($query, (string) $filters['status']);
             })
             ->when(isset($filters['reference']), static function (Builder $query) use ($filters): void {
                 $reference = (string) $filters['reference'];

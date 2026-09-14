@@ -10,6 +10,8 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        $this->withoutVite();
+
         config()->set('surepay.features.wallet_settlement', false);
 
         config()->set('coins.gateway.client_id', 'test-coins-client-id');

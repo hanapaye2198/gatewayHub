@@ -3,6 +3,7 @@
 namespace App\Services\Exports;
 
 use App\Models\Payment;
+use App\Services\Payments\PaymentDisplayStatusResolver;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Collection;
 use RuntimeException;
@@ -24,6 +25,7 @@ final class MerchantPaymentsExcelExporter
         'GatewayHub Platform Fee',
         'Net After GatewayHub Fee',
         'Status',
+        'Display Status',
     ];
 
     /**
@@ -238,7 +240,7 @@ XML;
 
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-            .'<dimension ref="A1:J'.$lastRow.'"/>'
+            .'<dimension ref="A1:K'.$lastRow.'"/>'
             .'<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView></sheetViews>'
             .'<sheetFormatPr defaultRowHeight="15"/>'
             .'<cols>'
@@ -249,9 +251,10 @@ XML;
             .'<col min="6" max="6" width="10" customWidth="1"/>'
             .'<col min="7" max="9" width="23" customWidth="1"/>'
             .'<col min="10" max="10" width="16" customWidth="1"/>'
+            .'<col min="11" max="11" width="22" customWidth="1"/>'
             .'</cols>'
             .'<sheetData>'.implode('', $xmlRows).'</sheetData>'
-            .'<autoFilter ref="A1:J'.$lastRow.'"/>'
+            .'<autoFilter ref="A1:K'.$lastRow.'"/>'
             .'<pageMargins left="0.25" right="0.25" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>'
             .'</worksheet>';
     }
@@ -282,6 +285,7 @@ XML;
             $this->nullableNumberCell($feeData['gatewayhub_platform_fee']),
             $this->nullableNumberCell($feeData['gatewayhub_net_amount']),
             $this->textCell($payment->status),
+            $this->textCell((new PaymentDisplayStatusResolver)->resolve($payment)->label()),
         ];
     }
 

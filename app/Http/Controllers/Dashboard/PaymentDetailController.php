@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
+use App\Services\Payments\PaymentDisplayStatusResolver;
 use App\Services\PaymentStatusSyncService;
 use App\Services\QrCodeGenerator;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
@@ -21,7 +23,10 @@ class PaymentDetailController extends Controller
             return redirect()->route('dashboard.payments');
         }
 
-        $payment->load(['gateway', 'webhookEvents']);
+        $payment->load([
+            'gateway',
+            'webhookEvents' => static fn (HasMany $query) => $query->orderByDesc('received_at'),
+        ]);
 
         $qrData = $payment->getQrData();
         $qrImageUrl = null;
@@ -34,11 +39,13 @@ class PaymentDetailController extends Controller
         }
 
         $expiresAt = $payment->getExpiresAt();
+        $displayStatus = app(PaymentDisplayStatusResolver::class)->resolve($payment);
 
         return view('dashboard.payment-detail', [
             'payment' => $payment,
             'qrImageUrl' => $qrImageUrl,
             'expiresAt' => $expiresAt,
+            'displayStatus' => $displayStatus,
         ]);
     }
 

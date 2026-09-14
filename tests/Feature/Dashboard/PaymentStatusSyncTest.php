@@ -5,10 +5,13 @@ namespace Tests\Feature\Dashboard;
 use App\Models\Gateway;
 use App\Models\Payment;
 use App\Models\User;
+use App\Models\WebhookEvent;
+use App\Services\Coins\CoinsSignatureService;
 use App\Services\Gateways\Drivers\CoinsDriver;
 use App\Services\PaymentStatusSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class PaymentStatusSyncTest extends TestCase
@@ -228,5 +231,76 @@ class PaymentStatusSyncTest extends TestCase
         $this->assertSame('pending', $payment->status);
         $this->assertNull($payment->paid_at);
         Http::assertNothingSent();
+    }
+
+    public function test_local_expiry_then_late_succeeded_webhook_remains_failed(): void
+    {
+        Log::spy();
+        $this->app['config']->set('coins.webhook.allow_dev_bypass', false);
+        $this->app['config']->set('coins.webhook.secret', 'test-webhook-secret');
+
+        Gateway::query()->create([
+            'code' => 'coins',
+            'name' => 'Coins.ph',
+            'driver_class' => CoinsDriver::class,
+            'is_global_enabled' => true,
+            'config_json' => [
+                'client_id' => 'client',
+                'client_secret' => 'secret',
+                'api_base' => 'sandbox',
+                'webhook_secret' => 'test-webhook-secret',
+            ],
+        ]);
+
+        $merchant = User::factory()->create();
+        $payment = Payment::factory()->create([
+            'merchant_id' => $merchant->merchant_id,
+            'gateway_code' => 'coins',
+            'provider_reference' => 'ORDER-RACE-001',
+            'status' => 'pending',
+            'paid_at' => null,
+            'raw_response' => [
+                'expires_at' => now()->subMinute()->toIso8601String(),
+                'gateway_request_reference' => 'ORDER-RACE-001',
+            ],
+        ]);
+
+        $this->actingAs($merchant)
+            ->getJson(route('dashboard.payments.status', $payment))
+            ->assertOk()
+            ->assertJson(['status' => 'failed']);
+
+        $payment->refresh();
+        $this->assertSame('failed', $payment->status);
+        $this->assertNull($payment->paid_at);
+
+        $payload = [
+            'referenceId' => 'ORDER-RACE-001',
+            'status' => 'SUCCEEDED',
+            'settleDate' => 1707475200000,
+            'timestamp' => (string) (int) (microtime(true) * 1000),
+        ];
+        $signed = (new CoinsSignatureService)->sign($payload, 'test-webhook-secret');
+
+        $this->postJson('/api/webhooks?provider=coins', $payload, [
+            'Content-Type' => 'application/json',
+            'X-COINS-SIGNATURE' => $signed['signature'],
+        ])->assertOk();
+
+        $payment->refresh();
+        $this->assertSame('failed', $payment->status);
+        $this->assertNull($payment->paid_at);
+        $this->assertTrue(
+            WebhookEvent::query()->where('payment_id', $payment->id)->exists()
+        );
+
+        Log::shouldHaveReceived('warning')
+            ->withArgs(function (string $message, array $context) use ($payment): bool {
+                return $message === 'webhook.payment_transition_blocked'
+                    && ($context['payment_id'] ?? null) === $payment->id
+                    && ($context['current_status'] ?? null) === 'failed'
+                    && ($context['incoming_status'] ?? null) === 'paid'
+                    && ($context['reason'] ?? null) === 'failed_cannot_become_paid';
+            });
     }
 }

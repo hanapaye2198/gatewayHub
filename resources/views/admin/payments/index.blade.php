@@ -25,7 +25,7 @@
     </div>
 
     {{-- Stats Cards --}}
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         <div class="group rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm transition-shadow duration-150 hover:shadow-md dark:border-zinc-700/60 dark:bg-zinc-800">
             <div class="flex items-start justify-between">
                 <p class="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Total Transactions</p>
@@ -53,14 +53,32 @@
             </div>
             <p class="mt-3 text-3xl font-bold tabular-nums tracking-tight text-zinc-900 dark:text-zinc-100">{{ number_format((int) ($summary['pending_count'] ?? 0)) }}</p>
         </div>
+        <div class="group rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm transition-shadow duration-150 hover:shadow-md dark:border-zinc-700/60 dark:bg-zinc-800">
+            <div class="flex items-start justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Expired</p>
+                <div class="flex size-8 items-center justify-center rounded-lg bg-zinc-100 dark:bg-zinc-700">
+                    <flux:icon name="clock" class="size-4 text-zinc-500 dark:text-zinc-400" />
+                </div>
+            </div>
+            <p class="mt-3 text-3xl font-bold tabular-nums tracking-tight text-zinc-900 dark:text-zinc-100">{{ number_format((int) ($summary['expired_count'] ?? 0)) }}</p>
+        </div>
         <div class="group rounded-2xl border border-red-100 bg-white p-5 shadow-sm transition-shadow duration-150 hover:shadow-md dark:border-red-900/30 dark:bg-zinc-800">
             <div class="flex items-start justify-between">
-                <p class="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Failed / Refunded</p>
+                <p class="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Failed</p>
                 <div class="flex size-8 items-center justify-center rounded-lg bg-red-50 dark:bg-red-900/20">
                     <flux:icon name="x-circle" class="size-4 text-red-500" />
                 </div>
             </div>
-            <p class="mt-3 text-3xl font-bold tabular-nums tracking-tight text-zinc-900 dark:text-zinc-100">{{ number_format((int) ($summary['failed_refunded_count'] ?? 0)) }}</p>
+            <p class="mt-3 text-3xl font-bold tabular-nums tracking-tight text-zinc-900 dark:text-zinc-100">{{ number_format((int) ($summary['failed_count'] ?? 0)) }}</p>
+        </div>
+        <div class="group rounded-2xl border border-orange-100 bg-white p-5 shadow-sm transition-shadow duration-150 hover:shadow-md dark:border-orange-900/30 dark:bg-zinc-800">
+            <div class="flex items-start justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Provisioning Failed</p>
+                <div class="flex size-8 items-center justify-center rounded-lg bg-orange-50 dark:bg-orange-900/20">
+                    <flux:icon name="exclamation-triangle" class="size-4 text-orange-500" />
+                </div>
+            </div>
+            <p class="mt-3 text-3xl font-bold tabular-nums tracking-tight text-zinc-900 dark:text-zinc-100">{{ number_format((int) ($summary['provisioning_failed_count'] ?? 0)) }}</p>
         </div>
     </div>
 
@@ -97,7 +115,7 @@
                     <select id="status" name="status" class="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-sm transition-colors focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:ring-zinc-700">
                         <option value="">All statuses</option>
                         @foreach ($statuses as $status)
-                            <option value="{{ $status }}" @selected((string) $activeFilters['status'] === (string) $status)>{{ ucfirst(str_replace('_', ' ', $status)) }}</option>
+                            <option value="{{ $status->value }}" @selected((string) $activeFilters['status'] === $status->value)>{{ $status->label() }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -216,7 +234,8 @@
                                 @endif
                             </td>
                             <td class="px-5 py-4 text-center">
-                                <x-status-badge :status="$payment->status" />
+                                @php $rowDisplayStatus = $displayStatusResolver->resolve($payment); @endphp
+                                <x-status-badge :status="$rowDisplayStatus->value" :label="$rowDisplayStatus->label()" />
                             </td>
                             <td class="px-7 py-4 text-right">
                                 <span class="font-mono text-xs tabular-nums text-zinc-500 dark:text-zinc-400">{{ $payment->created_at->format('Y-m-d') }}</span>

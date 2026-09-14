@@ -3,7 +3,7 @@
         class="flex h-full w-full flex-1 flex-col gap-6"
         x-data="paymentDetail({
             paymentId: @js($payment->id),
-            initialStatus: @js($payment->status),
+            initialStatus: @js($displayStatus->value),
             statusUrl: @js(route('dashboard.payments.status', $payment)),
             paymentsUrl: @js(route('dashboard.payments')),
             expiresAt: @js($expiresAt?->toIso8601String()),
@@ -94,18 +94,7 @@
                         <div>
                             <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Status') }}</flux:text>
                             <div class="mt-1">
-                                <template x-if="displayStatus === 'expired'">
-                                    <span class="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/30 dark:text-red-300">
-                                        {{ __('Payment expired') }}
-                                    </span>
-                                </template>
-                                <template x-if="displayStatus !== 'expired'">
-                                    <span :class="{
-                                        'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300': displayStatus === 'success',
-                                        'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300': displayStatus === 'pending',
-                                        'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300': displayStatus === 'failed',
-                                    }" x-text="displayLabel"></span>
-                                </template>
+                                <x-status-badge :status="$displayStatus->value" :label="$displayStatus->label()" />
                             </div>
                         </div>
                         <div>
@@ -118,13 +107,29 @@
                                 <flux:text class="mt-1 block">{{ $payment->paid_at->format('M j, Y g:i A') }}</flux:text>
                             </div>
                         @endif
-                        @if ($expiresAt && in_array($payment->status, ['pending'], true))
+                        @if ($expiresAt && $payment->status === 'pending')
                             <div class="sm:col-span-2">
                                 <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Expires') }}</flux:text>
-                                <p class="mt-1 text-sm" x-text="displayStatus === 'expired' ? '{{ __('Payment expired') }}' : countdownText"></p>
+                                <p class="mt-1 text-sm" x-text="countdownText"></p>
                             </div>
                         @endif
                     </dl>
+
+                    @if ($displayStatus === \App\Enums\PaymentDisplayStatus::Expired)
+                        <div class="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-900/40">
+                            <p class="font-semibold text-zinc-900 dark:text-zinc-100">{{ $displayStatus->label() }}</p>
+                            <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{{ $displayStatus->explanation() }}</p>
+                            <p class="mt-2 text-sm font-medium text-zinc-800 dark:text-zinc-200">{{ $displayStatus->recommendedAction() }}</p>
+                            <flux:button variant="primary" :href="route('dashboard.payments.create')" wire:navigate class="mt-4" icon="plus">
+                                {{ __('Create Payment') }}
+                            </flux:button>
+                        </div>
+                    @elseif ($displayStatus === \App\Enums\PaymentDisplayStatus::Failed)
+                        <div class="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/40 dark:bg-rose-900/20">
+                            <p class="font-semibold text-rose-800 dark:text-rose-300">{{ $displayStatus->label() }}</p>
+                            <p class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ $displayStatus->explanation() }}</p>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -177,18 +182,16 @@
                 statusUrl: config.statusUrl,
                 paymentsUrl: config.paymentsUrl,
                 expiresAt: config.expiresAt ? new Date(config.expiresAt) : null,
-                displayStatus: config.initialStatus === 'paid' ? 'success' : (config.initialStatus === 'failed' ? 'failed' : 'pending'),
+                displayStatus: config.initialStatus === 'paid' ? 'success' : (config.initialStatus || 'pending'),
                 countdownText: '',
                 pollInterval: null,
-
-                get displayLabel() {
-                    return { success: '{{ __('Success') }}', pending: '{{ __('Pending') }}', failed: '{{ __('Failed') }}' }[this.displayStatus] ?? '{{ __('Pending') }}';
-                },
 
                 init() {
                     this.updateCountdown();
                     if (this.displayStatus === 'pending' && this.expiresAt) {
                         setInterval(() => this.updateCountdown(), 1000);
+                        this.startPolling();
+                    } else if (this.displayStatus === 'pending') {
                         this.startPolling();
                     }
                 },
@@ -197,9 +200,7 @@
                     if (!this.expiresAt || this.displayStatus !== 'pending') return;
                     const now = new Date();
                     if (now >= this.expiresAt) {
-                        this.displayStatus = 'expired';
-                        this.stopPolling();
-                        this.countdownText = '';
+                        this.countdownText = '{{ __('QR time has ended. Waiting for confirmation.') }}';
                         return;
                     }
                     const s = Math.floor((this.expiresAt - now) / 1000);
@@ -220,7 +221,7 @@
                 },
 
                 async fetchStatus() {
-                    if (this.displayStatus !== 'pending' && this.displayStatus !== 'expired') return;
+                    if (this.displayStatus !== 'pending') return;
                     try {
                         const res = await fetch(this.statusUrl, { headers: { Accept: 'application/json' } });
                         const data = await res.json();
@@ -229,8 +230,8 @@
                             this.stopPolling();
                             window.location.href = this.paymentsUrl;
                         } else if (data.status === 'failed') {
-                            this.displayStatus = 'failed';
                             this.stopPolling();
+                            window.location.reload();
                         }
                     } catch (_) {}
                 },

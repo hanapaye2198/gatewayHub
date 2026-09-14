@@ -43,11 +43,3 @@
         <x-header-user-menu />
     </div>
 </flux:header>
-
-<script>
-    document.querySelector('[data-app-shell-topbar] .theme-toggle')?.addEventListener('click', () => {
-        window.Flux?.applyAppearance?.(
-            document.documentElement.classList.contains('dark') ? 'light' : 'dark'
-        );
-    });
-</script>

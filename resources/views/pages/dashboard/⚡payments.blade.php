@@ -1,10 +1,13 @@
 <?php
 
+use App\Enums\PaymentDisplayStatus;
 use App\Models\Gateway;
 use App\Models\Payment;
 use App\Services\PaymentStatusSyncService;
+use App\Services\Payments\PaymentDisplayStatusResolver;
 use App\Services\QrCodeGenerator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -47,7 +50,11 @@ new class extends Component {
     public function payments()
     {
         return $this->buildFilteredPaymentsQuery()
-            ->with(['gateway', 'platformFee'])
+            ->with([
+                'gateway',
+                'platformFee',
+                'webhookEvents' => static fn (HasMany $query) => $query->orderByDesc('received_at'),
+            ])
             ->latest('created_at')
             ->paginate(25);
     }
@@ -55,19 +62,7 @@ new class extends Component {
     #[Computed]
     public function summary(): array
     {
-        $stats = $this->buildFilteredPaymentsQuery()
-            ->selectRaw('COUNT(*) as total_transactions')
-            ->selectRaw("COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as paid_collections")
-            ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_count")
-            ->selectRaw("SUM(CASE WHEN status IN ('failed', 'refunded', 'failed_after_paid') THEN 1 ELSE 0 END) as failed_refunded_count")
-            ->first();
-
-        return [
-            'total_transactions' => (int) ($stats->total_transactions ?? 0),
-            'paid_collections' => (float) ($stats->paid_collections ?? 0),
-            'pending_count' => (int) ($stats->pending_count ?? 0),
-            'failed_refunded_count' => (int) ($stats->failed_refunded_count ?? 0),
-        ];
+        return $this->displayStatusResolver()->summarize($this->buildFilteredPaymentsQuery());
     }
 
     #[Computed]
@@ -116,7 +111,10 @@ new class extends Component {
 
         $payment = Payment::query()
             ->where('merchant_id', (int) $merchantId)
-            ->with('gateway')
+            ->with([
+                'gateway',
+                'webhookEvents' => static fn (HasMany $query) => $query->orderByDesc('received_at'),
+            ])
             ->find($this->selectedPaymentId);
 
         return $payment instanceof Payment ? $payment : null;
@@ -148,6 +146,16 @@ new class extends Component {
         return app(QrCodeGenerator::class)->toDataUri($qrData['value']);
     }
 
+    public function displayStatus(Payment $payment): PaymentDisplayStatus
+    {
+        return $this->displayStatusResolver()->resolve($payment);
+    }
+
+    private function displayStatusResolver(): PaymentDisplayStatusResolver
+    {
+        return app(PaymentDisplayStatusResolver::class);
+    }
+
     /**
      * @return Builder<Payment>
      */
@@ -164,7 +172,7 @@ new class extends Component {
                 $query->where('gateway_code', $this->gatewayCode);
             })
             ->when($this->status !== null, function (Builder $query): void {
-                $query->where('status', $this->status);
+                $this->displayStatusResolver()->applyFilter($query, (string) $this->status);
             })
             ->when($this->reference !== null, function (Builder $query): void {
                 $reference = $this->reference;
@@ -222,7 +230,10 @@ new class extends Component {
             return null;
         }
 
-        return in_array($status, ['pending', 'paid', 'failed', 'refunded', 'failed_after_paid'], true)
+        return in_array($status, array_map(
+            static fn (PaymentDisplayStatus $displayStatus): string => $displayStatus->value,
+            PaymentDisplayStatus::filterOptions()
+        ), true)
             ? $status
             : null;
     }
@@ -306,9 +317,9 @@ new class extends Component {
                         <label for="status_filter" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{{ __('Status') }}</label>
                         <select id="status_filter" name="status" class="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100">
                             <option value="">{{ __('All statuses') }}</option>
-                            @foreach (['pending', 'paid', 'failed', 'refunded', 'failed_after_paid'] as $statusOption)
-                                <option value="{{ $statusOption }}" @selected($status === $statusOption)>
-                                    {{ ucfirst(str_replace('_', ' ', $statusOption)) }}
+                            @foreach (PaymentDisplayStatus::filterOptions() as $statusOption)
+                                <option value="{{ $statusOption->value }}" @selected($status === $statusOption->value)>
+                                    {{ $statusOption->label() }}
                                 </option>
                             @endforeach
                         </select>
@@ -348,7 +359,7 @@ new class extends Component {
     </div>
 
     {{-- Enhanced Stats Cards --}}
-    <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <div class="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800/50">
             <div class="absolute -right-8 -top-8 size-20 rounded-full bg-gradient-to-br from-blue-500/10 to-blue-500/5 blur-2xl"></div>
             <div class="relative flex items-center justify-between">
@@ -379,7 +390,7 @@ new class extends Component {
             <div class="absolute -right-8 -top-8 size-20 rounded-full bg-gradient-to-br from-amber-500/10 to-amber-500/5 blur-2xl"></div>
             <div class="relative flex items-center justify-between">
                 <div>
-                    <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Pending Count') }}</p>
+                    <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Pending') }}</p>
                     <p class="mt-1 text-3xl font-bold text-zinc-900 dark:text-zinc-100">{{ number_format((int) $this->summary['pending_count']) }}</p>
                 </div>
                 <div class="flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/20">
@@ -389,14 +400,40 @@ new class extends Component {
         </div>
 
         <div class="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800/50">
+            <div class="absolute -right-8 -top-8 size-20 rounded-full bg-gradient-to-br from-zinc-500/10 to-zinc-500/5 blur-2xl"></div>
+            <div class="relative flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Expired') }}</p>
+                    <p class="mt-1 text-3xl font-bold text-zinc-900 dark:text-zinc-100">{{ number_format((int) $this->summary['expired_count']) }}</p>
+                </div>
+                <div class="flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-zinc-100 to-zinc-50 dark:from-zinc-700/40 dark:to-zinc-800/20">
+                    <flux:icon name="clock" class="size-6 text-zinc-600 dark:text-zinc-400" />
+                </div>
+            </div>
+        </div>
+
+        <div class="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800/50">
             <div class="absolute -right-8 -top-8 size-20 rounded-full bg-gradient-to-br from-rose-500/10 to-rose-500/5 blur-2xl"></div>
             <div class="relative flex items-center justify-between">
                 <div>
-                    <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Failed / Refunded') }}</p>
-                    <p class="mt-1 text-3xl font-bold text-zinc-900 dark:text-zinc-100">{{ number_format((int) $this->summary['failed_refunded_count']) }}</p>
+                    <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Failed') }}</p>
+                    <p class="mt-1 text-3xl font-bold text-zinc-900 dark:text-zinc-100">{{ number_format((int) $this->summary['failed_count']) }}</p>
                 </div>
                 <div class="flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-rose-100 to-rose-50 dark:from-rose-900/30 dark:to-rose-800/20">
-                    <flux:icon name="exclamation-triangle" class="size-6 text-rose-600 dark:text-rose-400" />
+                    <flux:icon name="x-circle" class="size-6 text-rose-600 dark:text-rose-400" />
+                </div>
+            </div>
+        </div>
+
+        <div class="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800/50">
+            <div class="absolute -right-8 -top-8 size-20 rounded-full bg-gradient-to-br from-orange-500/10 to-orange-500/5 blur-2xl"></div>
+            <div class="relative flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Provisioning Failed') }}</p>
+                    <p class="mt-1 text-3xl font-bold text-zinc-900 dark:text-zinc-100">{{ number_format((int) $this->summary['provisioning_failed_count']) }}</p>
+                </div>
+                <div class="flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-orange-100 to-orange-50 dark:from-orange-900/30 dark:to-orange-800/20">
+                    <flux:icon name="exclamation-triangle" class="size-6 text-orange-600 dark:text-orange-400" />
                 </div>
             </div>
         </div>
@@ -453,20 +490,8 @@ new class extends Component {
                                 {{ $payment->platformFee ? number_format($payment->platformFee->net_amount, 2) . ' ' . $payment->currency : '—' }}
                             </td>
                             <td class="whitespace-nowrap px-5 py-4 text-center">
-                                @php
-                                    $statusConfig = [
-                                        'pending' => ['bg' => 'bg-amber-100 dark:bg-amber-900/30', 'text' => 'text-amber-700 dark:text-amber-400', 'icon' => 'clock'],
-                                        'paid' => ['bg' => 'bg-emerald-100 dark:bg-emerald-900/30', 'text' => 'text-emerald-700 dark:text-emerald-400', 'icon' => 'check-circle'],
-                                        'failed' => ['bg' => 'bg-rose-100 dark:bg-rose-900/30', 'text' => 'text-rose-700 dark:text-rose-400', 'icon' => 'x-circle'],
-                                        'refunded' => ['bg' => 'bg-purple-100 dark:bg-purple-900/30', 'text' => 'text-purple-700 dark:text-purple-400', 'icon' => 'arrow-path'],
-                                        'failed_after_paid' => ['bg' => 'bg-orange-100 dark:bg-orange-900/30', 'text' => 'text-orange-700 dark:text-orange-400', 'icon' => 'exclamation-triangle'],
-                                    ];
-                                    $config = $statusConfig[$payment->status] ?? $statusConfig['pending'];
-                                @endphp
-                                <span class="inline-flex items-center gap-1.5 rounded-full {{ $config['bg'] }} px-2.5 py-1 text-xs font-medium {{ $config['text'] }}">
-                                    <flux:icon name="{{ $config['icon'] }}" class="size-3" />
-                                    {{ ucfirst(str_replace('_', ' ', $payment->status)) }}
-                                </span>
+                                @php $rowDisplayStatus = $this->displayStatus($payment); @endphp
+                                <x-status-badge :status="$rowDisplayStatus->value" :label="$rowDisplayStatus->label()" />
                             </td>
                             <td class="whitespace-nowrap px-5 py-4 text-right font-mono text-sm text-zinc-500 dark:text-zinc-400">
                                 {{ $payment->created_at->format('Y-m-d H:i') }}
@@ -522,18 +547,8 @@ new class extends Component {
                             • {{ $this->selectedPayment->gateway?->name ?? ucfirst($this->selectedPayment->gateway_code) }}
                         </flux:subheading>
                     </div>
-                    @php
-                        $modalStatusConfig = [
-                            'pending' => ['bg' => 'bg-amber-100 dark:bg-amber-900/30', 'text' => 'text-amber-700 dark:text-amber-400'],
-                            'paid' => ['bg' => 'bg-emerald-100 dark:bg-emerald-900/30', 'text' => 'text-emerald-700 dark:text-emerald-400'],
-                            'failed' => ['bg' => 'bg-rose-100 dark:bg-rose-900/30', 'text' => 'text-rose-700 dark:text-rose-400'],
-                            'refunded' => ['bg' => 'bg-purple-100 dark:bg-purple-900/30', 'text' => 'text-purple-700 dark:text-purple-400'],
-                        ];
-                        $modalConfig = $modalStatusConfig[$this->selectedPayment->status] ?? $modalStatusConfig['pending'];
-                    @endphp
-                    <span class="inline-flex items-center gap-1.5 rounded-full {{ $modalConfig['bg'] }} px-3 py-1 text-xs font-medium {{ $modalConfig['text'] }}">
-                        {{ ucfirst(str_replace('_', ' ', $this->selectedPayment->status)) }}
-                    </span>
+                    @php $modalDisplayStatus = $this->displayStatus($this->selectedPayment); @endphp
+                    <x-status-badge :status="$modalDisplayStatus->value" :label="$modalDisplayStatus->label()" class="px-3 py-1" />
                 </div>
 
                 @if ($this->selectedPayment->status === 'paid' && $this->selectedPayment->platform_fee !== null)
@@ -585,13 +600,29 @@ new class extends Component {
                             <flux:text class="font-semibold text-emerald-700 dark:text-emerald-300">{{ __('Payment Successful') }}</flux:text>
                             <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('This transaction has been completed.') }}</flux:text>
                         </div>
-                    @elseif (in_array($this->selectedPayment->status, ['failed', 'failed_after_paid'], true))
-                        <div class="flex flex-col items-center gap-3">
+                    @elseif ($modalDisplayStatus === \App\Enums\PaymentDisplayStatus::Expired)
+                        <div class="flex flex-col items-center gap-3 text-center">
+                            <div class="flex size-20 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-700/50">
+                                <flux:icon name="clock" class="size-10 text-zinc-600 dark:text-zinc-300" />
+                            </div>
+                            <flux:text class="font-semibold text-zinc-800 dark:text-zinc-200">{{ $modalDisplayStatus->label() }}</flux:text>
+                            <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ $modalDisplayStatus->explanation() }}</flux:text>
+                            <flux:text class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{{ $modalDisplayStatus->recommendedAction() }}</flux:text>
+                        </div>
+                    @elseif ($modalDisplayStatus === \App\Enums\PaymentDisplayStatus::Failed)
+                        <div class="flex flex-col items-center gap-3 text-center">
                             <div class="flex size-20 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/30">
                                 <flux:icon name="x-circle" class="size-10 text-rose-600 dark:text-rose-400" />
                             </div>
-                            <flux:text class="font-semibold text-rose-700 dark:text-rose-300">{{ __('Payment Failed') }}</flux:text>
-                            <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Please check your gateway logs for details.') }}</flux:text>
+                            <flux:text class="font-semibold text-rose-700 dark:text-rose-300">{{ $modalDisplayStatus->label() }}</flux:text>
+                            <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ $modalDisplayStatus->explanation() }}</flux:text>
+                        </div>
+                    @elseif ($this->selectedPayment->status === 'failed_after_paid')
+                        <div class="flex flex-col items-center gap-3">
+                            <div class="flex size-20 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30">
+                                <flux:icon name="exclamation-triangle" class="size-10 text-orange-600 dark:text-orange-400" />
+                            </div>
+                            <flux:text class="font-semibold text-orange-700 dark:text-orange-300">{{ __('Failed After Paid') }}</flux:text>
                         </div>
                     @elseif ($this->selectedPayment->status === 'refunded')
                         <div class="flex flex-col items-center gap-3">
@@ -602,7 +633,7 @@ new class extends Component {
                             <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('This payment has been refunded.') }}</flux:text>
                         </div>
                     @else
-                        <x-status-badge :status="$this->selectedPayment->status" />
+                        <x-status-badge :status="$modalDisplayStatus->value" :label="$modalDisplayStatus->label()" />
                     @endif
                 </div>
 

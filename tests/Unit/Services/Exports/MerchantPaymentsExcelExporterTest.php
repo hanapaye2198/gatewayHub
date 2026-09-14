@@ -85,6 +85,31 @@ class MerchantPaymentsExcelExporterTest extends TestCase
         $this->assertInstanceOf(SimpleXMLElement::class, $xml);
     }
 
+    public function test_generated_workbook_includes_display_status_for_expired_provider_evidence(): void
+    {
+        $payment = new Payment([
+            'reference_id' => 'DISP-EXPIRED-001',
+            'provider_reference' => 'PROV-EXPIRED',
+            'gateway_code' => 'coins',
+            'amount' => 10,
+            'currency' => 'PHP',
+            'status' => 'failed',
+            'raw_response' => ['status' => 'EXPIRED'],
+        ]);
+        $payment->setRelation('gateway', null);
+        $payment->setRelation('platformFee', null);
+        $payment->setRelation('webhookEvents', collect());
+
+        $entries = $this->zipEntries(
+            (new MerchantPaymentsExcelExporter)->generate(new Collection([$payment]))
+        );
+        $worksheet = $entries['xl/worksheets/sheet1.xml'];
+
+        $this->assertStringContainsString('Display Status', $worksheet);
+        $this->assertStringContainsString('Expired', $worksheet);
+        $this->assertStringContainsString('failed', $worksheet);
+    }
+
     private function generateWorkbook(): string
     {
         return (new MerchantPaymentsExcelExporter)->generate(new Collection);

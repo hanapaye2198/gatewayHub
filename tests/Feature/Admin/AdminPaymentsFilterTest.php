@@ -91,6 +91,42 @@ class AdminPaymentsFilterTest extends TestCase
         $response->assertDontSee('FILTER-MAYA-PAID');
     }
 
+    public function test_admin_expired_filter_excludes_genuine_failed_payments(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $merchant = User::factory()->create();
+
+        Payment::factory()->create([
+            'merchant_id' => $merchant->merchant_id,
+            'reference_id' => 'ADMIN-EXPIRED-ROW',
+            'gateway_code' => 'coins',
+            'status' => 'failed',
+            'raw_response' => ['status' => 'EXPIRED'],
+        ]);
+        Payment::factory()->create([
+            'merchant_id' => $merchant->merchant_id,
+            'reference_id' => 'ADMIN-FAILED-ROW',
+            'gateway_code' => 'coins',
+            'status' => 'failed',
+            'raw_response' => ['status' => 'FAILED'],
+        ]);
+
+        $expired = $this->actingAs($admin)->get(route('admin.payments.index', [
+            'status' => 'expired',
+        ]));
+        $expired->assertOk();
+        $expired->assertSee('ADMIN-EXPIRED-ROW');
+        $expired->assertSee('Expired');
+        $expired->assertDontSee('ADMIN-FAILED-ROW');
+
+        $failed = $this->actingAs($admin)->get(route('admin.payments.index', [
+            'status' => 'failed',
+        ]));
+        $failed->assertOk();
+        $failed->assertSee('ADMIN-FAILED-ROW');
+        $failed->assertDontSee('ADMIN-EXPIRED-ROW');
+    }
+
     public function test_admin_can_filter_payments_by_date_range_and_reference(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -185,7 +221,9 @@ class AdminPaymentsFilterTest extends TestCase
             return $summary['total_transactions'] === 3
                 && (float) $summary['paid_collections'] === 100.0
                 && $summary['pending_count'] === 1
-                && $summary['failed_refunded_count'] === 1;
+                && $summary['expired_count'] === 0
+                && $summary['failed_count'] === 1
+                && $summary['provisioning_failed_count'] === 0;
         });
     }
 

@@ -379,8 +379,10 @@ class PaymentsDashboardTest extends TestCase
         $response->assertOk();
         $response->assertSee('Total Transactions');
         $response->assertSee('Paid Collections');
-        $response->assertSee('Pending Count');
-        $response->assertSee('Failed / Refunded');
+        $response->assertSee('Pending');
+        $response->assertSee('Expired');
+        $response->assertSee('Failed');
+        $response->assertSee('Provisioning Failed');
         $response->assertSee('PHP 433.33');
     }
 

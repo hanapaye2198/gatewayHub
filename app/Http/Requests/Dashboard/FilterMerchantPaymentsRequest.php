@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Dashboard;
 
+use App\Enums\PaymentDisplayStatus;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -24,7 +25,10 @@ class FilterMerchantPaymentsRequest extends FormRequest
     {
         return [
             'gateway_code' => ['nullable', 'string', Rule::exists('gateways', 'code')],
-            'status' => ['nullable', 'string', Rule::in(['pending', 'paid', 'failed', 'refunded', 'failed_after_paid'])],
+            'status' => ['nullable', 'string', Rule::in(array_map(
+                static fn (PaymentDisplayStatus $status): string => $status->value,
+                PaymentDisplayStatus::filterOptions()
+            ))],
             'reference' => ['nullable', 'string', 'max:255'],
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],

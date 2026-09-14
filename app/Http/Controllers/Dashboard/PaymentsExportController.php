@@ -6,12 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Dashboard\FilterMerchantPaymentsRequest;
 use App\Models\Payment;
 use App\Services\Exports\MerchantPaymentsExcelExporter;
+use App\Services\Payments\PaymentDisplayStatusResolver;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PaymentsExportController extends Controller
 {
-    public function __construct(private MerchantPaymentsExcelExporter $excelExporter) {}
+    public function __construct(
+        private MerchantPaymentsExcelExporter $excelExporter,
+        private PaymentDisplayStatusResolver $displayStatusResolver,
+    ) {}
 
     public function __invoke(FilterMerchantPaymentsRequest $request): StreamedResponse
     {
@@ -27,7 +32,11 @@ class PaymentsExportController extends Controller
         }
 
         $payments = $this->buildFilteredPaymentsQuery($mid, $filters)
-            ->with(['gateway:code,name', 'platformFee:id,payment_id,fee_amount,net_amount'])
+            ->with([
+                'gateway:code,name',
+                'platformFee:id,payment_id,fee_amount,net_amount',
+                'webhookEvents' => static fn (HasMany $query) => $query->orderByDesc('received_at'),
+            ])
             ->latest('created_at')
             ->get();
 
@@ -52,8 +61,8 @@ class PaymentsExportController extends Controller
             ->when(isset($filters['gateway_code']), static function (Builder $query) use ($filters): void {
                 $query->where('gateway_code', (string) $filters['gateway_code']);
             })
-            ->when(isset($filters['status']), static function (Builder $query) use ($filters): void {
-                $query->where('status', (string) $filters['status']);
+            ->when(isset($filters['status']), function (Builder $query) use ($filters): void {
+                $this->displayStatusResolver->applyFilter($query, (string) $filters['status']);
             })
             ->when(isset($filters['reference']), static function (Builder $query) use ($filters): void {
                 $reference = (string) $filters['reference'];
