@@ -161,8 +161,14 @@ jobs:
 
             git config --global --add safe.directory "${APP_DIR}" || true
 
+            WORKER_SERVICE="gatewayhub-worker.service"
+
             php artisan down || true
-            trap 'cd "${APP_DIR}" && php artisan up || true' EXIT
+            # The worker must not process jobs while optimize:clear removes the
+            # file cache. Otherwise a webhook can be accepted and then fail
+            # while claiming its idempotency key.
+            systemctl stop "${WORKER_SERVICE}" || true
+            trap 'cd "${APP_DIR}" && php artisan up || true; systemctl start "${WORKER_SERVICE}" || true' EXIT
 
             git fetch origin "${BRANCH}"
             git checkout "${BRANCH}"
@@ -180,8 +186,12 @@ jobs:
 
             php artisan migrate --force
             php artisan optimize:clear
+            mkdir -p storage/framework/cache/data
+            chown -R www-data:www-data storage/framework/cache
+            chmod -R ug+rwX storage/framework/cache
             php artisan optimize
-            php artisan queue:restart
+
+            systemctl start "${WORKER_SERVICE}"
 
             php artisan up
 
