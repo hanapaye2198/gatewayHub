@@ -1176,7 +1176,7 @@ class CoinsWebhookTest extends TestCase
             });
     }
 
-    public function test_webhook_blocks_paid_transition_on_already_failed_payment(): void
+    public function test_webhook_reconciles_failed_payment_when_coins_confirms_success(): void
     {
         Log::spy();
 
@@ -1204,16 +1204,16 @@ class CoinsWebhookTest extends TestCase
         $response->assertStatus(200);
 
         $payment->refresh();
-        $this->assertSame('failed', $payment->status);
-        $this->assertNull($payment->paid_at);
+        $this->assertSame('paid', $payment->status);
+        $this->assertNotNull($payment->paid_at);
 
         Log::shouldHaveReceived('warning')
             ->withArgs(function (string $message, array $context) use ($payment): bool {
-                return $message === 'webhook.payment_transition_blocked'
+                return $message === 'webhook.payment_reconciled'
                     && ($context['payment_id'] ?? null) === $payment->id
-                    && ($context['current_status'] ?? null) === 'failed'
-                    && ($context['incoming_status'] ?? null) === 'paid'
-                    && ($context['reason'] ?? null) === 'failed_cannot_become_paid';
+                    && ($context['previous_status'] ?? null) === 'failed'
+                    && ($context['new_status'] ?? null) === 'paid'
+                    && ($context['provider'] ?? null) === 'coins';
             });
     }
 
