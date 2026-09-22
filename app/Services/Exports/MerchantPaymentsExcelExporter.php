@@ -5,7 +5,6 @@ namespace App\Services\Exports;
 use App\Models\Payment;
 use App\Services\Payments\PaymentDisplayStatusResolver;
 use DateTimeInterface;
-use Illuminate\Database\Eloquent\Collection;
 use RuntimeException;
 use ZipArchive;
 
@@ -29,9 +28,9 @@ final class MerchantPaymentsExcelExporter
     ];
 
     /**
-     * @param  Collection<int, Payment>  $payments
+     * @param  iterable<int, Payment>  $payments
      */
-    public function generate(Collection $payments): string
+    public function generate(iterable $payments): string
     {
         $temporaryPath = tempnam(sys_get_temp_dir(), 'gatewayhub-payments-');
         if ($temporaryPath === false) {
@@ -79,10 +78,10 @@ final class MerchantPaymentsExcelExporter
     }
 
     /**
-     * @param  Collection<int, Payment>  $payments
+     * @param  iterable<int, Payment>  $payments
      * @return array<string, string>
      */
-    private function workbookFiles(Collection $payments): array
+    private function workbookFiles(iterable $payments): array
     {
         $timestamp = gmdate('Y-m-d\TH:i:s\Z');
 
@@ -208,9 +207,9 @@ XML;
     }
 
     /**
-     * @param  Collection<int, Payment>  $payments
+     * @param  iterable<int, Payment>  $payments
      */
-    private function worksheetXml(Collection $payments): string
+    private function worksheetXml(iterable $payments): string
     {
         $rows = [$this->headerRow()];
         foreach ($payments as $payment) {

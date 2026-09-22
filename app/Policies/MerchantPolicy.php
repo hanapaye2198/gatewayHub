@@ -7,12 +7,27 @@ use App\Models\User;
 
 class MerchantPolicy
 {
+    public function viewAny(User $user): bool
+    {
+        return $user->isPlatformOperator();
+    }
+
+    public function view(User $user, Merchant $merchant): bool
+    {
+        return $user->isPlatformOperator();
+    }
+
+    public function create(User $user): bool
+    {
+        return $user->isPlatformOperator();
+    }
+
     /**
      * Determine whether the user can update the merchant.
      */
     public function update(User $user, Merchant $merchant): bool
     {
-        if ($user->role === User::ROLE_ADMIN) {
+        if ($user->isPlatformOperator()) {
             return true;
         }
 

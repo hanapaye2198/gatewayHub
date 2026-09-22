@@ -14,5 +14,7 @@ class ExampleTest extends TestCase
         $response = $this->get(route('home'));
 
         $response->assertOk();
+        $response->assertDontSee('Google sign-in', false);
+        $response->assertDontSee('Sign up with email or Google', false);
     }
 }

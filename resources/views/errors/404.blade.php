@@ -20,7 +20,7 @@
 
         <div class="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
             @auth
-                @if (auth()->user()->role === \App\Models\User::ROLE_ADMIN && Route::has('admin.index'))
+                @if (auth()->user() instanceof \App\Models\User && auth()->user()->isPlatformOperator() && Route::has('admin.index'))
                     <flux:button variant="primary" :href="route('admin.index')" wire:navigate>
                         {{ __('Go to admin panel') }}
                     </flux:button>

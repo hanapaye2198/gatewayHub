@@ -15,6 +15,11 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', DashboardController::class)->name('admin.index');
 Route::livewire('/merchants', MerchantList::class)->name('admin.merchants.index');
+Route::get('/merchants/create', [MerchantsController::class, 'create'])->name('admin.merchants.create');
+Route::post('/merchants', [MerchantsController::class, 'store'])->name('admin.merchants.store');
+Route::get('/merchants/{merchant}', [MerchantsController::class, 'show'])->name('admin.merchants.show');
+Route::get('/merchants/{merchant}/edit', [MerchantsController::class, 'edit'])->name('admin.merchants.edit');
+Route::put('/merchants/{merchant}', [MerchantsController::class, 'update'])->name('admin.merchants.update');
 Route::patch('/merchants/{merchant}', [MerchantsController::class, 'toggleActive'])->name('admin.merchants.toggle');
 Route::livewire('/gateways', GatewayHub::class)->name('admin.gateways.index');
 Route::patch('/gateways/{gateway}/merchants/{merchant}', [GatewaysController::class, 'updateMerchantGateway'])->name('admin.gateways.merchant-update');

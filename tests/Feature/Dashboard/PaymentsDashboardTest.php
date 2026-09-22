@@ -41,7 +41,11 @@ class PaymentsDashboardTest extends TestCase
         $response->assertSee('500.00');
         $response->assertSee('PHP');
         $response->assertSee('Paid');
-        $response->assertSee('Download Excel');
+        $response->assertSee('Download Transactions');
+        $response->assertSee('Apply');
+        $response->assertSee('Clear');
+        $response->assertSee('name="from_date"', false);
+        $response->assertSee('name="to_date"', false);
     }
 
     public function test_merchant_does_not_see_other_merchants_payments(): void

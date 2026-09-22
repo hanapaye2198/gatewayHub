@@ -34,7 +34,6 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'google_id',
         'merchant_id',
         'onboarding_gateways_at',
         'onboarding_completed_at',
@@ -79,6 +78,14 @@ class User extends Authenticatable
     public function isMerchantUser(): bool
     {
         return $this->role === self::ROLE_MERCHANT_USER;
+    }
+
+    /**
+     * Platform-wide operator. Stored role remains {@see self::ROLE_ADMIN}.
+     */
+    public function isPlatformOperator(): bool
+    {
+        return $this->role === self::ROLE_ADMIN;
     }
 
     /**

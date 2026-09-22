@@ -4,6 +4,7 @@ use App\Enums\PaymentDisplayStatus;
 use App\Models\Gateway;
 use App\Models\Payment;
 use App\Services\PaymentStatusSyncService;
+use App\Services\Payments\MerchantPaymentQuery;
 use App\Services\Payments\PaymentDisplayStatusResolver;
 use App\Services\QrCodeGenerator;
 use Illuminate\Database\Eloquent\Builder;
@@ -166,32 +167,13 @@ new class extends Component {
             return Payment::query()->whereRaw('1 = 0');
         }
 
-        return Payment::query()
-            ->where('merchant_id', (int) $merchantId)
-            ->when($this->gatewayCode !== null, function (Builder $query): void {
-                $query->where('gateway_code', $this->gatewayCode);
-            })
-            ->when($this->status !== null, function (Builder $query): void {
-                $this->displayStatusResolver()->applyFilter($query, (string) $this->status);
-            })
-            ->when($this->reference !== null, function (Builder $query): void {
-                $reference = $this->reference;
-                if ($reference === null) {
-                    return;
-                }
-
-                $query->where(function (Builder $referenceQuery) use ($reference): void {
-                    $referenceQuery
-                        ->where('reference_id', 'like', '%'.$reference.'%')
-                        ->orWhere('provider_reference', 'like', '%'.$reference.'%');
-                });
-            })
-            ->when($this->fromDate !== null, function (Builder $query): void {
-                $query->whereDate('created_at', '>=', $this->fromDate);
-            })
-            ->when($this->toDate !== null, function (Builder $query): void {
-                $query->whereDate('created_at', '<=', $this->toDate);
-            });
+        return app(MerchantPaymentQuery::class)->forMerchant((int) $merchantId, [
+            'gateway_code' => $this->gatewayCode,
+            'status' => $this->status,
+            'reference' => $this->reference,
+            'from_date' => $this->fromDate,
+            'to_date' => $this->toDate,
+        ]);
     }
 
     /**
@@ -300,10 +282,10 @@ new class extends Component {
                 </div>
 
                 {{-- Filters Grid --}}
-                <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                <div class="grid items-end gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <div>
                         <label for="gateway_code" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{{ __('Gateway') }}</label>
-                        <select id="gateway_code" name="gateway_code" class="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100">
+                        <select id="gateway_code" name="gateway_code" class="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100">
                             <option value="">{{ __('All gateways') }}</option>
                             @foreach ($this->gatewayOptions as $gatewayOption)
                                 <option value="{{ $gatewayOption->code }}" @selected($gatewayCode === $gatewayOption->code)>
@@ -315,7 +297,7 @@ new class extends Component {
 
                     <div>
                         <label for="status_filter" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{{ __('Status') }}</label>
-                        <select id="status_filter" name="status" class="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100">
+                        <select id="status_filter" name="status" class="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100">
                             <option value="">{{ __('All statuses') }}</option>
                             @foreach (PaymentDisplayStatus::filterOptions() as $statusOption)
                                 <option value="{{ $statusOption->value }}" @selected($status === $statusOption->value)>
@@ -325,35 +307,39 @@ new class extends Component {
                         </select>
                     </div>
 
-                    <div class="md:col-span-2 lg:col-span-2">
-                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{{ __('Date Range') }}</label>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div class="relative">
-                                <flux:icon name="calendar" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
-                                <input id="from_date" name="from_date" type="date" value="{{ $fromDate ?? '' }}" class="w-full rounded-lg border border-zinc-300 bg-white pl-9 pr-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100" aria-label="{{ __('From date') }}">
-                            </div>
-                            <div class="relative">
-                                <flux:icon name="calendar" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
-                                <input id="to_date" name="to_date" type="date" value="{{ $toDate ?? '' }}" class="w-full rounded-lg border border-zinc-300 bg-white pl-9 pr-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100" aria-label="{{ __('To date') }}">
-                            </div>
+                    <div>
+                        <label for="from_date" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{{ __('From') }}</label>
+                        <div class="relative">
+                            <flux:icon name="calendar" class="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+                            <input id="from_date" name="from_date" type="date" value="{{ $fromDate ?? '' }}" class="h-10 w-full rounded-lg border border-zinc-300 bg-white ps-9 pe-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100">
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap items-end gap-2 lg:justify-end">
-                        <flux:button type="submit" variant="primary" class="whitespace-nowrap shadow-sm">
-                            <flux:icon name="funnel" class="mr-1 size-4" />
-                            {{ __('Apply') }}
-                        </flux:button>
-                        <a href="{{ route('dashboard') }}" class="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-300 px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-700 whitespace-nowrap">
-                            <flux:icon name="x-mark" class="mr-1 size-4" />
-                            {{ __('Clear') }}
-                        </a>
-                        <a href="{{ $this->exportUrl }}" class="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-300 px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-700 whitespace-nowrap">
-                            <flux:icon name="arrow-down-tray" class="mr-1 size-4" />
-                            {{ __('Download Excel') }}
-                        </a>
+                    <div>
+                        <label for="to_date" class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{{ __('To') }}</label>
+                        <div class="relative">
+                            <flux:icon name="calendar" class="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+                            <input id="to_date" name="to_date" type="date" value="{{ $toDate ?? '' }}" class="h-10 w-full rounded-lg border border-zinc-300 bg-white ps-9 pe-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100">
+                        </div>
                     </div>
                 </div>
+
+                <div class="flex flex-col gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-700 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <flux:button type="submit" variant="primary" icon="funnel" class="shadow-sm">
+                            {{ __('Apply') }}
+                        </flux:button>
+                        <flux:button variant="ghost" icon="x-mark" :href="route('dashboard')">
+                            {{ __('Clear') }}
+                        </flux:button>
+                    </div>
+                    <flux:button variant="outline" icon="arrow-down-tray" :href="$this->exportUrl" class="w-full sm:w-auto">
+                        {{ __('Download Transactions') }}
+                    </flux:button>
+                </div>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400">
+                    {{ __('Download Transactions includes every matching payment for these filters, not only this page.') }}
+                </p>
             </form>
         </div>
     </div>

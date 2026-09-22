@@ -44,7 +44,7 @@
                                 </span>
                                 <span>
                                     <span class="font-medium text-white">{{ __('Secure sign-in') }}</span>
-                                    {{ __('— email, password, and optional Google OAuth.') }}
+                                    {{ __('— email and password.') }}
                                 </span>
                             </li>
                             <li class="flex gap-3">

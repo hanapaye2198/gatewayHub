@@ -25,7 +25,7 @@ class EnsureAdmin
             abort(403, __('You do not have permission to access the admin panel.'));
         }
 
-        if ($user->role !== User::ROLE_ADMIN) {
+        if (! $user instanceof User || ! $user->isPlatformOperator()) {
             if ($request->expectsJson()) {
                 abort(403, __('You do not have permission to access the admin panel.'));
             }

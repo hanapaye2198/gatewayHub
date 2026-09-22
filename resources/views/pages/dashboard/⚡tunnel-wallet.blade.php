@@ -30,7 +30,7 @@ new class extends Component {
         }
 
         $user = auth()->user();
-        if ($user === null || $user->role !== 'admin') {
+        if (! $user instanceof \App\Models\User || ! $user->isPlatformOperator()) {
             abort(403);
         }
     }

@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Auth\GoogleController;
 use App\Http\Controllers\CoinsQrController;
 use App\Http\Controllers\Dashboard\CreatePaymentController;
 use App\Http\Controllers\Dashboard\PaymentDetailController;
@@ -11,9 +10,6 @@ use App\Http\Controllers\Merchant\MerchantWebhookSettingsController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\PaymentRedirectController;
 use Illuminate\Support\Facades\Route;
-
-Route::get('/auth/google', [GoogleController::class, 'redirect'])->name('google.redirect');
-Route::get('/auth/google/callback', [GoogleController::class, 'callback'])->name('google.callback');
 
 Route::get('/', HomeController::class)->name('home');
 Route::get('/health', fn () => response('ok', 200))->name('health');

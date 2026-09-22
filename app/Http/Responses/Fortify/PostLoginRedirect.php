@@ -17,13 +17,11 @@ class PostLoginRedirect
             return route('login');
         }
 
-        $role = $user->role ?? null;
-
-        if ($role === User::ROLE_ADMIN) {
+        if ($user instanceof User && $user->isPlatformOperator()) {
             return route('admin.index', absolute: false);
         }
 
-        if ($role === User::ROLE_MERCHANT_USER) {
+        if ($user instanceof User && $user->isMerchantUser()) {
             return $user->merchantOnboardingOrDashboardUrl();
         }
 

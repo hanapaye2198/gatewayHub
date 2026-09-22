@@ -28,15 +28,19 @@
                     </div>
                 </div>
 
-                {{-- Quick Stats --}}
-                <div class="flex gap-2">
-                    <div class="rounded-lg bg-emerald-50 px-4 py-2 dark:bg-emerald-950/30">
-                        <span class="text-xs font-medium text-emerald-600 dark:text-emerald-400">Active</span>
-                        <p class="text-lg font-semibold text-emerald-700 dark:text-emerald-300">{{ $activeCount }}</p>
-                    </div>
-                    <div class="rounded-lg bg-red-50 px-4 py-2 dark:bg-red-950/30">
-                        <span class="text-xs font-medium text-red-600 dark:text-red-400">Inactive</span>
-                        <p class="text-lg font-semibold text-red-700 dark:text-red-300">{{ $inactiveCount }}</p>
+                <div class="flex flex-col items-stretch gap-3 sm:items-end">
+                    <flux:button variant="primary" icon="plus" :href="route('admin.merchants.create')" wire:navigate>
+                        {{ __('Create merchant') }}
+                    </flux:button>
+                    <div class="flex gap-2">
+                        <div class="rounded-lg bg-emerald-50 px-4 py-2 dark:bg-emerald-950/30">
+                            <span class="text-xs font-medium text-emerald-600 dark:text-emerald-400">Active</span>
+                            <p class="text-lg font-semibold text-emerald-700 dark:text-emerald-300">{{ $activeCount }}</p>
+                        </div>
+                        <div class="rounded-lg bg-red-50 px-4 py-2 dark:bg-red-950/30">
+                            <span class="text-xs font-medium text-red-600 dark:text-red-400">Suspended</span>
+                            <p class="text-lg font-semibold text-red-700 dark:text-red-300">{{ $inactiveCount }}</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -89,7 +93,7 @@
                         <span class="font-semibold">
                             @if($statusFilter === 'all') All
                             @elseif($statusFilter === 'active') Active
-                            @else Inactive
+                            @else Suspended
                             @endif
                         </span>
                         <flux:icon name="chevron-down" class="size-4 transition-transform" ::class="{ 'rotate-180': open }" />
@@ -117,7 +121,7 @@
                             </button>
                             <button type="button" wire:click="$set('statusFilter', 'inactive')" @click="open = false" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700">
                                 <span class="h-2 w-2 rounded-full bg-red-500"></span>
-                                Inactive Only
+                                Suspended
                             </button>
                         </div>
                     </div>
@@ -203,7 +207,7 @@
                 @endif
                 @if($statusFilter !== 'all')
                     <span class="inline-flex items-center gap-1 rounded-full {{ $statusFilter === 'active' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400' }} px-3 py-1 text-xs font-medium">
-                        Status: {{ ucfirst($statusFilter) }}
+                        Status: {{ $statusFilter === 'active' ? 'Active' : 'Suspended' }}
                         <button type="button" wire:click="$set('statusFilter', 'all')" class="ml-1 hover:opacity-80">
                             <flux:icon name="x-mark" class="size-3" />
                         </button>
@@ -277,24 +281,32 @@
                                         <span class="relative inline-flex h-2.5 w-2.5 rounded-full {{ $merchant->is_active ? 'bg-emerald-500' : 'bg-red-500' }}"></span>
                                     </span>
                                     <span class="text-sm font-medium {{ $merchant->is_active ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400' }}">
-                                        {{ $merchant->is_active ? 'Active' : 'Inactive' }}
+                                        {{ $merchant->is_active ? 'Active' : 'Suspended' }}
                                     </span>
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-right">
-                                <form action="{{ route('admin.merchants.toggle', ['merchant' => $merchant]) }}" method="POST" class="inline">
-                                    @csrf
-                                    @method('PATCH')
-                                    @if ($merchant->is_active)
-                                        <flux:button type="submit" variant="danger" size="sm">
-                                            Deactivate
-                                        </flux:button>
-                                    @else
-                                        <flux:button type="submit" variant="primary" size="sm">
-                                            Activate
-                                        </flux:button>
-                                    @endif
-                                </form>
+                                <div class="flex items-center justify-end gap-2">
+                                    <flux:button size="sm" variant="ghost" :href="route('admin.merchants.show', $merchant)" wire:navigate>
+                                        {{ __('View') }}
+                                    </flux:button>
+                                    <flux:button size="sm" variant="ghost" :href="route('admin.merchants.edit', $merchant)" wire:navigate>
+                                        {{ __('Edit') }}
+                                    </flux:button>
+                                    <form action="{{ route('admin.merchants.toggle', ['merchant' => $merchant]) }}" method="POST" class="inline">
+                                        @csrf
+                                        @method('PATCH')
+                                        @if ($merchant->is_active)
+                                            <flux:button type="submit" variant="danger" size="sm">
+                                                {{ __('Suspend') }}
+                                            </flux:button>
+                                        @else
+                                            <flux:button type="submit" variant="primary" size="sm">
+                                                {{ __('Activate') }}
+                                            </flux:button>
+                                        @endif
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     @empty

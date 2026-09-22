@@ -19,7 +19,7 @@ class EnsureMerchant
         $user = $request->user();
 
         if ($user === null || $user->role !== \App\Models\User::ROLE_MERCHANT_USER) {
-            if ($user !== null && $user->role === \App\Models\User::ROLE_ADMIN && ! $request->expectsJson()) {
+            if ($user instanceof \App\Models\User && $user->isPlatformOperator() && ! $request->expectsJson()) {
                 return new RedirectResponse(PostLoginRedirect::path($user));
             }
 

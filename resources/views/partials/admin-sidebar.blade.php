@@ -19,7 +19,7 @@
                     {{ config('app.name') }}
                 </div>
                 <div class="truncate text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                    {{ __('Admin Panel') }}
+                    {{ __('Platform Administrator') }}
                 </div>
             </div>
         </a>

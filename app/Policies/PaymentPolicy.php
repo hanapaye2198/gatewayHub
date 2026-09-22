@@ -12,7 +12,7 @@ class PaymentPolicy
      */
     public function view(User $user, Payment $payment): bool
     {
-        if ($user->role === User::ROLE_ADMIN) {
+        if ($user->isPlatformOperator()) {
             return true;
         }
 

@@ -16,6 +16,15 @@ class AuthenticationTest extends TestCase
         $response = $this->get(route('login'));
 
         $response->assertOk();
+        $response->assertSee('Log in to your account', false);
+        $response->assertDontSee('Continue with Google', false);
+        $response->assertDontSee('Sign in with email or Google', false);
+    }
+
+    public function test_google_oauth_routes_are_not_registered(): void
+    {
+        $this->get('/auth/google')->assertNotFound();
+        $this->get('/auth/google/callback')->assertNotFound();
     }
 
     public function test_merchant_redirects_to_dashboard_after_login(): void

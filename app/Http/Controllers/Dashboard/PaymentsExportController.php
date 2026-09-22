@@ -4,10 +4,8 @@ namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Dashboard\FilterMerchantPaymentsRequest;
-use App\Models\Payment;
 use App\Services\Exports\MerchantPaymentsExcelExporter;
-use App\Services\Payments\PaymentDisplayStatusResolver;
-use Illuminate\Database\Eloquent\Builder;
+use App\Services\Payments\MerchantPaymentQuery;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -15,68 +13,38 @@ class PaymentsExportController extends Controller
 {
     public function __construct(
         private MerchantPaymentsExcelExporter $excelExporter,
-        private PaymentDisplayStatusResolver $displayStatusResolver,
+        private MerchantPaymentQuery $merchantPaymentQuery,
     ) {}
 
     public function __invoke(FilterMerchantPaymentsRequest $request): StreamedResponse
     {
-        $merchant = $request->user();
-        if ($merchant === null) {
+        $user = $request->user();
+        if ($user === null) {
             abort(401);
         }
 
-        $filters = $request->validated();
-        $mid = $merchant->merchant_id;
-        if ($mid === null) {
+        $merchantId = $user->merchant_id;
+        if ($merchantId === null) {
             abort(403);
         }
 
-        $payments = $this->buildFilteredPaymentsQuery($mid, $filters)
+        $payments = $this->merchantPaymentQuery
+            ->forMerchant((int) $merchantId, $request->validated())
             ->with([
                 'gateway:code,name',
-                'platformFee:id,payment_id,fee_amount,net_amount',
+                'platformFee:id,payment_id,fee_amount,fee_rate,net_amount',
                 'webhookEvents' => static fn (HasMany $query) => $query->orderByDesc('received_at'),
             ])
             ->latest('created_at')
-            ->get();
+            ->lazy(200);
 
         $workbook = $this->excelExporter->generate($payments);
-        $fileName = 'merchant-payments-'.now()->format('Ymd-His').'.xlsx';
+        $fileName = 'transactions_'.now()->format('Y-m-d_H-i-s').'.xlsx';
 
         return response()->streamDownload(function () use ($workbook): void {
             echo $workbook;
         }, $fileName, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
-    }
-
-    /**
-     * @param  array<string, mixed>  $filters
-     * @return Builder<Payment>
-     */
-    private function buildFilteredPaymentsQuery(int $merchantId, array $filters): Builder
-    {
-        return Payment::query()
-            ->where('merchant_id', $merchantId)
-            ->when(isset($filters['gateway_code']), static function (Builder $query) use ($filters): void {
-                $query->where('gateway_code', (string) $filters['gateway_code']);
-            })
-            ->when(isset($filters['status']), function (Builder $query) use ($filters): void {
-                $this->displayStatusResolver->applyFilter($query, (string) $filters['status']);
-            })
-            ->when(isset($filters['reference']), static function (Builder $query) use ($filters): void {
-                $reference = (string) $filters['reference'];
-                $query->where(static function (Builder $referenceQuery) use ($reference): void {
-                    $referenceQuery
-                        ->where('reference_id', 'like', '%'.$reference.'%')
-                        ->orWhere('provider_reference', 'like', '%'.$reference.'%');
-                });
-            })
-            ->when(isset($filters['from_date']), static function (Builder $query) use ($filters): void {
-                $query->whereDate('created_at', '>=', (string) $filters['from_date']);
-            })
-            ->when(isset($filters['to_date']), static function (Builder $query) use ($filters): void {
-                $query->whereDate('created_at', '<=', (string) $filters['to_date']);
-            });
     }
 }

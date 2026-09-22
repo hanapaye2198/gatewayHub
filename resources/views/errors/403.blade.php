@@ -5,7 +5,7 @@
     }
 
     $user = auth()->user();
-    $isAdmin = $user?->role === \App\Models\User::ROLE_ADMIN;
+    $isAdmin = $user instanceof \App\Models\User && $user->isPlatformOperator();
     $isMerchant = $user?->role === \App\Models\User::ROLE_MERCHANT_USER;
     $onAdminPath = request()->is('admin', 'admin/*');
 @endphp
