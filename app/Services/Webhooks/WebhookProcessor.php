@@ -108,8 +108,8 @@ class WebhookProcessor
                 return $this->acknowledgeWithMessage(['message' => 'Already processed']);
             }
 
-            DB::transaction(function () use ($payment, $normalized): void {
-                $this->applyStatusFromNormalized($payment, $normalized);
+            DB::transaction(function () use ($payment, $normalized, $providerName, $eventId): void {
+                $this->applyStatusFromNormalized($payment, $normalized, $providerName, $eventId);
                 $this->mergeRawResponse($payment, $normalized['raw_payload']);
                 $payment->save();
             });
@@ -150,9 +150,10 @@ class WebhookProcessor
      *  - paid   -> *        : BLOCKED. paid is financial finality; reversals
      *                         must go through an explicit reconciliation flow,
      *                         never a late-arriving webhook.
-     *  - failed -> paid     : BLOCKED. We already decided this payment failed;
-     *                         a later "SUCCEEDED" could be a replay, a misrouted
-     *                         provider retry, or a compromised callback.
+     *  - failed -> paid     : allowed only for an authenticated Coins callback
+     *                         that resolves to this exact payment. This is the
+     *                         provider-confirmed reconciliation path for a
+     *                         payment that GatewayHub previously marked failed.
      *  - refunded / failed_after_paid / provisioning_failed
      *                       : terminal states, webhook cannot mutate.
      *
@@ -167,14 +168,17 @@ class WebhookProcessor
      * Apply a normalized webhook status to the payment, respecting the strict
      * transition map above. Returns true when the payment's status actually
      * changed, false when the inbound webhook was ignored (same-state delivery
-     * or a blocked transition). Blocked transitions are logged so ops can see
-     * replays, misrouted callbacks, or provider-side reversals they need to
-     * reconcile out-of-band.
+     * or a blocked transition). A failed payment may only be reconciled to paid
+     * by a verified Coins webhook resolved against its exact provider reference.
      *
      * @param  array{status: 'paid'|'failed'|'pending'|'refunded'|'failed_after_paid', paid_at?: int|null}  $normalized
      */
-    private function applyStatusFromNormalized(Payment $payment, array $normalized): bool
-    {
+    private function applyStatusFromNormalized(
+        Payment $payment,
+        array $normalized,
+        string $providerName,
+        string $eventId,
+    ): bool {
         $incoming = $normalized['status'];
         $current = (string) $payment->status;
 
@@ -183,7 +187,12 @@ class WebhookProcessor
         }
 
         $allowed = self::ALLOWED_WEBHOOK_TRANSITIONS[$current] ?? [];
-        if (! in_array($incoming, $allowed, true)) {
+        $isCoinsReconciliation = $current === 'failed'
+            && $incoming === 'paid'
+            && $providerName === 'coins'
+            && in_array((string) $payment->gateway_code, ['coins', 'gcash', 'maya', 'paypal', 'qrph'], true);
+
+        if (! in_array($incoming, $allowed, true) && ! $isCoinsReconciliation) {
             Log::warning('webhook.payment_transition_blocked', [
                 'payment_id' => $payment->id,
                 'current_status' => $current,
@@ -192,6 +201,17 @@ class WebhookProcessor
             ]);
 
             return false;
+        }
+
+        if ($isCoinsReconciliation) {
+            Log::warning('webhook.payment_reconciled', [
+                'payment_id' => $payment->id,
+                'previous_status' => $current,
+                'new_status' => $incoming,
+                'provider' => $providerName,
+                'event_id' => $eventId,
+                'provider_reference' => $payment->provider_reference,
+            ]);
         }
 
         if ($incoming === 'paid') {
