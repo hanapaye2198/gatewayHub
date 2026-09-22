@@ -7,10 +7,9 @@ use App\Http\Requests\Dashboard\FilterMerchantPaymentsRequest;
 use App\Services\Exports\MerchantPaymentsExcelExporter;
 use App\Services\Payments\MerchantPaymentQuery;
 use App\Support\MerchantContext;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-class PaymentsExportController extends Controller
+class MerchantPaymentReportController extends Controller
 {
     public function __construct(
         private MerchantPaymentsExcelExporter $excelExporter,
@@ -29,18 +28,36 @@ class PaymentsExportController extends Controller
             abort(403);
         }
 
-        $payments = $this->merchantPaymentQuery
-            ->forMerchant((int) $merchantId, $request->validated())
+        $query = $this->merchantPaymentQuery->forMerchant((int) $merchantId, $request->validated());
+        $summary = $this->merchantPaymentQuery->reportSummary($query);
+
+        $payments = (clone $query)
+            ->select([
+                'id',
+                'merchant_id',
+                'gateway_code',
+                'reference_id',
+                'amount',
+                'currency',
+                'status',
+                'platform_fee',
+                'net_amount',
+                'created_at',
+                'paid_at',
+            ])
             ->with([
                 'gateway:code,name',
                 'platformFee:id,payment_id,fee_amount,fee_rate,net_amount',
-                'webhookEvents' => static fn (HasMany $query) => $query->orderByDesc('received_at'),
             ])
             ->latest('created_at')
             ->lazy(200);
 
-        $workbook = $this->excelExporter->generate($payments);
-        $fileName = 'transactions_'.now()->format('Y-m-d_H-i-s').'.xlsx';
+        $workbook = $this->excelExporter->generateReport(
+            $payments,
+            $summary,
+            (string) (app(MerchantContext::class)->merchant()?->name ?? ''),
+        );
+        $fileName = 'payment_report_'.now()->format('Y-m-d_H-i-s').'.xlsx';
 
         return response()->streamDownload(function () use ($workbook): void {
             echo $workbook;

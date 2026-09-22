@@ -2,16 +2,27 @@
 
 namespace Tests\Feature;
 
+use App\Models\Merchant;
 use App\Models\User;
 use Database\Seeders\AdminUserSeeder;
 use Database\Seeders\SuperAdminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 use Tests\TestCase;
 
 class SuperAdminSeederTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const SEED_PASSWORD = 'seeder-test-secret';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['auth.super_admin.password' => self::SEED_PASSWORD]);
+    }
 
     public function test_super_admin_seeder_creates_a_platform_operator(): void
     {
@@ -26,7 +37,8 @@ class SuperAdminSeederTest extends TestCase
         $this->assertNull($user->merchant_id);
         $this->assertTrue($user->is_active);
         $this->assertNotNull($user->email_verified_at);
-        $this->assertTrue(Hash::check('password', $user->password));
+        $this->assertTrue(Hash::check(self::SEED_PASSWORD, $user->password));
+        $this->assertNotSame(self::SEED_PASSWORD, $user->password);
         $this->assertNull($user->merchant);
     }
 
@@ -38,6 +50,50 @@ class SuperAdminSeederTest extends TestCase
         $this->assertSame(1, User::query()->where('email', 'admin@example.com')->count());
     }
 
+    public function test_running_the_seeder_again_does_not_overwrite_an_existing_password(): void
+    {
+        $merchant = Merchant::factory()->create();
+        $existing = User::factory()->create([
+            'email' => 'admin@example.com',
+            'name' => 'Existing Admin',
+            'password' => 'already-chosen-secret',
+            'role' => User::ROLE_MERCHANT_USER,
+            'merchant_id' => $merchant->id,
+            'is_active' => false,
+        ]);
+        $passwordHash = $existing->password;
+
+        $this->seed(SuperAdminSeeder::class);
+        $this->seed(SuperAdminSeeder::class);
+
+        $existing->refresh();
+
+        $this->assertSame(1, User::query()->where('email', 'admin@example.com')->count());
+        $this->assertSame($passwordHash, $existing->password);
+        $this->assertTrue(Hash::check('already-chosen-secret', $existing->password));
+        $this->assertFalse(Hash::check(self::SEED_PASSWORD, $existing->password));
+        $this->assertSame('Existing Admin', $existing->name);
+        $this->assertSame(User::ROLE_ADMIN, $existing->role);
+        $this->assertNull($existing->merchant_id);
+        $this->assertTrue($existing->is_active);
+    }
+
+    public function test_missing_password_configuration_fails_clearly(): void
+    {
+        foreach ([null, ''] as $password) {
+            config(['auth.super_admin.password' => $password]);
+
+            try {
+                $this->seed(SuperAdminSeeder::class);
+                $this->fail('Seeder should fail when SUPER_ADMIN_PASSWORD is missing.');
+            } catch (RuntimeException $exception) {
+                $this->assertStringContainsString('SUPER_ADMIN_PASSWORD', $exception->getMessage());
+            }
+        }
+
+        $this->assertSame(0, User::query()->where('email', 'admin@example.com')->count());
+    }
+
     public function test_admin_user_seeder_seeds_the_same_platform_operator(): void
     {
         $this->seed(AdminUserSeeder::class);
@@ -46,6 +102,9 @@ class SuperAdminSeederTest extends TestCase
 
         $this->assertInstanceOf(User::class, $user);
         $this->assertTrue($user->isPlatformOperator());
+        $this->assertSame(User::ROLE_ADMIN, $user->role);
+        $this->assertNull($user->merchant_id);
+        $this->assertTrue($user->is_active);
         $this->assertSame(1, User::query()->where('role', User::ROLE_ADMIN)->count());
     }
 }

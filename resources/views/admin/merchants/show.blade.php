@@ -15,6 +15,9 @@
                     <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium {{ $merchant->is_active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400' }}">
                         {{ $merchant->is_active ? __('Active') : __('Suspended') }}
                     </span>
+                    <flux:button variant="ghost" icon="users" :href="route('admin.merchants.users.index', $merchant)" wire:navigate>
+                        {{ __('Manage Users') }}
+                    </flux:button>
                     <flux:button variant="ghost" :href="route('admin.merchants.edit', $merchant)" wire:navigate>
                         {{ __('Edit') }}
                     </flux:button>
@@ -30,12 +33,25 @@
                     <flux:button variant="primary" :href="route('admin.payments.index', ['merchant_id' => $merchant->id])" wire:navigate>
                         {{ __('View payments') }}
                     </flux:button>
+                    @if ($merchant->is_active)
+                        <form action="{{ route('admin.merchants.access', $merchant) }}" method="POST">
+                            @csrf
+                            <flux:button type="submit" variant="primary">{{ __('Access Merchant') }}</flux:button>
+                        </form>
+                    @else
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Access Merchant is available for active merchants only.') }}</p>
+                    @endif
                 </div>
             </div>
 
             @if (session('status'))
                 <flux:callout variant="success" icon="check-circle" class="mt-5">
                     {{ session('status') }}
+                </flux:callout>
+            @endif
+            @if (session('error'))
+                <flux:callout variant="danger" icon="exclamation-triangle" class="mt-5">
+                    {{ session('error') }}
                 </flux:callout>
             @endif
         </div>

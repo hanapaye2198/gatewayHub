@@ -7,12 +7,17 @@ use App\Http\Requests\Admin\StoreMerchantRequest;
 use App\Http\Requests\Admin\UpdateMerchantRequest;
 use App\Models\Merchant;
 use App\Models\MerchantGateway;
+use App\Models\PlatformAuditLog;
+use App\Services\Admin\PlatformAuditService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 
 class MerchantsController extends Controller
 {
+    public function __construct(private PlatformAuditService $audit) {}
+
     public function index(): View
     {
         $this->authorize('viewAny', Merchant::class);
@@ -41,10 +46,23 @@ class MerchantsController extends Controller
     {
         $this->authorize('create', Merchant::class);
 
-        $merchant = Merchant::query()->create([
-            ...$this->merchantProfileAttributes($request->validated()),
-            'is_active' => true,
-        ]);
+        $merchant = DB::transaction(function () use ($request): Merchant {
+            $merchant = Merchant::query()->create([
+                ...$this->merchantProfileAttributes($request->validated()),
+                'is_active' => true,
+            ]);
+
+            $this->audit->record(
+                PlatformAuditLog::ACTION_MERCHANT_CREATED,
+                $merchant,
+                $merchant,
+                [],
+                $this->audit->merchantSnapshot($merchant),
+                'Created merchant '.$merchant->name.'.',
+            );
+
+            return $merchant;
+        });
 
         return redirect()
             ->route('admin.merchants.show', $merchant)
@@ -80,7 +98,24 @@ class MerchantsController extends Controller
     {
         $this->authorize('update', $merchant);
 
-        $merchant->update($this->merchantProfileAttributes($request->validated()));
+        DB::transaction(function () use ($request, $merchant): void {
+            $before = $this->audit->merchantSnapshot($merchant);
+            $merchant->update($this->merchantProfileAttributes($request->validated()));
+            [$old, $new] = $this->audit->changes($before, $this->audit->merchantSnapshot($merchant));
+
+            if ($old === [] && $new === []) {
+                return;
+            }
+
+            $this->audit->record(
+                PlatformAuditLog::ACTION_MERCHANT_UPDATED,
+                $merchant,
+                $merchant,
+                $old,
+                $new,
+                'Updated merchant '.$merchant->name.'.',
+            );
+        });
 
         return redirect()
             ->route('admin.merchants.show', $merchant)
@@ -91,9 +126,22 @@ class MerchantsController extends Controller
     {
         $this->authorize('update', $merchant);
 
-        $merchant->update(['is_active' => ! $merchant->is_active]);
+        DB::transaction(function () use ($merchant): void {
+            $wasActive = (bool) $merchant->is_active;
+            $merchant->update(['is_active' => ! $wasActive]);
+            $merchant->users()->update(['is_active' => $merchant->is_active]);
 
-        $merchant->users()->update(['is_active' => $merchant->is_active]);
+            $this->audit->record(
+                $merchant->is_active
+                    ? PlatformAuditLog::ACTION_MERCHANT_ACTIVATED
+                    : PlatformAuditLog::ACTION_MERCHANT_SUSPENDED,
+                $merchant,
+                $merchant,
+                ['is_active' => $wasActive],
+                ['is_active' => (bool) $merchant->is_active],
+                ($merchant->is_active ? 'Activated merchant ' : 'Suspended merchant ').$merchant->name.'.',
+            );
+        });
 
         return redirect()->route('admin.merchants.index')
             ->with('status', $merchant->is_active ? 'Merchant activated.' : 'Merchant suspended.');

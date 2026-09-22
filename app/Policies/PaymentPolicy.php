@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Payment;
 use App\Models\User;
+use App\Support\MerchantContext;
 
 class PaymentPolicy
 {
@@ -13,7 +14,10 @@ class PaymentPolicy
     public function view(User $user, Payment $payment): bool
     {
         if ($user->isPlatformOperator()) {
-            return true;
+            $merchantId = app(MerchantContext::class)->id();
+
+            return $merchantId !== null
+                && (int) $merchantId === (int) $payment->merchant_id;
         }
 
         return $user->merchant_id !== null

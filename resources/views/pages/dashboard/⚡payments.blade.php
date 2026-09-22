@@ -7,6 +7,7 @@ use App\Services\PaymentStatusSyncService;
 use App\Services\Payments\MerchantPaymentQuery;
 use App\Services\Payments\PaymentDisplayStatusResolver;
 use App\Services\QrCodeGenerator;
+use App\Support\MerchantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
@@ -75,8 +76,8 @@ new class extends Component {
     #[Computed]
     public function gatewayOptions()
     {
-        $merchantId = auth()->user()?->merchant_id;
-        if ($merchantId === null || $merchantId === '') {
+        $merchantId = $this->scopedMerchantId();
+        if ($merchantId === null) {
             return collect();
         }
 
@@ -99,14 +100,20 @@ new class extends Component {
     }
 
     #[Computed]
+    public function reportUrl(): string
+    {
+        return route('dashboard.payments.report', $this->activeFilterParams());
+    }
+
+    #[Computed]
     public function selectedPayment(): ?Payment
     {
         if ($this->selectedPaymentId === null) {
             return null;
         }
 
-        $merchantId = auth()->user()?->merchant_id;
-        if ($merchantId === null || $merchantId === '') {
+        $merchantId = $this->scopedMerchantId();
+        if ($merchantId === null) {
             return null;
         }
 
@@ -162,8 +169,8 @@ new class extends Component {
      */
     private function buildFilteredPaymentsQuery(): Builder
     {
-        $merchantId = auth()->user()?->merchant_id;
-        if ($merchantId === null || $merchantId === '') {
+        $merchantId = $this->scopedMerchantId();
+        if ($merchantId === null) {
             return Payment::query()->whereRaw('1 = 0');
         }
 
@@ -220,6 +227,11 @@ new class extends Component {
             : null;
     }
 
+    private function scopedMerchantId(): ?int
+    {
+        return app(MerchantContext::class)->id();
+    }
+
     private function normalizeDate(mixed $value): ?string
     {
         if (! is_string($value) || trim($value) === '') {
@@ -238,8 +250,12 @@ new class extends Component {
      */
     public function syncPendingFromProvider(PaymentStatusSyncService $paymentStatusSyncService): void
     {
-        $merchantId = auth()->user()?->merchant_id;
-        if ($merchantId === null || $merchantId === '') {
+        if (auth()->user()?->isPlatformOperator()) {
+            return;
+        }
+
+        $merchantId = $this->scopedMerchantId();
+        if ($merchantId === null) {
             return;
         }
 
@@ -256,9 +272,11 @@ new class extends Component {
                 <h1 class="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">{{ __('Payments') }}</h1>
                 <p class="mt-1 text-zinc-600 dark:text-zinc-400">{{ __('Track and manage all payment transactions from your gateways.') }}</p>
             </div>
-            <flux:button variant="primary" :href="route('dashboard.payments.create')" wire:navigate icon="plus" class="shadow-sm">
-                {{ __('Create Payment') }}
-            </flux:button>
+            @unless (auth()->user()?->isPlatformOperator())
+                <flux:button variant="primary" :href="route('dashboard.payments.create')" wire:navigate icon="plus" class="shadow-sm">
+                    {{ __('Create Payment') }}
+                </flux:button>
+            @endunless
         </div>
     </div>
 
@@ -333,12 +351,17 @@ new class extends Component {
                             {{ __('Clear') }}
                         </flux:button>
                     </div>
-                    <flux:button variant="outline" icon="arrow-down-tray" :href="$this->exportUrl" class="w-full sm:w-auto">
-                        {{ __('Download Transactions') }}
-                    </flux:button>
+                    <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                        <flux:button variant="outline" icon="document-text" :href="$this->reportUrl" class="w-full sm:w-auto">
+                            {{ __('Download Payment Report') }}
+                        </flux:button>
+                        <flux:button variant="outline" icon="arrow-down-tray" :href="$this->exportUrl" class="w-full sm:w-auto">
+                            {{ __('Download Transactions') }}
+                        </flux:button>
+                    </div>
                 </div>
                 <p class="text-xs text-zinc-500 dark:text-zinc-400">
-                    {{ __('Download Transactions includes every matching payment for these filters, not only this page.') }}
+                    {{ __('Payment Report and Download Transactions include every matching payment for these filters, not only this page.') }}
                 </p>
             </form>
         </div>

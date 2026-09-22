@@ -2,6 +2,7 @@
 
 use App\Models\Gateway;
 use App\Models\MerchantGateway;
+use App\Support\MerchantContext;
 use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -12,20 +13,42 @@ new class extends Component
     #[Layout('layouts.app', ['title' => 'Gateways'])]
     public array $gatewayStates = [];
 
+    public bool $readOnly = false;
+
     public ?array $coinsPingMessage = null;
 
     public function mount(): void
     {
         $user = auth()->user();
-        if ($user === null) {
+        $merchantId = app(MerchantContext::class)->id();
+        if ($user === null || $merchantId === null) {
             return;
         }
 
+        $this->readOnly = $user->isPlatformOperator();
         $gateways = Gateway::query()->orderBy('name')->get();
+
+        if ($this->readOnly) {
+            $existing = MerchantGateway::query()
+                ->where('merchant_id', $merchantId)
+                ->get(['id', 'merchant_id', 'gateway_id', 'is_enabled'])
+                ->keyBy('gateway_id');
+
+            foreach ($gateways as $gateway) {
+                $row = $existing->get($gateway->id);
+                $this->gatewayStates[$gateway->id] = [
+                    'enabled' => (bool) ($row?->is_enabled),
+                    'global_enabled' => (bool) $gateway->is_global_enabled,
+                ];
+            }
+
+            return;
+        }
+
         foreach ($gateways as $gateway) {
             $merchantGateway = MerchantGateway::query()->firstOrCreate(
                 [
-                    'merchant_id' => $user->merchant_id,
+                    'merchant_id' => $merchantId,
                     'gateway_id' => $gateway->id,
                 ],
                 [
@@ -50,7 +73,8 @@ new class extends Component
     public function toggleEnabled(int $gatewayId): void
     {
         $user = auth()->user();
-        if ($user === null) {
+        $merchantId = app(MerchantContext::class)->id();
+        if ($user === null || $merchantId === null || $user->isPlatformOperator()) {
             return;
         }
 
@@ -71,13 +95,13 @@ new class extends Component
         }
 
         $merchantGateway = MerchantGateway::query()
-            ->where('merchant_id', $user->merchant_id)
+            ->where('merchant_id', $merchantId)
             ->where('gateway_id', $gatewayId)
             ->first();
 
         MerchantGateway::query()->updateOrCreate(
             [
-                'merchant_id' => $user->merchant_id,
+                'merchant_id' => $merchantId,
                 'gateway_id' => $gatewayId,
             ],
             [
@@ -289,6 +313,7 @@ new class extends Component
                             </span>
                         @endif
 
+                        @unless ($readOnly)
                         {{-- Toggle button --}}
                         <button
                             type="button"
@@ -328,6 +353,7 @@ new class extends Component
                                 wire:change="toggleEnabled({{ $gateway->id }})"
                             />
                         </flux:field>
+                        @endunless
                     </div>
                 </div>
 

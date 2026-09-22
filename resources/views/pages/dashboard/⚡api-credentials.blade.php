@@ -18,9 +18,19 @@ new class extends Component
 
     public bool $hasWebhookSecret = false;
 
+    public bool $credentialsHidden = false;
+
     public function mount(): void
     {
-        $merchant = auth()->user()?->merchant;
+        $user = auth()->user();
+        if ($user?->isPlatformOperator()) {
+            $this->credentialsHidden = true;
+            $this->webhookUrl = app(\App\Support\MerchantContext::class)->merchant()?->webhook_url ?? '';
+
+            return;
+        }
+
+        $merchant = $user?->merchant;
         $this->webhookUrl = $merchant?->webhook_url ?? '';
         $ws = $merchant?->webhook_secret;
         $this->hasWebhookSecret = is_string($ws) && trim($ws) !== '';
@@ -33,6 +43,10 @@ new class extends Component
 
     public function regenerateApiKey(): void
     {
+        if ($this->credentialsHidden || auth()->user()?->isPlatformOperator()) {
+            return;
+        }
+
         $user = auth()->user();
         if ($user === null || $user->id !== auth()->id()) {
             return;
@@ -57,12 +71,20 @@ new class extends Component
 
     public function regenerateWebhookSecretNow(): void
     {
+        if ($this->credentialsHidden || auth()->user()?->isPlatformOperator()) {
+            return;
+        }
+
         $this->regenerateWebhookSecret = true;
         $this->updateWebhookSettings();
     }
 
     public function updateWebhookSettings(): void
     {
+        if ($this->credentialsHidden || auth()->user()?->isPlatformOperator()) {
+            return;
+        }
+
         $merchant = auth()->user()?->merchant;
         if ($merchant === null) {
             return;
@@ -102,6 +124,22 @@ new class extends Component
     }
 }; ?>
 
+@if ($credentialsHidden)
+    <div class="flex h-full w-full flex-1 flex-col gap-6 font-sans text-zinc-900 dark:text-zinc-100">
+        <div class="mx-auto w-full max-w-5xl space-y-6">
+            <div class="rounded-xl border border-zinc-200/80 bg-white p-6 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-800/80">
+                <h1 class="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">{{ __('API Credentials') }}</h1>
+                <p class="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
+                    {{ __('API keys and webhook secrets stay with the merchant account. They are not shown while you are viewing this merchant as Super Admin.') }}
+                </p>
+                <dl class="mt-6 text-sm">
+                    <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Webhook URL') }}</dt>
+                    <dd class="mt-1 break-all text-zinc-900 dark:text-zinc-100">{{ $webhookUrl !== '' ? $webhookUrl : __('Not set') }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+@else
 <div class="flex h-full w-full flex-1 flex-col gap-6 font-sans text-zinc-900 dark:text-zinc-100">
     <div class="mx-auto w-full max-w-5xl space-y-6">
         {{-- Page header (matches gateways / dashboard pattern) --}}
@@ -563,6 +601,7 @@ new class extends Component
         </div>
     </div>
 </div>
+@endif
 
 <style>
 [x-cloak] { display: none !important; }

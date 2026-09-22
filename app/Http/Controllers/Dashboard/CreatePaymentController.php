@@ -15,7 +15,7 @@ class CreatePaymentController extends Controller
     public function create(): View
     {
         $user = auth()->user();
-        if ($user === null) {
+        if ($user === null || $user->isPlatformOperator()) {
             abort(403);
         }
 
@@ -35,6 +35,10 @@ class CreatePaymentController extends Controller
     public function store(StorePaymentRequest $request, PaymentCreationService $creationService): RedirectResponse
     {
         $user = auth()->user();
+        if ($user?->isPlatformOperator()) {
+            abort(403);
+        }
+
         $merchant = $user?->merchant;
         if ($merchant === null) {
             abort(403);

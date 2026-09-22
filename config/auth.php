@@ -112,4 +112,18 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Platform administrator seed password
+    |--------------------------------------------------------------------------
+    |
+    | Used only by SuperAdminSeeder. There is no default. Set SUPER_ADMIN_PASSWORD
+    | in the environment before seeding. Do not commit a production password.
+    |
+    */
+
+    'super_admin' => [
+        'password' => env('SUPER_ADMIN_PASSWORD'),
+    ],
+
 ];

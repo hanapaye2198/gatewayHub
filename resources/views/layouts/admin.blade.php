@@ -12,6 +12,7 @@
         <x-layout-topbar :title="$title ?? null" :context="__('Admin Panel')" />
 
         <flux:main class="app-shell-main">
+            @include('partials.merchant-context-banner')
             @isset($slot)
                 {{ $slot }}
             @else

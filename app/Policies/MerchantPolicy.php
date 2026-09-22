@@ -23,6 +23,22 @@ class MerchantPolicy
     }
 
     /**
+     * Super Admin opens a temporary merchant-dashboard context.
+     */
+    public function access(User $user, Merchant $merchant): bool
+    {
+        return $user->isPlatformOperator();
+    }
+
+    /**
+     * Super Admin manages the users that belong to a merchant.
+     */
+    public function manageUsers(User $user, Merchant $merchant): bool
+    {
+        return $user->isPlatformOperator();
+    }
+
+    /**
      * Determine whether the user can update the merchant.
      */
     public function update(User $user, Merchant $merchant): bool

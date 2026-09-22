@@ -293,6 +293,12 @@
                                     <flux:button size="sm" variant="ghost" :href="route('admin.merchants.edit', $merchant)" wire:navigate>
                                         {{ __('Edit') }}
                                     </flux:button>
+                                    @if ($merchant->is_active)
+                                        <form action="{{ route('admin.merchants.access', $merchant) }}" method="POST" class="inline">
+                                            @csrf
+                                            <flux:button type="submit" size="sm" variant="primary">{{ __('Access Merchant') }}</flux:button>
+                                        </form>
+                                    @endif
                                     <form action="{{ route('admin.merchants.toggle', ['merchant' => $merchant]) }}" method="POST" class="inline">
                                         @csrf
                                         @method('PATCH')

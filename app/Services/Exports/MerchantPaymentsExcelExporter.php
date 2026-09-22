@@ -78,6 +78,68 @@ final class MerchantPaymentsExcelExporter
     }
 
     /**
+     * Official merchant payment report. Summary values are precomputed from stored columns.
+     *
+     * @param  iterable<int, Payment>  $payments
+     * @param  array{
+     *     total_transactions: int,
+     *     paid_transactions: int,
+     *     pending_transactions: int,
+     *     failed_transactions: int,
+     *     refunded_transactions: int,
+     *     gross_volume: float,
+     *     platform_fees: float,
+     *     merchant_net: float
+     * }  $summary
+     */
+    public function generateReport(iterable $payments, array $summary, string $merchantName): string
+    {
+        $temporaryPath = tempnam(sys_get_temp_dir(), 'gatewayhub-payment-report-');
+        if ($temporaryPath === false) {
+            throw new RuntimeException('Unable to create a temporary Excel workbook.');
+        }
+
+        $workbookPath = $temporaryPath.'.xlsx';
+
+        try {
+            if (is_file($temporaryPath)) {
+                unlink($temporaryPath);
+            }
+
+            $archive = new ZipArchive;
+            $openResult = $archive->open($workbookPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+            if ($openResult !== true) {
+                throw new RuntimeException('Unable to open the Excel workbook archive.');
+            }
+
+            try {
+                foreach ($this->reportWorkbookFiles($payments, $summary, $merchantName) as $fileName => $contents) {
+                    if ($archive->addFromString($fileName, $contents) === false) {
+                        throw new RuntimeException('Unable to add a file to the Excel workbook.');
+                    }
+
+                    $archive->setCompressionName($fileName, ZipArchive::CM_DEFLATE);
+                }
+            } finally {
+                $archive->close();
+            }
+
+            $workbook = file_get_contents($workbookPath);
+            if ($workbook === false) {
+                throw new RuntimeException('Unable to read the generated Excel workbook.');
+            }
+
+            return $this->makeZipCompatibleWithExcel($workbook);
+        } finally {
+            foreach ([$temporaryPath, $workbookPath] as $path) {
+                if (is_file($path)) {
+                    unlink($path);
+                }
+            }
+        }
+    }
+
+    /**
      * @param  iterable<int, Payment>  $payments
      * @return array<string, string>
      */
@@ -94,6 +156,36 @@ final class MerchantPaymentsExcelExporter
             'xl/_rels/workbook.xml.rels' => $this->workbookRelationshipsXml(),
             'xl/styles.xml' => $this->stylesXml(),
             'xl/worksheets/sheet1.xml' => $this->worksheetXml($payments),
+        ];
+    }
+
+    /**
+     * @param  iterable<int, Payment>  $payments
+     * @param  array{
+     *     total_transactions: int,
+     *     paid_transactions: int,
+     *     pending_transactions: int,
+     *     failed_transactions: int,
+     *     refunded_transactions: int,
+     *     gross_volume: float,
+     *     platform_fees: float,
+     *     merchant_net: float
+     * }  $summary
+     * @return array<string, string>
+     */
+    private function reportWorkbookFiles(iterable $payments, array $summary, string $merchantName): array
+    {
+        $timestamp = gmdate('Y-m-d\TH:i:s\Z');
+
+        return [
+            '[Content_Types].xml' => $this->contentTypesXml(),
+            '_rels/.rels' => $this->rootRelationshipsXml(),
+            'docProps/core.xml' => $this->corePropertiesXml($timestamp),
+            'docProps/app.xml' => $this->appPropertiesXml(),
+            'xl/workbook.xml' => $this->workbookXml('Payment Report'),
+            'xl/_rels/workbook.xml.rels' => $this->workbookRelationshipsXml(),
+            'xl/styles.xml' => $this->stylesXml(),
+            'xl/worksheets/sheet1.xml' => $this->reportWorksheetXml($payments, $summary, $merchantName),
         ];
     }
 
@@ -148,9 +240,11 @@ XML;
 XML;
     }
 
-    private function workbookXml(): string
+    private function workbookXml(string $sheetName = 'Transactions'): string
     {
-        return <<<'XML'
+        $safeName = htmlspecialchars($sheetName, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+
+        return <<<XML
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
     <workbookPr/>
@@ -158,7 +252,7 @@ XML;
         <workbookView xWindow="0" yWindow="0" windowWidth="20480" windowHeight="11905"/>
     </bookViews>
     <sheets>
-        <sheet name="Transactions" sheetId="1" r:id="rId1"/>
+        <sheet name="{$safeName}" sheetId="1" r:id="rId1"/>
     </sheets>
 </workbook>
 XML;
@@ -300,12 +394,142 @@ XML;
     }
 
     /**
+     * @param  iterable<int, Payment>  $payments
+     * @param  array{
+     *     total_transactions: int,
+     *     paid_transactions: int,
+     *     pending_transactions: int,
+     *     failed_transactions: int,
+     *     refunded_transactions: int,
+     *     gross_volume: float,
+     *     platform_fees: float,
+     *     merchant_net: float
+     * }  $summary
+     */
+    private function reportWorksheetXml(iterable $payments, array $summary, string $merchantName): string
+    {
+        $rows = [
+            [$this->textCell('Payment Report')],
+            [$this->textCell('Merchant'), $this->textCell($merchantName)],
+            [$this->textCell('Total Transactions'), $this->integerCell($summary['total_transactions'])],
+            [$this->textCell('Paid Transactions'), $this->integerCell($summary['paid_transactions'])],
+            [$this->textCell('Pending Transactions'), $this->integerCell($summary['pending_transactions'])],
+            [$this->textCell('Failed Transactions'), $this->integerCell($summary['failed_transactions'])],
+            [$this->textCell('Refunded Transactions'), $this->integerCell($summary['refunded_transactions'])],
+            [$this->textCell('Gross Transaction Volume'), $this->numberCell($summary['gross_volume'])],
+            [$this->textCell('Platform Fees'), $this->numberCell($summary['platform_fees'])],
+            [$this->textCell('Merchant Net Amount'), $this->numberCell($summary['merchant_net'])],
+            [],
+            $this->reportHeaderRow(),
+        ];
+        $headerRowNumber = count($rows);
+
+        foreach ($payments as $payment) {
+            $rows[] = $this->reportPaymentRow($payment);
+        }
+
+        $lastRow = count($rows);
+        $xmlRows = [];
+        foreach ($rows as $rowIndex => $row) {
+            $excelRow = $rowIndex + 1;
+            $cells = [];
+            foreach ($row as $columnIndex => $cell) {
+                $cellReference = $this->columnName($columnIndex + 1).$excelRow;
+                $style = $excelRow === $headerRowNumber ? ' s="1"' : '';
+
+                if ($cell['type'] === 'n') {
+                    $cells[] = '<c r="'.$cellReference.'" t="n"'.$style.'><v>'.$cell['value'].'</v></c>';
+
+                    continue;
+                }
+
+                $cells[] = $this->inlineStringCell($cellReference, $style, $cell['value']);
+            }
+
+            $xmlRows[] = '<row r="'.$excelRow.'">'.implode('', $cells).'</row>';
+        }
+
+        $headerCell = 'A'.$headerRowNumber;
+
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            .'<dimension ref="A1:J'.$lastRow.'"/>'
+            .'<sheetViews><sheetView workbookViewId="0"><pane ySplit="'.$headerRowNumber.'" topLeftCell="A'.($headerRowNumber + 1).'" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="'.$headerCell.'" sqref="'.$headerCell.'"/></sheetView></sheetViews>'
+            .'<sheetFormatPr defaultRowHeight="15"/>'
+            .'<cols>'
+            .'<col min="1" max="1" width="28" customWidth="1"/>'
+            .'<col min="2" max="2" width="28" customWidth="1"/>'
+            .'<col min="3" max="3" width="18" customWidth="1"/>'
+            .'<col min="4" max="4" width="14" customWidth="1"/>'
+            .'<col min="5" max="5" width="12" customWidth="1"/>'
+            .'<col min="6" max="6" width="22" customWidth="1"/>'
+            .'<col min="7" max="8" width="16" customWidth="1"/>'
+            .'<col min="9" max="10" width="21" customWidth="1"/>'
+            .'</cols>'
+            .'<sheetData>'.implode('', $xmlRows).'</sheetData>'
+            .'<autoFilter ref="A'.$headerRowNumber.':J'.$lastRow.'"/>'
+            .'<pageMargins left="0.25" right="0.25" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>'
+            .'</worksheet>';
+    }
+
+    /**
+     * @return list<array{value: string, type: 'inlineStr'|'n'}>
+     */
+    private function reportHeaderRow(): array
+    {
+        return array_map(fn (string $header): array => $this->textCell($header), [
+            'Transaction ID',
+            'Reference',
+            'Gateway',
+            'Amount',
+            'Currency',
+            'Status',
+            'Platform Fee',
+            'Net Amount',
+            'Created At',
+            'Paid At',
+        ]);
+    }
+
+    /**
+     * @return list<array{value: string, type: 'inlineStr'|'n'}>
+     */
+    private function reportPaymentRow(Payment $payment): array
+    {
+        $feeData = $payment->gatewayHubFeeData();
+
+        return [
+            $this->textCell($payment->getKey()),
+            $this->textCell($payment->reference_id),
+            $this->textCell($payment->gateway?->name ?? $payment->gateway_code),
+            $this->numberCell((float) $payment->amount),
+            $this->textCell($payment->currency),
+            $this->textCell((new PaymentDisplayStatusResolver)->resolve($payment)->label()),
+            $this->nullableNumberCell($feeData['gatewayhub_platform_fee']),
+            $this->nullableNumberCell($feeData['gatewayhub_net_amount']),
+            $this->textCell($this->formatDate($payment->created_at)),
+            $this->textCell($this->formatDate($payment->paid_at)),
+        ];
+    }
+
+    /**
      * @return array{value: string, type: 'inlineStr'|'n'}
      */
     private function numberCell(float $value): array
     {
         return [
             'value' => number_format($value, 2, '.', ''),
+            'type' => 'n',
+        ];
+    }
+
+    /**
+     * @return array{value: string, type: 'inlineStr'|'n'}
+     */
+    private function integerCell(int $value): array
+    {
+        return [
+            'value' => (string) $value,
             'type' => 'n',
         ];
     }

@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments;
 
+use App\Enums\PaymentDisplayStatus;
 use App\Models\Payment;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -46,6 +47,48 @@ final class MerchantPaymentQuery
             ->when($toDate !== null, static function (Builder $query) use ($toDate): void {
                 $query->whereDate('created_at', '<=', $toDate);
             });
+    }
+
+    /**
+     * Read stored payment totals for a merchant-scoped query. Fees are not recalculated.
+     *
+     * @param  Builder<Payment>  $query
+     * @return array{
+     *     total_transactions: int,
+     *     paid_transactions: int,
+     *     pending_transactions: int,
+     *     failed_transactions: int,
+     *     refunded_transactions: int,
+     *     gross_volume: float,
+     *     platform_fees: float,
+     *     merchant_net: float
+     * }
+     */
+    public function reportSummary(Builder $query): array
+    {
+        $failedQuery = clone $query;
+        $this->displayStatusResolver->applyFilter($failedQuery, PaymentDisplayStatus::Failed->value);
+
+        return [
+            'total_transactions' => (clone $query)->count(),
+            'paid_transactions' => (clone $query)->where('status', PaymentDisplayStatus::Paid->value)->count(),
+            'pending_transactions' => (clone $query)->where('status', PaymentDisplayStatus::Pending->value)->count(),
+            'failed_transactions' => $failedQuery->count(),
+            'refunded_transactions' => (clone $query)->where('status', PaymentDisplayStatus::Refunded->value)->count(),
+            'gross_volume' => $this->sumStoredColumn($query, 'amount'),
+            'platform_fees' => $this->sumStoredColumn($query, 'platform_fee'),
+            'merchant_net' => $this->sumStoredColumn($query, 'net_amount'),
+        ];
+    }
+
+    /**
+     * @param  Builder<Payment>  $query
+     */
+    private function sumStoredColumn(Builder $query, string $column): float
+    {
+        $sum = (clone $query)->sum($column);
+
+        return round((float) $sum, 2);
     }
 
     /**

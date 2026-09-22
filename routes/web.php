@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CoinsQrController;
 use App\Http\Controllers\Dashboard\CreatePaymentController;
+use App\Http\Controllers\Dashboard\MerchantPaymentReportController;
 use App\Http\Controllers\Dashboard\PaymentDetailController;
 use App\Http\Controllers\Dashboard\PaymentsExportController;
 use App\Http\Controllers\HomeController;
@@ -41,6 +42,7 @@ Route::middleware(['auth', 'verified', 'merchant.onboarding', \App\Http\Middlewa
     Route::livewire('dashboard/payments', 'pages::dashboard.payments')->name('dashboard.payments');
     Route::get('dashboard/payments/create', [CreatePaymentController::class, 'create'])->name('dashboard.payments.create');
     Route::post('dashboard/payments', [CreatePaymentController::class, 'store'])->name('dashboard.payments.store');
+    Route::get('dashboard/payments/report', MerchantPaymentReportController::class)->name('dashboard.payments.report');
     Route::get('dashboard/payments/export', PaymentsExportController::class)->name('dashboard.payments.export');
     Route::livewire('dashboard/api-credentials', 'pages::dashboard.api-credentials')->name('dashboard.api-credentials');
     Route::livewire('dashboard/gateways', 'pages::dashboard.gateways')->name('dashboard.gateways');

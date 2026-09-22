@@ -57,6 +57,10 @@ class PaymentDetailController extends Controller
     {
         abort_unless(auth()->user()?->can('view', $payment), 404);
 
+        if (auth()->user()?->isPlatformOperator()) {
+            return $this->statusPayload($payment);
+        }
+
         if ($payment->status === 'pending') {
             $paymentStatusSyncService->syncPendingPayment($payment);
             $payment->refresh();
@@ -69,6 +73,11 @@ class PaymentDetailController extends Controller
             }
         }
 
+        return $this->statusPayload($payment);
+    }
+
+    private function statusPayload(Payment $payment): JsonResponse
+    {
         $status = match ($payment->status) {
             'paid' => 'success',
             'failed' => 'failed',

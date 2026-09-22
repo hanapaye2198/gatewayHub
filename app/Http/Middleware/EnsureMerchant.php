@@ -3,6 +3,9 @@
 namespace App\Http\Middleware;
 
 use App\Http\Responses\Fortify\PostLoginRedirect;
+use App\Models\Merchant;
+use App\Models\User;
+use App\Support\MerchantContext;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,11 +21,30 @@ class EnsureMerchant
     {
         $user = $request->user();
 
-        if ($user === null || $user->role !== \App\Models\User::ROLE_MERCHANT_USER) {
-            if ($user instanceof \App\Models\User && $user->isPlatformOperator() && ! $request->expectsJson()) {
-                return new RedirectResponse(PostLoginRedirect::path($user));
+        if ($user instanceof User && $user->isPlatformOperator()) {
+            $hadContext = $request->session()->has(MerchantContext::SESSION_ID);
+            $merchant = app(MerchantContext::class)->merchant();
+
+            if ($merchant instanceof Merchant) {
+                $request->attributes->set('current_merchant', $merchant);
+
+                return $next($request);
             }
 
+            if ($request->expectsJson()) {
+                abort(403, __('Merchant context is not active.'));
+            }
+
+            if ($hadContext) {
+                return redirect()
+                    ->route('admin.index')
+                    ->with('status', __('Merchant context ended because that merchant is no longer available.'));
+            }
+
+            return new RedirectResponse(PostLoginRedirect::path($user));
+        }
+
+        if ($user === null || $user->role !== User::ROLE_MERCHANT_USER) {
             abort(403, __('Merchant dashboard access is limited to merchant accounts.'));
         }
 
