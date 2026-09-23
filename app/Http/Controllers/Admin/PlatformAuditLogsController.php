@@ -45,7 +45,7 @@ class PlatformAuditLogsController extends Controller
             'filters' => $filters,
             'actions' => PlatformAuditLog::ACTIONS,
             'merchants' => Merchant::query()->orderBy('name')->get(['id', 'name']),
-            'actors' => User::query()->where('role', User::ROLE_ADMIN)->orderBy('name')->get(['id', 'name']),
+            'actors' => User::query()->whereIn('role', [User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN])->orderBy('name')->get(['id', 'name']),
         ]);
     }
 

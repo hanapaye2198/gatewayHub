@@ -14,8 +14,9 @@ class MerchantManagementTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_platform_operator_is_only_the_existing_admin_role(): void
+    public function test_platform_operators_are_super_admin_and_admin(): void
     {
+        $superAdmin = User::factory()->superAdmin()->create();
         $admin = User::factory()->admin()->create();
         $merchantUser = User::factory()->create();
         $staff = User::factory()->create([
@@ -23,7 +24,13 @@ class MerchantManagementTest extends TestCase
             'merchant_id' => null,
         ]);
 
+        $this->assertSame(User::ROLE_SUPER_ADMIN, $superAdmin->role);
+        $this->assertTrue($superAdmin->isSuperAdmin());
+        $this->assertFalse($superAdmin->isAdmin());
+        $this->assertTrue($superAdmin->isPlatformOperator());
         $this->assertSame(User::ROLE_ADMIN, $admin->role);
+        $this->assertTrue($admin->isAdmin());
+        $this->assertFalse($admin->isSuperAdmin());
         $this->assertTrue($admin->isPlatformOperator());
         $this->assertFalse($merchantUser->isPlatformOperator());
         $this->assertFalse($staff->isPlatformOperator());

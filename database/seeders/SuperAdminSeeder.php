@@ -3,13 +3,15 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Support\DesignatedPlatformOwner;
 use Illuminate\Database\Seeder;
 use RuntimeException;
 
 class SuperAdminSeeder extends Seeder
 {
     /**
-     * Seed the platform operator. The stored role remains admin.
+     * Seed the designated platform owner as super_admin.
+     * An existing password is left unchanged.
      */
     public function run(): void
     {
@@ -22,7 +24,7 @@ class SuperAdminSeeder extends Seeder
         }
 
         $user = User::query()->firstOrNew([
-            'email' => 'admin@example.com',
+            'email' => DesignatedPlatformOwner::email(),
         ]);
 
         if (! $user->exists) {
@@ -32,7 +34,7 @@ class SuperAdminSeeder extends Seeder
         }
 
         $user->forceFill([
-            'role' => User::ROLE_ADMIN,
+            'role' => User::ROLE_SUPER_ADMIN,
             'merchant_id' => null,
             'is_active' => true,
         ])->save();

@@ -18,6 +18,8 @@ class User extends Authenticatable
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
 
+    public const ROLE_SUPER_ADMIN = 'super_admin';
+
     public const ROLE_ADMIN = 'admin';
 
     public const ROLE_MERCHANT_USER = 'merchant_user';
@@ -75,17 +77,31 @@ class User extends Authenticatable
         ];
     }
 
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === self::ROLE_SUPER_ADMIN;
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === self::ROLE_ADMIN;
+    }
+
     public function isMerchantUser(): bool
     {
         return $this->role === self::ROLE_MERCHANT_USER;
     }
 
     /**
-     * Platform-wide operator. Stored role remains {@see self::ROLE_ADMIN}.
+     * Platform operator with access to the admin panel.
+     * Super Admin and Admin are distinct; merchant access stays separate.
      */
     public function isPlatformOperator(): bool
     {
-        return $this->role === self::ROLE_ADMIN;
+        return in_array($this->role, [
+            self::ROLE_SUPER_ADMIN,
+            self::ROLE_ADMIN,
+        ], true);
     }
 
     /**

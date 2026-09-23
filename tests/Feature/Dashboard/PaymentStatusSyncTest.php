@@ -233,7 +233,7 @@ class PaymentStatusSyncTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_local_expiry_then_late_succeeded_webhook_remains_failed(): void
+    public function test_local_expiry_then_verified_coins_success_webhook_reconciles_to_paid(): void
     {
         Log::spy();
         $this->app['config']->set('coins.webhook.allow_dev_bypass', false);
@@ -288,19 +288,20 @@ class PaymentStatusSyncTest extends TestCase
         ])->assertOk();
 
         $payment->refresh();
-        $this->assertSame('failed', $payment->status);
-        $this->assertNull($payment->paid_at);
+        $this->assertSame('paid', $payment->status);
+        $this->assertNotNull($payment->paid_at);
+        $this->assertSame(1707475200, $payment->paid_at->timestamp);
         $this->assertTrue(
             WebhookEvent::query()->where('payment_id', $payment->id)->exists()
         );
 
         Log::shouldHaveReceived('warning')
             ->withArgs(function (string $message, array $context) use ($payment): bool {
-                return $message === 'webhook.payment_transition_blocked'
+                return $message === 'webhook.payment_reconciled'
                     && ($context['payment_id'] ?? null) === $payment->id
-                    && ($context['current_status'] ?? null) === 'failed'
-                    && ($context['incoming_status'] ?? null) === 'paid'
-                    && ($context['reason'] ?? null) === 'failed_cannot_become_paid';
+                    && ($context['previous_status'] ?? null) === 'failed'
+                    && ($context['new_status'] ?? null) === 'paid'
+                    && ($context['provider'] ?? null) === 'coins';
             });
     }
 }

@@ -105,6 +105,17 @@ class UserFactory extends Factory
     }
 
     /**
+     * Indicate that the user has the super admin role.
+     */
+    public function superAdmin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => User::ROLE_SUPER_ADMIN,
+            'merchant_id' => null,
+        ]);
+    }
+
+    /**
      * Store API credentials on the linked {@see Merchant} (Bearer auth resolves merchants, not users).
      */
     public function withMerchantApiKey(string $apiKey): static

@@ -33,6 +33,10 @@ class EnsureAdmin
             return new RedirectResponse(PostLoginRedirect::path($user));
         }
 
+        if (! $user->is_active) {
+            abort(403, __('Your account has been deactivated.'));
+        }
+
         return $next($request);
     }
 }

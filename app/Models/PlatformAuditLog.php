@@ -34,6 +34,16 @@ class PlatformAuditLog extends Model
 
     public const ACTION_MERCHANT_CONTEXT_EXITED = 'merchant.context_exited';
 
+    public const ACTION_ADMIN_CREATED = 'admin.created';
+
+    public const ACTION_ADMIN_UPDATED = 'admin.updated';
+
+    public const ACTION_ADMIN_ENABLED = 'admin.enabled';
+
+    public const ACTION_ADMIN_DISABLED = 'admin.disabled';
+
+    public const ACTION_PLATFORM_FEE_UPDATED = 'platform_fee.updated';
+
     /**
      * @var list<string>
      */
@@ -48,6 +58,11 @@ class PlatformAuditLog extends Model
         self::ACTION_MERCHANT_USER_DISABLED,
         self::ACTION_MERCHANT_CONTEXT_ENTERED,
         self::ACTION_MERCHANT_CONTEXT_EXITED,
+        self::ACTION_ADMIN_CREATED,
+        self::ACTION_ADMIN_UPDATED,
+        self::ACTION_ADMIN_ENABLED,
+        self::ACTION_ADMIN_DISABLED,
+        self::ACTION_PLATFORM_FEE_UPDATED,
     ];
 
     /**

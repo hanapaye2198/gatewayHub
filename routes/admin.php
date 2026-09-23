@@ -6,7 +6,9 @@ use App\Http\Controllers\Admin\MerchantContextController;
 use App\Http\Controllers\Admin\MerchantsController;
 use App\Http\Controllers\Admin\MerchantUsersController;
 use App\Http\Controllers\Admin\PaymentsController;
+use App\Http\Controllers\Admin\PlatformAdministratorsController;
 use App\Http\Controllers\Admin\PlatformAuditLogsController;
+use App\Http\Controllers\Admin\PlatformFeeController;
 use App\Http\Controllers\Admin\TunnelWalletsController;
 use App\Livewire\Admin\GatewayHub;
 use App\Livewire\Admin\MerchantList;
@@ -36,6 +38,17 @@ Route::livewire('/gateways', GatewayHub::class)->name('admin.gateways.index');
 Route::patch('/gateways/{gateway}/merchants/{merchant}', [GatewaysController::class, 'updateMerchantGateway'])->name('admin.gateways.merchant-update');
 Route::patch('/gateways/{gateway}/platform-config', [GatewaysController::class, 'updatePlatformConfig'])->name('admin.gateways.platform-config');
 Route::patch('/gateways/{gateway}', [GatewaysController::class, 'toggleEnabled'])->name('admin.gateways.toggle');
+Route::middleware('super-admin')->group(function (): void {
+    Route::get('/administrators', [PlatformAdministratorsController::class, 'index'])->name('admin.administrators.index');
+    Route::get('/administrators/create', [PlatformAdministratorsController::class, 'create'])->name('admin.administrators.create');
+    Route::post('/administrators', [PlatformAdministratorsController::class, 'store'])->name('admin.administrators.store');
+    Route::get('/administrators/{administrator}/edit', [PlatformAdministratorsController::class, 'edit'])->name('admin.administrators.edit')->whereNumber('administrator');
+    Route::match(['put', 'patch'], '/administrators/{administrator}', [PlatformAdministratorsController::class, 'update'])->name('admin.administrators.update')->whereNumber('administrator');
+    Route::patch('/administrators/{administrator}/active', [PlatformAdministratorsController::class, 'toggle'])->name('admin.administrators.toggle')->whereNumber('administrator');
+    Route::get('/platform-fee', [PlatformFeeController::class, 'edit'])->name('admin.platform-fee.edit');
+    Route::put('/platform-fee', [PlatformFeeController::class, 'update'])->name('admin.platform-fee.update');
+});
+
 Route::get('/audit-logs', [PlatformAuditLogsController::class, 'index'])->name('admin.audit-logs.index');
 Route::get('/audit-logs/{platformAuditLog}', [PlatformAuditLogsController::class, 'show'])->name('admin.audit-logs.show')->whereNumber('platformAuditLog');
 Route::get('/payments/export', [PaymentsController::class, 'export'])->name('admin.payments.export');

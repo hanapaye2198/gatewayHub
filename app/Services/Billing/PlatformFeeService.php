@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Single, safe entry point for platform revenue.
- * Accepts Payment; calculates the GatewayHub 1.5% fee from gross amount and creates platform_fees record.
+ * Accepts Payment; calculates the GatewayHub fee from the configured global rate and creates the platform_fees record.
  * Idempotent; uses transaction and payment row lock. No UI or gateway logic.
  */
 class PlatformFeeService
@@ -79,13 +79,15 @@ class PlatformFeeService
     }
 
     /**
-     * Calculate the GatewayHub platform fee from gross amount. Formula: gross * 1.5%.
+     * Calculate the GatewayHub platform fee from gross amount.
+     * Formula: fee = round(gross × configured percentage / 100, 2).
+     * The percentage comes from the active global platform fee rule.
      *
      * @return array{fee_rate: float, fee_amount: float, net_amount: float}
      */
     public function calculateFromConfig(float $grossAmount): array
     {
-        $percentage = config('platform.fees.percentage', 1.5);
+        $percentage = PlatformFeeRule::configuredPercentage();
         $feeAmount = round($grossAmount * $percentage / 100, 2);
         $netAmount = round($grossAmount - $feeAmount, 2);
 

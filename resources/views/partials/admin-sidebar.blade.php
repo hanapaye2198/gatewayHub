@@ -51,6 +51,16 @@
                 </flux:sidebar.item>
             @endif
         </flux:sidebar.group>
+        @if (auth()->user()?->isSuperAdmin())
+            <flux:sidebar.group :heading="__('Platform')" class="grid gap-1">
+                <flux:sidebar.item icon="shield-check" :href="route('admin.administrators.index')" :current="request()->routeIs('admin.administrators.*')" wire:navigate>
+                    {{ __('Administrators') }}
+                </flux:sidebar.item>
+                <flux:sidebar.item icon="cog-6-tooth" :href="route('admin.platform-fee.edit')" :current="request()->routeIs('admin.platform-fee.*')" wire:navigate>
+                    {{ __('Platform Fee') }}
+                </flux:sidebar.item>
+            </flux:sidebar.group>
+        @endif
     </flux:sidebar.nav>
 
     <div class="app-shell-sidebar-footer in-data-flux-sidebar-collapsed-desktop:hidden">

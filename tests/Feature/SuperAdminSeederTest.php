@@ -21,7 +21,10 @@ class SuperAdminSeederTest extends TestCase
     {
         parent::setUp();
 
-        config(['auth.super_admin.password' => self::SEED_PASSWORD]);
+        config([
+            'auth.super_admin.password' => self::SEED_PASSWORD,
+            'auth.super_admin.email' => 'admin@example.com',
+        ]);
     }
 
     public function test_super_admin_seeder_creates_a_platform_operator(): void
@@ -32,8 +35,10 @@ class SuperAdminSeederTest extends TestCase
 
         $this->assertInstanceOf(User::class, $user);
         $this->assertSame('Super Admin', $user->name);
-        $this->assertSame(User::ROLE_ADMIN, $user->role);
+        $this->assertSame(User::ROLE_SUPER_ADMIN, $user->role);
+        $this->assertTrue($user->isSuperAdmin());
         $this->assertTrue($user->isPlatformOperator());
+        $this->assertFalse($user->isAdmin());
         $this->assertNull($user->merchant_id);
         $this->assertTrue($user->is_active);
         $this->assertNotNull($user->email_verified_at);
@@ -73,7 +78,7 @@ class SuperAdminSeederTest extends TestCase
         $this->assertTrue(Hash::check('already-chosen-secret', $existing->password));
         $this->assertFalse(Hash::check(self::SEED_PASSWORD, $existing->password));
         $this->assertSame('Existing Admin', $existing->name);
-        $this->assertSame(User::ROLE_ADMIN, $existing->role);
+        $this->assertSame(User::ROLE_SUPER_ADMIN, $existing->role);
         $this->assertNull($existing->merchant_id);
         $this->assertTrue($existing->is_active);
     }
@@ -101,10 +106,50 @@ class SuperAdminSeederTest extends TestCase
         $user = User::query()->where('email', 'admin@example.com')->first();
 
         $this->assertInstanceOf(User::class, $user);
+        $this->assertTrue($user->isSuperAdmin());
         $this->assertTrue($user->isPlatformOperator());
-        $this->assertSame(User::ROLE_ADMIN, $user->role);
+        $this->assertSame(User::ROLE_SUPER_ADMIN, $user->role);
         $this->assertNull($user->merchant_id);
         $this->assertTrue($user->is_active);
-        $this->assertSame(1, User::query()->where('role', User::ROLE_ADMIN)->count());
+        $this->assertSame(0, User::query()->where('role', User::ROLE_ADMIN)->count());
+        $this->assertSame(1, User::query()->where('role', User::ROLE_SUPER_ADMIN)->count());
+    }
+
+    public function test_seeder_does_not_promote_other_admin_accounts(): void
+    {
+        $other = User::factory()->admin()->create([
+            'email' => 'ops@example.com',
+        ]);
+
+        $this->seed(SuperAdminSeeder::class);
+
+        $other->refresh();
+        $this->assertSame(User::ROLE_ADMIN, $other->role);
+        $this->assertFalse($other->isSuperAdmin());
+        $this->assertNull($other->merchant_id);
+    }
+
+    public function test_promotion_updates_only_the_designated_admin(): void
+    {
+        config(['auth.super_admin.email' => 'owner@example.com']);
+        $merchant = Merchant::factory()->create();
+        $owner = User::factory()->admin()->create([
+            'email' => 'owner@example.com',
+            'merchant_id' => $merchant->id,
+            'password' => 'owner-secret',
+        ]);
+        $password = $owner->password;
+        $other = User::factory()->admin()->create(['email' => 'ops@example.com']);
+        $merchantUser = User::factory()->create();
+
+        $this->assertSame(1, \App\Support\DesignatedPlatformOwner::promoteExistingAdmin());
+
+        $owner->refresh();
+        $this->assertSame(User::ROLE_SUPER_ADMIN, $owner->role);
+        $this->assertNull($owner->merchant_id);
+        $this->assertSame($password, $owner->password);
+        $this->assertSame(User::ROLE_ADMIN, $other->refresh()->role);
+        $this->assertSame(User::ROLE_MERCHANT_USER, $merchantUser->refresh()->role);
+        $this->assertNotNull($merchantUser->merchant_id);
     }
 }

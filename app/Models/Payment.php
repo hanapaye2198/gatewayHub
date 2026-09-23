@@ -83,7 +83,7 @@ class Payment extends Model
             'gross_amount' => (float) $this->amount,
             'gatewayhub_platform_fee_percent' => $hasLedger
                 ? (float) $ledger->fee_rate * 100
-                : (float) config('platform.fees.percentage', 1.5),
+                : PlatformFeeRule::configuredPercentage(),
             'gatewayhub_platform_fee' => $hasLedger
                 ? (float) $ledger->fee_amount
                 : ($this->platform_fee !== null ? (float) $this->platform_fee : null),
