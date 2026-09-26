@@ -91,6 +91,7 @@ class PaymentCreationService
             'gateway_request_reference' => $gatewayRequestReference,
             'merchant_reference' => $data['reference'],
         ]);
+        $rawToStore = $this->withSavedQrPayload($rawToStore, $response);
 
         DB::transaction(function () use ($payment, $externalPaymentId, $rawToStore): void {
             $payment->update([
@@ -257,6 +258,34 @@ class PaymentCreationService
     private function buildGatewayRequestReference(Merchant $merchant): string
     {
         return sprintf('GH-%d-%s', $merchant->id, Str::upper((string) Str::ulid()));
+    }
+
+    /**
+     * Keep the scannable payload beside the provider body so a later status merge cannot drop it.
+     *
+     * @param  array<string, mixed>  $rawToStore
+     * @param  array<string, mixed>  $response
+     * @return array<string, mixed>
+     */
+    private function withSavedQrPayload(array $rawToStore, array $response): array
+    {
+        $qrString = $response['qr_string'] ?? null;
+        if (! is_string($qrString) || $qrString === '') {
+            $qrString = $response['qr_data'] ?? null;
+        }
+
+        if (is_string($qrString) && $qrString !== '' && ($response['qr_image'] ?? null) !== $qrString) {
+            $rawToStore['qr_string'] = $qrString;
+
+            return $rawToStore;
+        }
+
+        $qrImage = $response['qr_image'] ?? null;
+        if (is_string($qrImage) && $qrImage !== '') {
+            $rawToStore['qr_image'] = $qrImage;
+        }
+
+        return $rawToStore;
     }
 
     /**

@@ -249,17 +249,70 @@ class Payment extends Model
             return null;
         }
 
-        $data = $raw['data'] ?? $raw;
-        if (! is_array($data)) {
-            return null;
+        $saved = $this->qrDataFromArray($raw);
+        if ($saved !== null) {
+            return $saved;
         }
 
-        $qrImage = $data['qrImage'] ?? $data['qr_image'] ?? $data['qrImageUrl'] ?? $data['imageUrl'] ?? null;
+        $data = $raw['data'] ?? null;
+        if (is_string($data) && $data !== '') {
+            return ['type' => 'string', 'value' => $data];
+        }
+
+        if (is_array($data)) {
+            return $this->qrDataFromArray($data);
+        }
+
+        return null;
+    }
+
+    /**
+     * Keep a provider payload merge from dropping a QR string already stored on the payment.
+     *
+     * @param  array<string, mixed>  $incoming
+     */
+    public function mergeProviderResponse(array $incoming): void
+    {
+        $previous = $this->getQrData();
+        $existing = is_array($this->raw_response) ? $this->raw_response : [];
+        $merged = array_merge($existing, $incoming);
+
+        if (is_array($existing['data'] ?? null) && is_array($incoming['data'] ?? null)) {
+            $merged['data'] = array_merge($existing['data'], $incoming['data']);
+        }
+
+        $this->raw_response = $merged;
+
+        if ($this->getQrData() !== null || $previous === null || $previous['type'] !== 'string') {
+            return;
+        }
+
+        $this->rememberQrString($previous['value']);
+    }
+
+    public function rememberQrString(string $qrString): void
+    {
+        if ($qrString === '') {
+            return;
+        }
+
+        $raw = is_array($this->raw_response) ? $this->raw_response : [];
+        $raw['qr_string'] = $qrString;
+        $this->raw_response = $raw;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{type: string, value: string}|null
+     */
+    private function qrDataFromArray(array $payload): ?array
+    {
+        $qrImage = $payload['qrImage'] ?? $payload['qr_image'] ?? $payload['qrImageUrl'] ?? $payload['imageUrl'] ?? null;
         if (is_string($qrImage) && $qrImage !== '') {
             return ['type' => 'image', 'value' => $qrImage];
         }
 
-        $qrString = $data['qrCode'] ?? $data['qr_string'] ?? $data['qrString'] ?? $data['payload'] ?? null;
+        $qrString = $payload['qrCode'] ?? $payload['qr_string'] ?? $payload['qrString'] ?? $payload['payload'] ?? null;
         if (is_string($qrString) && $qrString !== '') {
             return ['type' => 'string', 'value' => $qrString];
         }

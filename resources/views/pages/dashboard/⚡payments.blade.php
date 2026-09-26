@@ -128,10 +128,18 @@ new class extends Component {
         return $payment instanceof Payment ? $payment : null;
     }
 
-    public function selectPayment(string $id): void
+    public function selectPayment(string $id, PaymentStatusSyncService $paymentStatusSyncService): void
     {
         $this->selectedPaymentId = $id;
         $this->showPaymentDetail = true;
+
+        $payment = $this->selectedPayment;
+        if (! $payment instanceof Payment || $payment->getQrData() !== null) {
+            return;
+        }
+
+        $paymentStatusSyncService->syncPendingPayment($payment);
+        unset($this->selectedPayment);
     }
 
     public function closeDetail(): void

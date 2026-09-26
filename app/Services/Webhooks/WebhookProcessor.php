@@ -257,11 +257,7 @@ class WebhookProcessor
      */
     private function mergeRawResponse(Payment $payment, array $payload): void
     {
-        $existing = $payment->raw_response ?? [];
-        if (! is_array($existing)) {
-            $existing = [];
-        }
-        $payment->raw_response = array_merge($existing, $payload);
+        $payment->mergeProviderResponse($payload);
     }
 
     /**

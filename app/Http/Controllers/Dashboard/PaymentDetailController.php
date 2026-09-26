@@ -15,12 +15,20 @@ use Illuminate\Http\Response;
 
 class PaymentDetailController extends Controller
 {
-    public function __invoke(Payment $payment, QrCodeGenerator $qrGenerator): View|Response|RedirectResponse
-    {
+    public function __invoke(
+        Payment $payment,
+        QrCodeGenerator $qrGenerator,
+        PaymentStatusSyncService $paymentStatusSyncService,
+    ): View|Response|RedirectResponse {
         abort_unless(auth()->user()?->can('view', $payment), 404);
 
         if ($payment->status === 'paid') {
             return redirect()->route('dashboard.payments');
+        }
+
+        if ($payment->status === 'pending' && $payment->getQrData() === null) {
+            $paymentStatusSyncService->syncPendingPayment($payment);
+            $payment->refresh();
         }
 
         $payment->load([

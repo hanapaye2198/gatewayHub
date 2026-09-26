@@ -88,6 +88,8 @@ class CreatePaymentTest extends TestCase
         ]);
 
         $payment = Payment::query()->where('merchant_id', $user->id)->firstOrFail();
+        $this->assertSame('qr123', $payment->raw_response['qr_string'] ?? null);
+        $this->assertSame('qr123', $payment->getQrData()['value'] ?? null);
         $this->assertMatchesRegularExpression(
             '/^GH-'.$user->id.'-[0-9A-HJKMNP-TV-Z]{26}$/',
             (string) ($payment->raw_response['gateway_request_reference'] ?? '')

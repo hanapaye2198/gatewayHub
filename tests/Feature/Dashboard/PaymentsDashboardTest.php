@@ -5,6 +5,7 @@ namespace Tests\Feature\Dashboard;
 use App\Models\Gateway;
 use App\Models\Payment;
 use App\Models\User;
+use App\Services\Gateways\Drivers\CoinsDriver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -118,12 +119,8 @@ class PaymentsDashboardTest extends TestCase
         $this->assertNotNull($response->instance()->selectedPayment);
         $this->assertSame($payment->id, $response->instance()->selectedPayment->id);
         $response->assertOk();
-        $html = $response->html();
-        $this->assertTrue(
-            str_contains($html, 'Scan to Pay')
-            || str_contains($html, 'QR code unavailable'),
-            'Expected pending QR payment to show either scan instructions or unavailable message'
-        );
+        $response->assertSee('Scan to Pay');
+        $response->assertDontSee('QR code unavailable.');
     }
 
     public function test_selected_payment_is_null_for_other_merchant_payment(): void
@@ -163,13 +160,65 @@ class PaymentsDashboardTest extends TestCase
 
         $response->assertSet('showPaymentDetail', true);
         $response->assertOk();
-        $html = $response->html();
-        $this->assertTrue(
-            str_contains($html, 'Scan to Pay')
-            || str_contains($html, 'QR code unavailable'),
-            'Expected Maya-labeled pending payment to show scan instructions or unavailable message'
-        );
+        $response->assertSee('Scan to Pay');
+        $response->assertDontSee('QR code unavailable.');
         $response->assertDontSee('Open checkout');
+    }
+
+    public function test_pending_payment_modal_loads_qr_from_coins_when_it_was_not_stored(): void
+    {
+        Gateway::query()->create([
+            'code' => 'coins',
+            'name' => 'Coins.ph',
+            'driver_class' => CoinsDriver::class,
+            'is_global_enabled' => true,
+            'config_json' => [
+                'client_id' => 'prod-client',
+                'client_secret' => 'prod-secret',
+                'api_base' => 'prod',
+            ],
+        ]);
+
+        Http::fake([
+            'api.pro.coins.ph/openapi/fiat/v1/get_qr_code*' => Http::response([
+                'status' => 0,
+                'error' => 'OK',
+                'data' => [
+                    'requestId' => 'GH-QR-BACKFILL-01',
+                    'qrCode' => '000201010212backfill',
+                    'status' => 'PENDING',
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $payment = Payment::factory()->for($user->merchant)->create([
+            'reference_id' => 'DASH-QR-BACKFILL',
+            'gateway_code' => 'gcash',
+            'provider_reference' => 'GH-QR-BACKFILL-01',
+            'status' => 'pending',
+            'raw_response' => [
+                'gateway_request_reference' => 'GH-QR-BACKFILL-01',
+                'data' => [
+                    'requestId' => 'GH-QR-BACKFILL-01',
+                    'status' => 'PENDING',
+                ],
+            ],
+        ]);
+
+        $response = Livewire::actingAs($user)->test('pages::dashboard.payments')
+            ->call('selectPayment', $payment->id);
+
+        $response->assertSee('Scan to Pay');
+        $response->assertDontSee('QR code unavailable.');
+
+        $payment->refresh();
+        $this->assertSame('000201010212backfill', $payment->raw_response['qr_string'] ?? null);
+        $this->assertSame('pending', $payment->status);
+
+        $detail = $this->actingAs($user)->get(route('dashboard.payments.show', $payment));
+        $detail->assertOk();
+        $detail->assertSee('Scan with GCash, Maya, Coins wallet, or other QRPH-compatible apps.');
     }
 
     public function test_qr_payment_shows_paid_state_when_paid(): void

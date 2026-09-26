@@ -56,13 +56,19 @@ class PaymentStatusSyncService
             return;
         }
 
+        $this->rememberQrFromProviderStatus($payment, $providerStatus);
+
         $normalized = $this->coinsWebhookNormalizer->normalize($providerStatus, []);
         if ($normalized['status'] === 'pending') {
+            if ($payment->isDirty('raw_response')) {
+                $payment->save();
+            }
+
             return;
         }
 
         $this->applyNormalizedStatus($payment, $normalized);
-        $payment->raw_response = $this->mergeRawResponse($payment->raw_response, $providerStatus);
+        $payment->mergeProviderResponse($providerStatus);
         $payment->save();
     }
 
@@ -157,12 +163,23 @@ class PaymentStatusSyncService
 
     /**
      * @param  array<string, mixed>  $providerStatus
-     * @return array<string, mixed>
      */
-    private function mergeRawResponse(mixed $existingRawResponse, array $providerStatus): array
+    private function rememberQrFromProviderStatus(Payment $payment, array $providerStatus): void
     {
-        $existing = is_array($existingRawResponse) ? $existingRawResponse : [];
+        if ($payment->getQrData() !== null) {
+            return;
+        }
 
-        return array_merge($existing, $providerStatus);
+        $data = $providerStatus['data'] ?? $providerStatus;
+        if (! is_array($data)) {
+            return;
+        }
+
+        $qrString = $data['qrCode'] ?? $data['qr_string'] ?? $data['qrString'] ?? $data['payload'] ?? null;
+        if (! is_string($qrString) || $qrString === '') {
+            return;
+        }
+
+        $payment->rememberQrString($qrString);
     }
 }
