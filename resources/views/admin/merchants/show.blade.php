@@ -103,6 +103,12 @@
                             {{ $webhookSecretConfigured ? __('Configured') : __('Not configured') }}
                         </dd>
                     </div>
+                    <div>
+                        <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Platform fee') }}</dt>
+                        <dd class="mt-1 text-zinc-900 dark:text-zinc-100">
+                            {{ $merchantPlatformFeePercentage !== null ? $merchantPlatformFeePercentage.'%' : __('Global default :rate%', ['rate' => $globalPlatformFeePercentage]) }}
+                        </dd>
+                    </div>
                 </dl>
             </div>
 
@@ -121,6 +127,36 @@
                     </ul>
                 @endif
             </div>
+
+            @if (auth()->user()?->isSuperAdmin())
+                <div class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-900 lg:col-span-2">
+                    <h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{{ __('Merchant platform fee') }}</h2>
+                    <p class="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-300">
+                        {{ __('Leave this blank to use the global default of :rate%. The fee is calculated from the original transaction amount and added on top.', ['rate' => $globalPlatformFeePercentage]) }}
+                    </p>
+                    <form method="POST" action="{{ route('admin.merchants.platform-fee.update', $merchant) }}" class="mt-5 flex max-w-xl flex-col gap-5">
+                        @csrf
+                        @method('PUT')
+                        <flux:field>
+                            <flux:label for="percentage">{{ __('Override percentage') }}</flux:label>
+                            <flux:input
+                                id="percentage"
+                                name="percentage"
+                                type="number"
+                                inputmode="decimal"
+                                step="0.01"
+                                min="0"
+                                max="100"
+                                :value="old('percentage', $merchantPlatformFeePercentage)"
+                            />
+                            <flux:error name="percentage" />
+                        </flux:field>
+                        <div>
+                            <flux:button type="submit" variant="primary">{{ __('Save platform fee') }}</flux:button>
+                        </div>
+                    </form>
+                </div>
+            @endif
         </div>
     </div>
 @endsection

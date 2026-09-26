@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\UpdateMerchantRequest;
 use App\Models\Merchant;
 use App\Models\MerchantGateway;
 use App\Models\PlatformAuditLog;
+use App\Models\PlatformFeeRule;
 use App\Services\Admin\PlatformAuditService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -81,6 +82,8 @@ class MerchantsController extends Controller
             'enabledGateways' => $this->enabledGateways($merchant),
             'apiKeyConfigured' => $merchant->hasApiKey(),
             'webhookSecretConfigured' => filled($merchant->getRawOriginal('webhook_secret')),
+            'merchantPlatformFeePercentage' => PlatformFeeRule::activeMerchantPercentageRule((int) $merchant->id)?->percentage(),
+            'globalPlatformFeePercentage' => number_format(PlatformFeeRule::configuredPercentage(), 2, '.', ''),
         ]);
     }
 

@@ -467,9 +467,9 @@ new class extends Component {
                     <tr>
                         <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Reference</th>
                         <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Gateway</th>
-                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Gross Amount</th>
-                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">GatewayHub Fee</th>
-                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Net After GatewayHub Fee</th>
+                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Transaction Amount</th>
+                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Platform Fee</th>
+                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Customer Total</th>
                         <th class="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Status</th>
                         <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Created</th>
                         <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Actions</th>
@@ -493,10 +493,22 @@ new class extends Component {
                                 {{ number_format($payment->amount, 2) }} {{ $payment->currency }}
                             </td>
                             <td class="whitespace-nowrap px-5 py-4 text-right font-mono text-sm text-zinc-500 dark:text-zinc-400">
-                                {{ $payment->platformFee ? '-' . number_format($payment->platformFee->fee_amount, 2) . ' ' . $payment->currency : '—' }}
+                                @if ($payment->usesAdditivePricing())
+                                    {{ number_format((float) $payment->platform_fee, 2) }} {{ $payment->currency }}
+                                @elseif ($payment->platformFee)
+                                    -{{ number_format($payment->platformFee->fee_amount, 2) }} {{ $payment->currency }}
+                                @else
+                                    —
+                                @endif
                             </td>
                             <td class="whitespace-nowrap px-5 py-4 text-right font-mono text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                                {{ $payment->platformFee ? number_format($payment->platformFee->net_amount, 2) . ' ' . $payment->currency : '—' }}
+                                @if ($payment->usesAdditivePricing())
+                                    {{ number_format((float) $payment->customer_total, 2) }} {{ $payment->currency }}
+                                @elseif ($payment->platformFee)
+                                    {{ number_format($payment->platformFee->net_amount, 2) }} {{ $payment->currency }}
+                                @else
+                                    —
+                                @endif
                             </td>
                             <td class="whitespace-nowrap px-5 py-4 text-center">
                                 @php $rowDisplayStatus = $this->displayStatus($payment); @endphp
@@ -560,25 +572,7 @@ new class extends Component {
                     <x-status-badge :status="$modalDisplayStatus->value" :label="$modalDisplayStatus->label()" class="px-3 py-1" />
                 </div>
 
-                @if ($this->selectedPayment->status === 'paid' && $this->selectedPayment->platform_fee !== null)
-                    <div class="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900/40">
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-zinc-600 dark:text-zinc-400">{{ __('Gross Amount') }}</span>
-                            <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ number_format($this->selectedPayment->amount, 2) }} {{ $this->selectedPayment->currency }}</span>
-                        </div>
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-zinc-600 dark:text-zinc-400">{{ __('GatewayHub Platform Fee') }}</span>
-                            <span class="font-medium text-rose-600 dark:text-rose-400">-{{ number_format($this->selectedPayment->platform_fee, 2) }} {{ $this->selectedPayment->currency }}</span>
-                        </div>
-                        <div class="mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-700">
-                            <div class="flex items-center justify-between text-sm font-semibold">
-                                <span class="text-zinc-900 dark:text-zinc-100">{{ __('Net After GatewayHub Fee') }}</span>
-                                <span class="text-emerald-600 dark:text-emerald-400">{{ number_format($this->selectedPayment->net_amount, 2) }} {{ $this->selectedPayment->currency }}</span>
-                            </div>
-                        </div>
-                        <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">{{ __('GatewayHub fee is 1.5% of the gross amount. Provider processing or conversion fees are not included.') }}</p>
-                    </div>
-                @endif
+                @include('partials.payment-amount-breakdown', ['payment' => $this->selectedPayment])
 
                 <div class="min-h-[220px] flex flex-col items-center justify-center rounded-xl bg-zinc-50 p-6 dark:bg-zinc-900/40">
                     @if ($this->selectedPayment->status === 'pending')

@@ -47,6 +47,7 @@ Route::middleware('super-admin')->group(function (): void {
     Route::patch('/administrators/{administrator}/active', [PlatformAdministratorsController::class, 'toggle'])->name('admin.administrators.toggle')->whereNumber('administrator');
     Route::get('/platform-fee', [PlatformFeeController::class, 'edit'])->name('admin.platform-fee.edit');
     Route::put('/platform-fee', [PlatformFeeController::class, 'update'])->name('admin.platform-fee.update');
+    Route::put('/merchants/{merchant}/platform-fee', [PlatformFeeController::class, 'updateMerchant'])->name('admin.merchants.platform-fee.update');
 });
 
 Route::get('/audit-logs', [PlatformAuditLogsController::class, 'index'])->name('admin.audit-logs.index');

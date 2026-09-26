@@ -75,10 +75,15 @@ class CheckoutCreationTest extends TestCase
 
         $response->assertStatus(201);
         $response->assertJsonPath('data.checkout_url', 'https://checkout.coins.test/pay/chk-001');
+        $response->assertJsonPath('data.amount', 100);
         $response->assertJsonPath('data.gross_amount', 100);
+        $response->assertJsonPath('data.base_amount', 100);
         $response->assertJsonPath('data.gatewayhub_platform_fee_percent', 1.5);
-        $response->assertJsonPath('data.gatewayhub_platform_fee', null);
-        $response->assertJsonPath('data.gatewayhub_net_amount', null);
+        $response->assertJsonPath('data.gatewayhub_platform_fee', 1.5);
+        $response->assertJsonPath('data.platform_fee', 1.5);
+        $response->assertJsonPath('data.convenience_fee', 20);
+        $response->assertJsonPath('data.customer_total', 121.5);
+        $response->assertJsonPath('data.gatewayhub_net_amount', 100);
         $response->assertJsonStructure([
             'data' => [
                 'transaction_id',

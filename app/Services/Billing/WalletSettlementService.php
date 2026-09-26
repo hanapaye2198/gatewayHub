@@ -40,6 +40,12 @@ class WalletSettlementService
                     return;
                 }
 
+                if ($lockedPayment->customer_total !== null) {
+                    $this->recordAdditiveCollection($lockedPayment);
+
+                    return;
+                }
+
                 $grossAmount = round((float) $lockedPayment->amount, 2);
                 $rawTaxAmount = round((float) ($lockedPayment->platform_fee ?? 0), 2);
                 $taxAmount = min($grossAmount, max(0.0, $rawTaxAmount));
@@ -190,6 +196,64 @@ class WalletSettlementService
         }
 
         return $settledCount;
+    }
+
+    /**
+     * Customer paid the base amount plus fees. The merchant settlement is the base amount.
+     * Platform fee and convenience fee are retained from the amount collected.
+     */
+    private function recordAdditiveCollection(Payment $lockedPayment): void
+    {
+        $collected = round((float) $lockedPayment->customer_total, 2);
+        $base = round((float) $lockedPayment->amount, 2);
+        $platformFee = round(max(0, (float) ($lockedPayment->platform_fee ?? 0)), 2);
+        $convenienceFee = round(max(0, (float) ($lockedPayment->convenience_fee ?? 0)), 2);
+        $merchantSettlement = $base;
+
+        $this->resolveSettings((int) $lockedPayment->merchant_id);
+
+        $currency = $lockedPayment->currency;
+        $metadata = [
+            'gateway' => $lockedPayment->gateway_code,
+            'reference_id' => $lockedPayment->reference_id,
+            'base_amount' => $base,
+            'customer_total' => $collected,
+            'platform_fee' => $platformFee,
+            'convenience_fee' => $convenienceFee,
+        ];
+
+        $tunnelWallet = $this->resolveMerchantWallet((int) $lockedPayment->merchant_id, Wallet::TYPE_MERCHANT_CLEARING, $currency);
+        $taxWallet = $this->resolveSystemWallet(Wallet::TYPE_SYSTEM_TAX, $currency);
+
+        $this->post($tunnelWallet, $lockedPayment, 'credit', $collected, WalletTransaction::ENTRY_PAYMENT_RECEIVED_GROSS, $metadata, true);
+        $this->appendFlowLogToLockedPayment($lockedPayment, self::SOURCE_CHANNEL_USER_TO_SUREPAY, [
+            'status' => 'success',
+            'stage' => 'gross_received',
+            'amount' => $collected,
+            'currency' => $currency,
+            'reference_id' => $lockedPayment->reference_id,
+            'gateway' => $lockedPayment->gateway_code,
+        ]);
+
+        if ($platformFee > 0) {
+            $this->post($tunnelWallet, $lockedPayment, 'debit', $platformFee, WalletTransaction::ENTRY_SUREPAY_TAX_COLLECTED, $metadata, true);
+            $this->post($taxWallet, $lockedPayment, 'credit', $platformFee, WalletTransaction::ENTRY_SUREPAY_TAX_COLLECTED, $metadata, true);
+        }
+
+        if ($convenienceFee > 0) {
+            $this->post($tunnelWallet, $lockedPayment, 'debit', $convenienceFee, WalletTransaction::ENTRY_CONVENIENCE_FEE_COLLECTED, $metadata, true);
+            $this->post($taxWallet, $lockedPayment, 'credit', $convenienceFee, WalletTransaction::ENTRY_CONVENIENCE_FEE_COLLECTED, $metadata, true);
+        }
+
+        $this->post($tunnelWallet, $lockedPayment, 'credit', $merchantSettlement, WalletTransaction::ENTRY_TUNNEL_NET_AVAILABLE, $metadata, false, false);
+        $this->appendSurepaySendingLogToLockedPayment($lockedPayment, [
+            'status' => 'queued',
+            'stage' => 'net_held_in_tunnel',
+            'amount' => $merchantSettlement,
+            'currency' => $currency,
+            'reference_id' => $lockedPayment->reference_id,
+            'gateway' => $lockedPayment->gateway_code,
+        ], self::SOURCE_CHANNEL_USER_TO_SUREPAY);
     }
 
     /**

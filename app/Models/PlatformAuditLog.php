@@ -44,6 +44,8 @@ class PlatformAuditLog extends Model
 
     public const ACTION_PLATFORM_FEE_UPDATED = 'platform_fee.updated';
 
+    public const ACTION_MERCHANT_PLATFORM_FEE_UPDATED = 'merchant_platform_fee.updated';
+
     /**
      * @var list<string>
      */
@@ -63,6 +65,7 @@ class PlatformAuditLog extends Model
         self::ACTION_ADMIN_ENABLED,
         self::ACTION_ADMIN_DISABLED,
         self::ACTION_PLATFORM_FEE_UPDATED,
+        self::ACTION_MERCHANT_PLATFORM_FEE_UPDATED,
     ];
 
     /**

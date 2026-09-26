@@ -23,7 +23,7 @@
                 </div>
             @endif
             <flux:heading size="lg">{{ __('Create Payment') }}</flux:heading>
-            <flux:subheading class="mt-1">{{ __('Create a new payment. All options are collected via Coins dynamic QR.') }}</flux:subheading>
+            <flux:subheading class="mt-1">{{ __('Enter the original transaction amount. GatewayHub adds the platform fee and convenience fee on top, and the customer pays that total.') }}</flux:subheading>
 
             @if ($enabledGateways->isEmpty())
                 <flux:callout variant="warning" icon="exclamation-triangle" class="mt-6">

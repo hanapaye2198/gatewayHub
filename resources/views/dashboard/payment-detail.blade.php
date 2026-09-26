@@ -31,7 +31,10 @@
             @endif
             <flux:heading size="lg">{{ $payment->reference_id }}</flux:heading>
             <flux:subheading class="mt-1">
-                {{ $payment->gateway?->name ?? ucfirst($payment->gateway_code) }} | {{ number_format($payment->amount, 2) }} {{ $payment->currency }}
+                {{ $payment->gateway?->name ?? ucfirst($payment->gateway_code) }}
+                |
+                {{ $payment->usesAdditivePricing() ? number_format((float) $payment->customer_total, 2) : number_format($payment->amount, 2) }}
+                {{ $payment->currency }}
             </flux:subheading>
             <flux:text class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
                 {{ __('Status updates are recorded from Coins webhook events.') }}
@@ -77,20 +80,9 @@
                             <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Gateway') }}</flux:text>
                             <flux:text class="mt-1 block">{{ $payment->gateway?->name ?? ucfirst($payment->gateway_code) }}</flux:text>
                         </div>
-                        <div>
-                            <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Gross Amount') }}</flux:text>
-                            <flux:text class="mt-1 block">{{ number_format($payment->amount, 2) }} {{ $payment->currency }}</flux:text>
+                        <div class="sm:col-span-2">
+                            @include('partials.payment-amount-breakdown', ['payment' => $payment])
                         </div>
-                        @if ($payment->status === 'paid' && $payment->platform_fee !== null)
-                            <div>
-                                <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('GatewayHub Platform Fee') }}</flux:text>
-                                <flux:text class="mt-1 block">-{{ number_format($payment->platform_fee, 2) }} {{ $payment->currency }}</flux:text>
-                            </div>
-                            <div>
-                                <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Net After GatewayHub Fee') }}</flux:text>
-                                <flux:text class="mt-1 block">{{ number_format($payment->net_amount, 2) }} {{ $payment->currency }}</flux:text>
-                            </div>
-                        @endif
                         <div>
                             <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Status') }}</flux:text>
                             <div class="mt-1">

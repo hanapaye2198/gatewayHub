@@ -219,15 +219,35 @@ new class extends Component {
             </div>
             <div>
                 <dt class="{{ $fieldKey }}">gatewayhub_platform_fee_percent</dt>
-                <dd class="mt-0.5">{{ __('The GatewayHub platform fee rate: 1.5% of gross_amount.') }}</dd>
+                <dd class="mt-0.5">{{ __('Platform fee percentage snapshotted for this payment. It is calculated from the base amount, not from the customer total.') }}</dd>
             </div>
             <div>
                 <dt class="{{ $fieldKey }}">gatewayhub_platform_fee</dt>
-                <dd class="mt-0.5">{{ __('The GatewayHub deduction, rounded to two decimals. Null until the payment is paid and fee processing is complete. Provider fees are not included.') }}</dd>
+                <dd class="mt-0.5">{{ __('Platform fee amount added on top of the base amount. Older payments may still show the fee that was deducted when they were paid.') }}</dd>
+            </div>
+            <div>
+                <dt class="{{ $fieldKey }}">base_amount</dt>
+                <dd class="mt-0.5">{{ __('Original transaction amount. Same value as amount and gross_amount.') }}</dd>
+            </div>
+            <div>
+                <dt class="{{ $fieldKey }}">platform_fee_rate</dt>
+                <dd class="mt-0.5">{{ __('Snapshotted platform fee percentage points, such as 3.00 for 3%.') }}</dd>
+            </div>
+            <div>
+                <dt class="{{ $fieldKey }}">platform_fee</dt>
+                <dd class="mt-0.5">{{ __('Same amount as gatewayhub_platform_fee.') }}</dd>
+            </div>
+            <div>
+                <dt class="{{ $fieldKey }}">convenience_fee</dt>
+                <dd class="mt-0.5">{{ __('Fixed convenience fee added on top of the base amount. Null on payments created before this fee.') }}</dd>
+            </div>
+            <div>
+                <dt class="{{ $fieldKey }}">customer_total</dt>
+                <dd class="mt-0.5">{{ __('Amount sent to the payment gateway: base amount plus platform fee plus convenience fee.') }}</dd>
             </div>
             <div>
                 <dt class="{{ $fieldKey }}">gatewayhub_net_amount</dt>
-                <dd class="mt-0.5">{{ __('gross_amount minus gatewayhub_platform_fee. Null until the payment is paid and fee processing is complete.') }}</dd>
+                <dd class="mt-0.5">{{ __('Merchant settlement amount. For current payments this is the original transaction amount, because platform and convenience fees are added on top. Older payments keep the original net after the platform fee was deducted.') }}</dd>
             </div>
         </dl>
     </div>

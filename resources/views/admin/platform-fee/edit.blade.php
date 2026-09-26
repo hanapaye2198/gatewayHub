@@ -8,10 +8,10 @@
                 {{ __('Current Rate: :rate%', ['rate' => $percentage]) }}
             </p>
             <p class="mt-3 max-w-2xl text-sm text-zinc-600 dark:text-zinc-300">
-                {{ __('This percentage is applied to applicable paid transactions using the existing platform fee calculation.') }}
+                {{ __('This percentage is calculated from the original transaction amount and added on top of it.') }}
             </p>
             <p class="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-300">
-                {{ __('The customer pays the quoted amount. GatewayHub deducts this fee from the merchant proceeds.') }}
+                {{ __('The merchant keeps the original transaction amount. A fixed convenience fee of :fee is added as well. The customer pays the total.', ['fee' => $convenienceFee]) }}
             </p>
         </div>
 
@@ -40,7 +40,7 @@
                         required
                         autofocus
                     />
-                    <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Percent of the gross amount. Example: 1.50') }}</p>
+                    <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Percent of the original transaction amount. Example: 1.50 for 1.50%.') }}</p>
                     <flux:error name="percentage" />
                 </flux:field>
 

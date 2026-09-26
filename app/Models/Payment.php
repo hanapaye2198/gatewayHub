@@ -33,7 +33,10 @@ class Payment extends Model
         'amount',
         'currency',
         'platform_fee',
+        'platform_fee_rate',
         'net_amount',
+        'convenience_fee',
+        'customer_total',
         'reference_id',
         'provider_reference',
         'status',
@@ -50,6 +53,18 @@ class Payment extends Model
                 $model->{$model->getKeyName()} = (string) Str::uuid();
             }
         });
+
+        static::updating(function (Payment $model): void {
+            if ($model->getOriginal('customer_total') === null) {
+                return;
+            }
+
+            foreach (['amount', 'platform_fee', 'platform_fee_rate', 'convenience_fee', 'customer_total', 'net_amount', 'currency'] as $key) {
+                if ($model->isDirty($key)) {
+                    $model->setAttribute($key, $model->getOriginal($key));
+                }
+            }
+        });
     }
 
     /**
@@ -62,7 +77,10 @@ class Payment extends Model
         return [
             'amount' => 'decimal:2',
             'platform_fee' => 'decimal:2',
+            'platform_fee_rate' => 'decimal:4',
             'net_amount' => 'decimal:2',
+            'convenience_fee' => 'decimal:2',
+            'customer_total' => 'decimal:2',
             'raw_response' => 'array',
             'paid_at' => 'datetime',
         ];
@@ -72,25 +90,76 @@ class Payment extends Model
      * Return only GatewayHub-owned financial fields for API and webhook payloads.
      * Provider response fields such as conversion fees are intentionally excluded.
      *
-     * @return array{gross_amount: float, gatewayhub_platform_fee_percent: float, gatewayhub_platform_fee: float|null, gatewayhub_net_amount: float|null}
+     * @return array{
+     *     gross_amount: float,
+     *     gatewayhub_platform_fee_percent: float,
+     *     gatewayhub_platform_fee: float|null,
+     *     gatewayhub_net_amount: float|null,
+     *     base_amount: float,
+     *     platform_fee_rate: float,
+     *     platform_fee: float|null,
+     *     convenience_fee: float|null,
+     *     customer_total: float|null
+     * }
      */
     public function gatewayHubFeeData(): array
     {
         $ledger = $this->relationLoaded('platformFee') ? $this->getRelation('platformFee') : null;
         $hasLedger = $ledger instanceof PlatformFee;
+        $percent = $this->resolvedPlatformFeePercent($hasLedger ? $ledger : null);
+        $platformFee = $hasLedger
+            ? (float) $ledger->fee_amount
+            : ($this->platform_fee !== null ? (float) $this->platform_fee : null);
+        $netAmount = $hasLedger
+            ? (float) $ledger->net_amount
+            : ($this->net_amount !== null ? (float) $this->net_amount : null);
 
         return [
             'gross_amount' => (float) $this->amount,
-            'gatewayhub_platform_fee_percent' => $hasLedger
-                ? (float) $ledger->fee_rate * 100
-                : PlatformFeeRule::configuredPercentage(),
-            'gatewayhub_platform_fee' => $hasLedger
-                ? (float) $ledger->fee_amount
-                : ($this->platform_fee !== null ? (float) $this->platform_fee : null),
-            'gatewayhub_net_amount' => $hasLedger
-                ? (float) $ledger->net_amount
-                : ($this->net_amount !== null ? (float) $this->net_amount : null),
+            'gatewayhub_platform_fee_percent' => $percent,
+            'gatewayhub_platform_fee' => $platformFee,
+            'gatewayhub_net_amount' => $netAmount,
+            'base_amount' => (float) $this->amount,
+            'platform_fee_rate' => $percent,
+            'platform_fee' => $platformFee,
+            'convenience_fee' => $this->convenience_fee !== null ? (float) $this->convenience_fee : null,
+            'customer_total' => $this->customer_total !== null ? (float) $this->customer_total : null,
         ];
+    }
+
+    /**
+     * Percentage points snapshotted for this payment, such as 3.00 for a 3% fee.
+     */
+    public function platformFeePercent(): ?float
+    {
+        if ($this->platform_fee_rate === null) {
+            return null;
+        }
+
+        $basisPoints = (int) round(((float) $this->platform_fee_rate) * 10000);
+
+        return $basisPoints / 100;
+    }
+
+    public function usesAdditivePricing(): bool
+    {
+        return $this->customer_total !== null;
+    }
+
+    private function resolvedPlatformFeePercent(?PlatformFee $ledger): float
+    {
+        if ($ledger instanceof PlatformFee) {
+            $basisPoints = (int) round(((float) $ledger->fee_rate) * 10000);
+
+            return $basisPoints / 100;
+        }
+
+        $snapshotted = $this->platformFeePercent();
+        if ($snapshotted !== null) {
+            return $snapshotted;
+        }
+
+        return PlatformFeeRule::configuredPercentage();
     }
 
     /**

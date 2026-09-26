@@ -63,6 +63,26 @@ class PlatformFeeRule extends Model
     }
 
     /**
+     * Active merchant percentage override, when one is in effect.
+     */
+    public static function activeMerchantPercentageRule(int $merchantId): ?self
+    {
+        return static::query()
+            ->where('scope_type', 'merchant')
+            ->where('scope_id', $merchantId)
+            ->where('fee_type', 'percentage')
+            ->where('is_active', true)
+            ->where('effective_from', '<=', now())
+            ->where(function ($query): void {
+                $query->whereNull('effective_to')
+                    ->orWhere('effective_to', '>=', now());
+            })
+            ->orderByDesc('effective_from')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    /**
      * Percentage points used by {@see \App\Services\Billing\PlatformFeeService::calculateFromConfig()}.
      * The global rule is authoritative when present; config is only the fallback.
      */

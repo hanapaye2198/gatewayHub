@@ -23,6 +23,8 @@ final class MerchantPaymentsExcelExporter
         'GatewayHub Platform Fee (%)',
         'GatewayHub Platform Fee',
         'Net After GatewayHub Fee',
+        'Convenience Fee',
+        'Customer Total',
         'Status',
         'Display Status',
     ];
@@ -333,7 +335,7 @@ XML;
 
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-            .'<dimension ref="A1:K'.$lastRow.'"/>'
+            .'<dimension ref="A1:M'.$lastRow.'"/>'
             .'<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView></sheetViews>'
             .'<sheetFormatPr defaultRowHeight="15"/>'
             .'<cols>'
@@ -343,11 +345,11 @@ XML;
             .'<col min="5" max="5" width="15" customWidth="1"/>'
             .'<col min="6" max="6" width="10" customWidth="1"/>'
             .'<col min="7" max="9" width="23" customWidth="1"/>'
-            .'<col min="10" max="10" width="16" customWidth="1"/>'
-            .'<col min="11" max="11" width="22" customWidth="1"/>'
+            .'<col min="10" max="12" width="18" customWidth="1"/>'
+            .'<col min="13" max="13" width="22" customWidth="1"/>'
             .'</cols>'
             .'<sheetData>'.implode('', $xmlRows).'</sheetData>'
-            .'<autoFilter ref="A1:K'.$lastRow.'"/>'
+            .'<autoFilter ref="A1:M'.$lastRow.'"/>'
             .'<pageMargins left="0.25" right="0.25" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>'
             .'</worksheet>';
     }
@@ -377,6 +379,8 @@ XML;
             $this->numberCell($feeData['gatewayhub_platform_fee_percent']),
             $this->nullableNumberCell($feeData['gatewayhub_platform_fee']),
             $this->nullableNumberCell($feeData['gatewayhub_net_amount']),
+            $this->nullableNumberCell($feeData['convenience_fee']),
+            $this->nullableNumberCell($feeData['customer_total']),
             $this->textCell($payment->status),
             $this->textCell((new PaymentDisplayStatusResolver)->resolve($payment)->label()),
         ];
@@ -453,7 +457,7 @@ XML;
 
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             .'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-            .'<dimension ref="A1:J'.$lastRow.'"/>'
+            .'<dimension ref="A1:L'.$lastRow.'"/>'
             .'<sheetViews><sheetView workbookViewId="0"><pane ySplit="'.$headerRowNumber.'" topLeftCell="A'.($headerRowNumber + 1).'" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="'.$headerCell.'" sqref="'.$headerCell.'"/></sheetView></sheetViews>'
             .'<sheetFormatPr defaultRowHeight="15"/>'
             .'<cols>'
@@ -464,10 +468,10 @@ XML;
             .'<col min="5" max="5" width="12" customWidth="1"/>'
             .'<col min="6" max="6" width="22" customWidth="1"/>'
             .'<col min="7" max="8" width="16" customWidth="1"/>'
-            .'<col min="9" max="10" width="21" customWidth="1"/>'
+            .'<col min="9" max="12" width="21" customWidth="1"/>'
             .'</cols>'
             .'<sheetData>'.implode('', $xmlRows).'</sheetData>'
-            .'<autoFilter ref="A'.$headerRowNumber.':J'.$lastRow.'"/>'
+            .'<autoFilter ref="A'.$headerRowNumber.':L'.$lastRow.'"/>'
             .'<pageMargins left="0.25" right="0.25" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>'
             .'</worksheet>';
     }
@@ -486,6 +490,8 @@ XML;
             'Status',
             'Platform Fee',
             'Net Amount',
+            'Convenience Fee',
+            'Customer Total',
             'Created At',
             'Paid At',
         ]);
@@ -507,6 +513,8 @@ XML;
             $this->textCell((new PaymentDisplayStatusResolver)->resolve($payment)->label()),
             $this->nullableNumberCell($feeData['gatewayhub_platform_fee']),
             $this->nullableNumberCell($feeData['gatewayhub_net_amount']),
+            $this->nullableNumberCell($feeData['convenience_fee']),
+            $this->nullableNumberCell($feeData['customer_total']),
             $this->textCell($this->formatDate($payment->created_at)),
             $this->textCell($this->formatDate($payment->paid_at)),
         ];

@@ -22,7 +22,7 @@ class PlatformFeeConfigurationTest extends TestCase
             ->get(route('admin.platform-fee.edit'))
             ->assertOk()
             ->assertSee('Current Rate: 1.50%')
-            ->assertSee('existing platform fee calculation');
+            ->assertSee('added on top of it');
 
         $this->actingAs($superAdmin)
             ->put(route('admin.platform-fee.update'), [

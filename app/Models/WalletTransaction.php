@@ -22,6 +22,8 @@ class WalletTransaction extends Model
 
     public const ENTRY_SUREPAY_TAX_COLLECTED = 'surepay_tax_collected';
 
+    public const ENTRY_CONVENIENCE_FEE_COLLECTED = 'convenience_fee_collected';
+
     public const ENTRY_TUNNEL_NET_AVAILABLE = 'tunnel_net_available';
 
     public const ENTRY_TUNNEL_BATCH_SETTLEMENT_OUT = 'tunnel_batch_settlement_out';
