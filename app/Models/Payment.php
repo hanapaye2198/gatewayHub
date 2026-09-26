@@ -249,21 +249,19 @@ class Payment extends Model
             return null;
         }
 
-        $saved = $this->qrDataFromArray($raw);
-        if ($saved !== null) {
-            return $saved;
-        }
+        return self::extractQrData($raw);
+    }
 
-        $data = $raw['data'] ?? null;
-        if (is_string($data) && $data !== '') {
-            return ['type' => 'string', 'value' => $data];
-        }
-
-        if (is_array($data)) {
-            return $this->qrDataFromArray($data);
-        }
-
-        return null;
+    /**
+     * Find a scannable QR payload anywhere in a provider response.
+     * Coins has returned the code as qrCode, qrcode, and qr_string.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{type: string, value: string}|null
+     */
+    public static function extractQrData(array $payload): ?array
+    {
+        return self::findQrData($payload, 0);
     }
 
     /**
@@ -302,19 +300,48 @@ class Payment extends Model
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<mixed>  $payload
      * @return array{type: string, value: string}|null
      */
-    private function qrDataFromArray(array $payload): ?array
+    private static function findQrData(array $payload, int $depth): ?array
     {
-        $qrImage = $payload['qrImage'] ?? $payload['qr_image'] ?? $payload['qrImageUrl'] ?? $payload['imageUrl'] ?? null;
-        if (is_string($qrImage) && $qrImage !== '') {
-            return ['type' => 'image', 'value' => $qrImage];
+        if ($depth > 6) {
+            return null;
         }
 
-        $qrString = $payload['qrCode'] ?? $payload['qr_string'] ?? $payload['qrString'] ?? $payload['payload'] ?? null;
-        if (is_string($qrString) && $qrString !== '') {
-            return ['type' => 'string', 'value' => $qrString];
+        foreach ($payload as $key => $value) {
+            if (! is_string($value)) {
+                continue;
+            }
+
+            $value = trim($value);
+            if ($value === '' || ! is_string($key)) {
+                continue;
+            }
+
+            $normalized = strtolower((string) preg_replace('/[^a-z0-9]/i', '', $key));
+            if (str_contains($normalized, 'status') || str_contains($normalized, 'merchant')) {
+                continue;
+            }
+
+            if (in_array($normalized, ['qrimage', 'qrimageurl', 'imageurl'], true)) {
+                return ['type' => 'image', 'value' => $value];
+            }
+
+            if (in_array($normalized, ['qrcode', 'qrstring', 'qrdata'], true) || str_starts_with($value, '000201')) {
+                return ['type' => 'string', 'value' => $value];
+            }
+        }
+
+        foreach ($payload as $value) {
+            if (! is_array($value)) {
+                continue;
+            }
+
+            $nested = self::findQrData($value, $depth + 1);
+            if ($nested !== null) {
+                return $nested;
+            }
         }
 
         return null;

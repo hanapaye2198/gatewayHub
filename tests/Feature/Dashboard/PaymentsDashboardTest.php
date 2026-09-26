@@ -165,6 +165,32 @@ class PaymentsDashboardTest extends TestCase
         $response->assertDontSee('Open checkout');
     }
 
+    public function test_pending_payment_renders_lowercase_qrcode_field(): void
+    {
+        $user = User::factory()->create();
+        $payment = Payment::factory()->for($user->merchant)->create([
+            'reference_id' => 'QR-LOWER',
+            'gateway_code' => 'gcash',
+            'status' => 'pending',
+            'raw_response' => [
+                'data' => [
+                    'requestId' => 'GH-QR-LOWER',
+                    'qrcode' => '000201010212lowercase',
+                    'qrcodeStatus' => 'PENDING',
+                ],
+            ],
+        ]);
+
+        $this->assertSame('000201010212lowercase', $payment->getQrData()['value'] ?? null);
+
+        $response = Livewire::actingAs($user)->test('pages::dashboard.payments')
+            ->call('selectPayment', $payment->id);
+
+        $response->assertSee('Scan to Pay');
+        $response->assertDontSee('QR code unavailable.');
+        $response->assertSee('data:image/svg+xml', false);
+    }
+
     public function test_pending_payment_modal_loads_qr_from_coins_when_it_was_not_stored(): void
     {
         Gateway::query()->create([

@@ -170,16 +170,11 @@ class PaymentStatusSyncService
             return;
         }
 
-        $data = $providerStatus['data'] ?? $providerStatus;
-        if (! is_array($data)) {
+        $qr = Payment::extractQrData($providerStatus);
+        if ($qr === null || $qr['type'] !== 'string') {
             return;
         }
 
-        $qrString = $data['qrCode'] ?? $data['qr_string'] ?? $data['qrString'] ?? $data['payload'] ?? null;
-        if (! is_string($qrString) || $qrString === '') {
-            return;
-        }
-
-        $payment->rememberQrString($qrString);
+        $payment->rememberQrString($qr['value']);
     }
 }

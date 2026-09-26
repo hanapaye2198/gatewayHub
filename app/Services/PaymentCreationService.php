@@ -269,21 +269,18 @@ class PaymentCreationService
      */
     private function withSavedQrPayload(array $rawToStore, array $response): array
     {
-        $qrString = $response['qr_string'] ?? null;
-        if (! is_string($qrString) || $qrString === '') {
-            $qrString = $response['qr_data'] ?? null;
+        $qr = Payment::extractQrData($response) ?? Payment::extractQrData($rawToStore);
+        if ($qr === null) {
+            return $rawToStore;
         }
 
-        if (is_string($qrString) && $qrString !== '' && ($response['qr_image'] ?? null) !== $qrString) {
-            $rawToStore['qr_string'] = $qrString;
+        if ($qr['type'] === 'image') {
+            $rawToStore['qr_image'] = $qr['value'];
 
             return $rawToStore;
         }
 
-        $qrImage = $response['qr_image'] ?? null;
-        if (is_string($qrImage) && $qrImage !== '') {
-            $rawToStore['qr_image'] = $qrImage;
-        }
+        $rawToStore['qr_string'] = $qr['value'];
 
         return $rawToStore;
     }
