@@ -476,8 +476,8 @@ new class extends Component {
                         <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Reference</th>
                         <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Gateway</th>
                         <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Transaction Amount</th>
-                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Platform Fee</th>
-                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Customer Total</th>
+                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Convenience Fee</th>
+                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Total</th>
                         <th class="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Status</th>
                         <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Created</th>
                         <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Actions</th>
@@ -498,13 +498,11 @@ new class extends Component {
                                 </span>
                             </td>
                             <td class="whitespace-nowrap px-5 py-4 text-right font-mono text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                {{ number_format($payment->amount, 2) }} {{ $payment->currency }}
+                                {{ number_format($payment->amountIncludingPlatformFee(), 2) }} {{ $payment->currency }}
                             </td>
                             <td class="whitespace-nowrap px-5 py-4 text-right font-mono text-sm text-zinc-500 dark:text-zinc-400">
                                 @if ($payment->usesAdditivePricing())
-                                    {{ number_format((float) $payment->platform_fee, 2) }} {{ $payment->currency }}
-                                @elseif ($payment->platformFee)
-                                    -{{ number_format($payment->platformFee->fee_amount, 2) }} {{ $payment->currency }}
+                                    {{ number_format((float) $payment->convenience_fee, 2) }} {{ $payment->currency }}
                                 @else
                                     —
                                 @endif
@@ -572,7 +570,7 @@ new class extends Component {
                             {{ $this->selectedPayment->reference_id }}
                         </flux:heading>
                         <flux:subheading class="mt-1 text-zinc-600 dark:text-zinc-400">
-                            {{ number_format($this->selectedPayment->amount, 2) }} {{ $this->selectedPayment->currency }}
+                            {{ number_format($this->selectedPayment->usesAdditivePricing() ? (float) $this->selectedPayment->customer_total : $this->selectedPayment->amountIncludingPlatformFee(), 2) }} {{ $this->selectedPayment->currency }}
                             • {{ $this->selectedPayment->gateway?->name ?? ucfirst($this->selectedPayment->gateway_code) }}
                         </flux:subheading>
                     </div>

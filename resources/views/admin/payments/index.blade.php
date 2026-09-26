@@ -190,8 +190,8 @@
                         <th class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Merchant</th>
                         <th class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Gateway</th>
                         <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Transaction Amount</th>
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Platform Fee</th>
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Customer Total</th>
+                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Convenience Fee</th>
+                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Total</th>
                         <th class="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Status</th>
                         <th class="px-7 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Created</th>
                     </tr>
@@ -214,15 +214,12 @@
                                 <span class="whitespace-nowrap text-sm text-zinc-600 dark:text-zinc-400">{{ $payment->gateway?->name ?? $payment->gateway_code }}</span>
                             </td>
                             <td class="px-5 py-4 text-right">
-                                <span class="font-mono text-sm tabular-nums text-zinc-900 dark:text-zinc-100">{{ number_format($payment->amount, 2) }}</span>
+                                <span class="font-mono text-sm tabular-nums text-zinc-900 dark:text-zinc-100">{{ number_format($payment->amountIncludingPlatformFee(), 2) }}</span>
                                 <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
                             </td>
                             <td class="px-5 py-4 text-right">
                                 @if ($payment->usesAdditivePricing())
-                                    <span class="font-mono text-sm tabular-nums text-zinc-700 dark:text-zinc-300">{{ number_format((float) $payment->platform_fee, 2) }}</span>
-                                    <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
-                                @elseif ($payment->platformFee)
-                                    <span class="font-mono text-sm tabular-nums text-zinc-700 dark:text-zinc-300">-{{ number_format($payment->platformFee->fee_amount, 2) }}</span>
+                                    <span class="font-mono text-sm tabular-nums text-zinc-700 dark:text-zinc-300">{{ number_format((float) $payment->convenience_fee, 2) }}</span>
                                     <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
                                 @else
                                     <span class="text-sm text-zinc-400 dark:text-zinc-500">—</span>

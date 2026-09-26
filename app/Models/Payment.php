@@ -146,6 +146,19 @@ class Payment extends Model
         return $this->customer_total !== null;
     }
 
+    /**
+     * Base amount plus the platform fee. The convenience fee stays separate.
+     */
+    public function amountIncludingPlatformFee(): float
+    {
+        $base = (float) $this->amount;
+        if (! $this->usesAdditivePricing()) {
+            return $base;
+        }
+
+        return round($base + (float) $this->platform_fee, 2);
+    }
+
     private function resolvedPlatformFeePercent(?PlatformFee $ledger): float
     {
         if ($ledger instanceof PlatformFee) {

@@ -101,12 +101,11 @@ class AdditivePaymentFeeTest extends TestCase
             ->get(route('dashboard.payments.show', $payment))
             ->assertOk()
             ->assertSee('Transaction Amount')
-            ->assertSee('1,000.00')
-            ->assertSee('Platform Fee')
-            ->assertSee('30.00')
+            ->assertSee('1,030.00')
+            ->assertDontSee('Platform Fee')
             ->assertSee('Convenience Fee')
             ->assertSee('20.00')
-            ->assertSee('Customer Total')
+            ->assertSee('Total')
             ->assertSee('1,050.00');
     }
 
