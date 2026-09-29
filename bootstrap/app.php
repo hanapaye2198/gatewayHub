@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'merchant.onboarding' => \App\Http\Middleware\EnsureOnboardingComplete::class,
             'super-admin' => \App\Http\Middleware\EnsureSuperAdmin::class,
+            'password.changed' => \App\Http\Middleware\EnsurePasswordChanged::class,
         ]);
         $middleware->api(append: [
             \App\Http\Middleware\AuthenticateMerchantApi::class,

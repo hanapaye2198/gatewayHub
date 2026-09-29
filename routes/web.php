@@ -37,7 +37,7 @@ Route::middleware(['auth', 'verified'])->prefix('onboarding')->name('onboarding.
     Route::post('complete', [OnboardingController::class, 'complete'])->name('complete');
 });
 
-Route::middleware(['auth', 'verified', 'merchant.onboarding', \App\Http\Middleware\EnsureMerchant::class])->group(function () {
+Route::middleware(['auth', 'verified', 'password.changed', 'merchant.onboarding', \App\Http\Middleware\EnsureMerchant::class])->group(function () {
     Route::livewire('dashboard', 'pages::dashboard.payments')->name('dashboard');
     Route::livewire('dashboard/payments', 'pages::dashboard.payments')->name('dashboard.payments');
     Route::get('dashboard/payments/create', [CreatePaymentController::class, 'create'])->name('dashboard.payments.create');

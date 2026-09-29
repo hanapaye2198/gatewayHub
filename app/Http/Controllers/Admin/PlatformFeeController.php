@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\UpdateMerchantConvenienceFeeRequest;
 use App\Http\Requests\Admin\UpdateMerchantPlatformFeeRequest;
 use App\Http\Requests\Admin\UpdatePlatformFeeRequest;
 use App\Models\Merchant;
@@ -41,5 +42,14 @@ class PlatformFeeController extends Controller
         return redirect()
             ->route('admin.merchants.show', $merchant)
             ->with('status', 'Merchant platform fee saved.');
+    }
+
+    public function updateMerchantConvenienceFee(UpdateMerchantConvenienceFeeRequest $request, Merchant $merchant): RedirectResponse
+    {
+        $this->fees->updateMerchantConvenienceFee($merchant, $request->validated('convenience_fee'));
+
+        return redirect()
+            ->route('admin.merchants.show', $merchant)
+            ->with('status', 'Merchant convenience fee saved.');
     }
 }

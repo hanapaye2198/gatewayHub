@@ -109,6 +109,18 @@
                             {{ $merchantPlatformFeePercentage !== null ? $merchantPlatformFeePercentage.'%' : __('Global default :rate%', ['rate' => $globalPlatformFeePercentage]) }}
                         </dd>
                     </div>
+                    <div>
+                        <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Convenience fee') }}</dt>
+                        <dd class="mt-1 text-zinc-900 dark:text-zinc-100">
+                            @if ($merchantConvenienceFee === null)
+                                {{ __('Global default :amount', ['amount' => $globalConvenienceFee]) }}
+                            @elseif ((float) $merchantConvenienceFee === 0.0)
+                                {{ __('Waived') }}
+                            @else
+                                {{ $merchantConvenienceFee }}
+                            @endif
+                        </dd>
+                    </div>
                 </dl>
             </div>
 
@@ -153,6 +165,33 @@
                         </flux:field>
                         <div>
                             <flux:button type="submit" variant="primary">{{ __('Save platform fee') }}</flux:button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-900 lg:col-span-2">
+                    <h2 class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{{ __('Merchant convenience fee') }}</h2>
+                    <p class="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-300">
+                        {{ __('Leave this blank to use the global default of :amount. Enter 0 to remove the convenience fee for this merchant.', ['amount' => $globalConvenienceFee]) }}
+                    </p>
+                    <form method="POST" action="{{ route('admin.merchants.convenience-fee.update', $merchant) }}" class="mt-5 flex max-w-xl flex-col gap-5">
+                        @csrf
+                        @method('PUT')
+                        <flux:field>
+                            <flux:label for="convenience_fee">{{ __('Convenience fee override') }}</flux:label>
+                            <flux:input
+                                id="convenience_fee"
+                                name="convenience_fee"
+                                type="number"
+                                inputmode="decimal"
+                                step="0.01"
+                                min="0"
+                                :value="old('convenience_fee', $merchantConvenienceFee)"
+                            />
+                            <flux:error name="convenience_fee" />
+                        </flux:field>
+                        <div>
+                            <flux:button type="submit" variant="primary">{{ __('Save convenience fee') }}</flux:button>
                         </div>
                     </form>
                 </div>

@@ -7,6 +7,7 @@ use App\Models\Gateway;
 use App\Models\Merchant;
 use App\Models\MerchantGateway;
 use App\Models\Payment;
+use App\Models\PlatformAuditLog;
 use App\Models\PlatformFee;
 use App\Models\PlatformFeeRule;
 use App\Models\User;
@@ -315,6 +316,128 @@ class AdditivePaymentFeeTest extends TestCase
         $threePercent = $service->quote(1000, (int) $merchant->merchant_id, 'coins');
         $this->assertSame(30.0, $threePercent['platform_fee']);
         $this->assertSame(1050.0, $threePercent['customer_total']);
+    }
+
+    public function test_merchant_with_waived_convenience_fee_pays_only_the_platform_fee_while_others_keep_it(): void
+    {
+        $this->fakeCoins();
+        $waived = $this->merchant('waived-key');
+        $regular = $this->merchant('regular-key');
+        $this->setMerchantConvenienceFee((int) $waived->merchant_id, '0');
+
+        $response = $this->createPayment($waived, 'waived-key', 1000, 'WAIVED-1000');
+        $this->createPayment($regular, 'regular-key', 1000, 'REGULAR-1000');
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.platform_fee', 15);
+        $response->assertJsonPath('data.convenience_fee', 0);
+        $response->assertJsonPath('data.customer_total', 1015);
+
+        $first = Payment::query()->where('reference_id', 'WAIVED-1000')->firstOrFail();
+        $second = Payment::query()->where('reference_id', 'REGULAR-1000')->firstOrFail();
+
+        $this->assertSame('0.00', (string) $first->convenience_fee);
+        $this->assertSame('1015.00', (string) $first->customer_total);
+        $this->assertSame('1000.00', (string) $first->amount);
+        $this->assertSame('20.00', (string) $second->convenience_fee);
+        $this->assertSame('1035.00', (string) $second->customer_total);
+        $this->assertSame(['1015.00', '1035.00'], $this->capturedAmounts);
+
+        $first->update([
+            'status' => 'paid',
+            'paid_at' => now(),
+        ]);
+        (new ProcessPaymentPaidEffectsJob($first->id))
+            ->handle(app(PlatformFeeService::class), app(WalletSettlementService::class));
+
+        $this->assertSame(0, WalletTransaction::query()
+            ->where('payment_id', $first->id)
+            ->where('entry_type', WalletTransaction::ENTRY_CONVENIENCE_FEE_COLLECTED)
+            ->count());
+        $this->assertSame('1000.00', (string) WalletTransaction::query()
+            ->where('payment_id', $first->id)
+            ->where('entry_type', WalletTransaction::ENTRY_TUNNEL_NET_AVAILABLE)
+            ->firstOrFail()
+            ->amount);
+    }
+
+    public function test_merchant_convenience_fee_can_be_set_to_a_custom_amount_and_cleared(): void
+    {
+        $service = app(PlatformFeeService::class);
+        $merchant = User::factory()->create();
+        $merchantId = (int) $merchant->merchant_id;
+
+        $this->setMerchantConvenienceFee($merchantId, '5.50');
+        $this->assertSame(5.5, $service->quote(1000, $merchantId, 'coins')['convenience_fee']);
+        $this->assertSame(1020.5, $service->quote(1000, $merchantId, 'coins')['customer_total']);
+
+        $this->setMerchantConvenienceFee($merchantId, '');
+        $this->assertNull(Merchant::query()->findOrFail($merchantId)->convenience_fee_override);
+        $this->assertSame(20.0, $service->quote(1000, $merchantId, 'coins')['convenience_fee']);
+        $this->assertSame(1035.0, $service->quote(1000, $merchantId, 'coins')['customer_total']);
+
+        $this->assertDatabaseHas('platform_audit_logs', [
+            'action' => PlatformAuditLog::ACTION_MERCHANT_CONVENIENCE_FEE_UPDATED,
+            'merchant_id' => $merchantId,
+        ]);
+    }
+
+    public function test_changing_the_merchant_convenience_fee_does_not_recalculate_an_existing_payment(): void
+    {
+        $this->fakeCoins();
+        $user = $this->merchant('convenience-snapshot-key');
+        $this->createPayment($user, 'convenience-snapshot-key', 1000, 'CONVENIENCE-SNAPSHOT');
+
+        $this->setMerchantConvenienceFee((int) $user->merchant_id, '0');
+
+        $payment = Payment::query()->where('reference_id', 'CONVENIENCE-SNAPSHOT')->firstOrFail();
+        $this->assertSame('20.00', (string) $payment->convenience_fee);
+        $this->assertSame('1035.00', (string) $payment->customer_total);
+    }
+
+    public function test_only_super_admin_can_configure_the_merchant_convenience_fee(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+        $admin = User::factory()->admin()->create();
+        $merchantUser = User::factory()->create();
+        $merchant = Merchant::query()->findOrFail($merchantUser->merchant_id);
+
+        $this->actingAs($superAdmin)
+            ->get(route('admin.merchants.show', $merchant))
+            ->assertOk()
+            ->assertSee('Save convenience fee');
+
+        $this->actingAs($superAdmin)
+            ->put(route('admin.merchants.convenience-fee.update', $merchant), ['convenience_fee' => '-1'])
+            ->assertSessionHasErrors('convenience_fee');
+
+        $this->actingAs($admin)
+            ->put(route('admin.merchants.convenience-fee.update', $merchant), ['convenience_fee' => '0'])
+            ->assertForbidden();
+
+        $this->actingAs($admin)
+            ->get(route('admin.merchants.show', $merchant))
+            ->assertOk()
+            ->assertDontSee('Save convenience fee');
+
+        $this->actingAs($merchantUser)
+            ->put(route('admin.merchants.convenience-fee.update', $merchant), ['convenience_fee' => '0'])
+            ->assertRedirect(url('/dashboard'));
+
+        $this->assertNull($merchant->fresh()->convenience_fee_override);
+    }
+
+    private function setMerchantConvenienceFee(int $merchantId, string $amount): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+        $merchant = Merchant::query()->findOrFail($merchantId);
+
+        $this->actingAs($superAdmin)
+            ->put(route('admin.merchants.convenience-fee.update', $merchant), [
+                'convenience_fee' => $amount,
+            ])
+            ->assertRedirect(route('admin.merchants.show', $merchant))
+            ->assertSessionHasNoErrors();
     }
 
     private function fakeCoins(): void

@@ -127,4 +127,38 @@ final class PlatformFeeConfigurator
             return $rule;
         });
     }
+
+    /**
+     * Set or clear one merchant's convenience fee. Zero waives it; empty falls back to the platform default.
+     * Existing payment snapshots are not rewritten.
+     */
+    public function updateMerchantConvenienceFee(Merchant $merchant, float|string|null $amount): void
+    {
+        DB::transaction(function () use ($merchant, $amount): void {
+            $next = $amount === null || $amount === '' ? null : number_format((float) $amount, 2, '.', '');
+            $current = $merchant->convenience_fee_override;
+            $previous = $current === null ? null : number_format((float) $current, 2, '.', '');
+
+            if ($previous === $next) {
+                return;
+            }
+
+            $merchant->forceFill(['convenience_fee_override' => $next])->save();
+
+            $description = match (true) {
+                $next === null => 'Cleared the convenience fee override for '.$merchant->name.'.',
+                (float) $next === 0.0 => 'Waived the convenience fee for '.$merchant->name.'.',
+                default => 'Set the convenience fee for '.$merchant->name.' to '.$next.'.',
+            };
+
+            $this->audit->record(
+                PlatformAuditLog::ACTION_MERCHANT_CONVENIENCE_FEE_UPDATED,
+                $merchant,
+                $merchant,
+                ['convenience_fee' => $previous],
+                ['convenience_fee' => $next],
+                $description,
+            );
+        });
+    }
 }

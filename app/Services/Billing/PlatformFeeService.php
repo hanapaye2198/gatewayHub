@@ -3,6 +3,7 @@
 namespace App\Services\Billing;
 
 use App\Enums\PlatformFeeStatus;
+use App\Models\Merchant;
 use App\Models\Payment;
 use App\Models\PlatformFee;
 use App\Models\PlatformFeeRule;
@@ -79,7 +80,7 @@ class PlatformFeeService
         $calculated = $this->platformFeeFor($baseAmount, $merchantId, $gatewayCode, $at ?? now());
         $baseCents = $this->cents($baseAmount);
         $feeCents = $this->cents($calculated['fee_amount']);
-        $convenienceCents = $this->cents($this->convenienceFeeAmount());
+        $convenienceCents = $this->cents($this->convenienceFeeAmount($merchantId));
 
         return [
             'base_amount' => $this->fromCents($baseCents),
@@ -146,8 +147,18 @@ class PlatformFeeService
         ];
     }
 
-    public function convenienceFeeAmount(): float
+    /**
+     * Merchant override when set (0 waives the fee), otherwise the platform default.
+     */
+    public function convenienceFeeAmount(?int $merchantId = null): float
     {
+        if ($merchantId !== null) {
+            $override = Merchant::query()->whereKey($merchantId)->value('convenience_fee_override');
+            if ($override !== null) {
+                return round(max(0, (float) $override), 2);
+            }
+        }
+
         return round(max(0, (float) config('platform.fees.convenience_fee', 20)), 2);
     }
 

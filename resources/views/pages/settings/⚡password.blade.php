@@ -18,10 +18,19 @@ new class extends Component {
      */
     public function updatePassword(): void
     {
+        $user = Auth::user();
+        $mustChangePassword = (bool) $user->must_change_password;
+
+        $passwordRules = $this->passwordRules();
+
+        if ($mustChangePassword) {
+            $passwordRules[] = 'different:current_password';
+        }
+
         try {
             $validated = $this->validate([
                 'current_password' => $this->currentPasswordRules(),
-                'password' => $this->passwordRules(),
+                'password' => $passwordRules,
             ]);
         } catch (ValidationException $e) {
             $this->reset('current_password', 'password', 'password_confirmation');
@@ -29,11 +38,20 @@ new class extends Component {
             throw $e;
         }
 
-        Auth::user()->update([
+        $user->forceFill([
             'password' => $validated['password'],
-        ]);
+            'must_change_password' => false,
+        ])->save();
 
         $this->reset('current_password', 'password', 'password_confirmation');
+
+        if ($mustChangePassword && $user->isMerchantUser()) {
+            session()->flash('status', __('Your password has been changed.'));
+
+            $this->redirect($user->merchantOnboardingOrDashboardUrl(), navigate: true);
+
+            return;
+        }
 
         $this->dispatch('password-updated');
     }
@@ -45,6 +63,12 @@ new class extends Component {
     <flux:heading class="sr-only">{{ __('Password Settings') }}</flux:heading>
 
     <x-pages::settings.layout :heading="__('Update password')" :subheading="__('Ensure your account is using a long, random password to stay secure')">
+        @if (auth()->user()->must_change_password)
+            <flux:callout variant="warning" icon="exclamation-triangle" class="mb-6" data-test="must-change-password-callout">
+                {{ __('Your password was reset to the default password. Please set a new password to continue using your dashboard.') }}
+            </flux:callout>
+        @endif
+
         <form method="POST" wire:submit="updatePassword" class="space-y-6">
             <flux:input
                 wire:model="current_password"

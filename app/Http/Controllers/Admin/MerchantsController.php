@@ -10,6 +10,7 @@ use App\Models\MerchantGateway;
 use App\Models\PlatformAuditLog;
 use App\Models\PlatformFeeRule;
 use App\Services\Admin\PlatformAuditService;
+use App\Services\Billing\PlatformFeeService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -70,7 +71,7 @@ class MerchantsController extends Controller
             ->with('status', 'Merchant created.');
     }
 
-    public function show(Merchant $merchant): View
+    public function show(Merchant $merchant, PlatformFeeService $platformFees): View
     {
         $this->authorize('view', $merchant);
 
@@ -84,6 +85,8 @@ class MerchantsController extends Controller
             'webhookSecretConfigured' => filled($merchant->getRawOriginal('webhook_secret')),
             'merchantPlatformFeePercentage' => PlatformFeeRule::activeMerchantPercentageRule((int) $merchant->id)?->percentage(),
             'globalPlatformFeePercentage' => number_format(PlatformFeeRule::configuredPercentage(), 2, '.', ''),
+            'merchantConvenienceFee' => $merchant->convenience_fee_override === null ? null : number_format((float) $merchant->convenience_fee_override, 2, '.', ''),
+            'globalConvenienceFee' => number_format($platformFees->convenienceFeeAmount(), 2, '.', ''),
         ]);
     }
 

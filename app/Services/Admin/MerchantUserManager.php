@@ -7,6 +7,7 @@ use App\Models\PlatformAuditLog;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Creates and updates merchant users for a single merchant.
@@ -114,6 +115,33 @@ final class MerchantUserManager
                 ['is_active' => $wasActive],
                 ['is_active' => (bool) $user->is_active],
                 ($user->is_active ? 'Enabled merchant user ' : 'Disabled merchant user ').$user->email.'.',
+            );
+
+            return $user;
+        });
+    }
+
+    /**
+     * Reset the password to the configured default and require the user to change it on next access.
+     */
+    public function resetPasswordToDefault(Merchant $merchant, User $user): User
+    {
+        $this->guard($merchant, $user);
+
+        return DB::transaction(function () use ($merchant, $user): User {
+            $user->forceFill([
+                'password' => (string) config('auth.merchant_default_password'),
+                'must_change_password' => true,
+                'remember_token' => Str::random(60),
+            ])->save();
+
+            $this->audit->record(
+                PlatformAuditLog::ACTION_MERCHANT_USER_PASSWORD_RESET,
+                $merchant,
+                $user,
+                [],
+                ['must_change_password' => true],
+                'Reset the password of merchant user '.$user->email.' to the default password.',
             );
 
             return $user;
