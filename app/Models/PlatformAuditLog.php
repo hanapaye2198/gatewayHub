@@ -22,6 +22,8 @@ class PlatformAuditLog extends Model
 
     public const ACTION_MERCHANT_SUSPENDED = 'merchant.suspended';
 
+    public const ACTION_MERCHANT_DELETED = 'merchant.deleted';
+
     public const ACTION_MERCHANT_USER_CREATED = 'merchant_user.created';
 
     public const ACTION_MERCHANT_USER_UPDATED = 'merchant_user.updated';
@@ -58,6 +60,7 @@ class PlatformAuditLog extends Model
         self::ACTION_MERCHANT_UPDATED,
         self::ACTION_MERCHANT_ACTIVATED,
         self::ACTION_MERCHANT_SUSPENDED,
+        self::ACTION_MERCHANT_DELETED,
         self::ACTION_MERCHANT_USER_CREATED,
         self::ACTION_MERCHANT_USER_UPDATED,
         self::ACTION_MERCHANT_USER_ENABLED,

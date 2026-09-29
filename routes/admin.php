@@ -45,6 +45,7 @@ Route::middleware('super-admin')->group(function (): void {
     Route::get('/administrators/{administrator}/edit', [PlatformAdministratorsController::class, 'edit'])->name('admin.administrators.edit')->whereNumber('administrator');
     Route::match(['put', 'patch'], '/administrators/{administrator}', [PlatformAdministratorsController::class, 'update'])->name('admin.administrators.update')->whereNumber('administrator');
     Route::patch('/administrators/{administrator}/active', [PlatformAdministratorsController::class, 'toggle'])->name('admin.administrators.toggle')->whereNumber('administrator');
+    Route::delete('/merchants/{merchant}', [MerchantsController::class, 'destroy'])->name('admin.merchants.destroy');
     Route::patch('/merchants/{merchant}/users/{user}/password-reset', [MerchantUsersController::class, 'resetPassword'])->name('admin.merchants.users.reset-password')->whereNumber('user');
     Route::get('/platform-fee', [PlatformFeeController::class, 'edit'])->name('admin.platform-fee.edit');
     Route::put('/platform-fee', [PlatformFeeController::class, 'update'])->name('admin.platform-fee.update');

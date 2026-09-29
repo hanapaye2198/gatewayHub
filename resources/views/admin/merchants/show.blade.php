@@ -195,6 +195,25 @@
                         </div>
                     </form>
                 </div>
+
+                <div class="rounded-2xl border border-red-200 bg-white p-6 shadow-sm dark:border-red-900/60 dark:bg-zinc-900 lg:col-span-2" data-test="delete-merchant-card">
+                    <h2 class="text-sm font-semibold text-red-700 dark:text-red-400">{{ __('Delete merchant') }}</h2>
+                    <p class="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-300">
+                        {{ __('This permanently deletes :name together with its :users user(s), :payments payment(s), wallets, gateway settings and fees. This cannot be undone.', ['name' => $merchant->name, 'users' => number_format($merchant->users_count), 'payments' => number_format($merchant->payments_count)]) }}
+                    </p>
+                    <form method="POST" action="{{ route('admin.merchants.destroy', $merchant) }}" class="mt-5 flex max-w-xl flex-col gap-5">
+                        @csrf
+                        @method('DELETE')
+                        <flux:field>
+                            <flux:label for="confirm_name">{{ __('Type :name to confirm', ['name' => $merchant->name]) }}</flux:label>
+                            <flux:input id="confirm_name" name="confirm_name" autocomplete="off" required />
+                            <flux:error name="confirm_name" />
+                        </flux:field>
+                        <div>
+                            <flux:button type="submit" variant="danger" icon="trash">{{ __('Delete merchant permanently') }}</flux:button>
+                        </div>
+                    </form>
+                </div>
             @endif
         </div>
     </div>

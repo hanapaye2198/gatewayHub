@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\DestroyMerchantRequest;
 use App\Http\Requests\Admin\StoreMerchantRequest;
 use App\Http\Requests\Admin\UpdateMerchantRequest;
 use App\Models\Merchant;
 use App\Models\MerchantGateway;
 use App\Models\PlatformAuditLog;
 use App\Models\PlatformFeeRule;
+use App\Services\Admin\MerchantDeleter;
 use App\Services\Admin\PlatformAuditService;
 use App\Services\Billing\PlatformFeeService;
 use Illuminate\Contracts\View\View;
@@ -151,6 +153,16 @@ class MerchantsController extends Controller
 
         return redirect()->route('admin.merchants.index')
             ->with('status', $merchant->is_active ? 'Merchant activated.' : 'Merchant suspended.');
+    }
+
+    public function destroy(DestroyMerchantRequest $request, Merchant $merchant, MerchantDeleter $deleter): RedirectResponse
+    {
+        $name = $merchant->name;
+
+        $deleter->delete($merchant);
+
+        return redirect()->route('admin.merchants.index')
+            ->with('status', __('Merchant :name was deleted.', ['name' => $name]));
     }
 
     /**
