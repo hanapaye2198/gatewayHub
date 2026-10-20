@@ -62,6 +62,15 @@
                         {{ __('Log in') }}
                     </flux:button>
                 </form>
+
+                <div class="flex flex-col gap-3 border-t border-zinc-200 pt-5 dark:border-zinc-700">
+                    <flux:button variant="outline" :href="route('kemofi.redirect')" class="w-full">
+                        {{ __('Continue with your KemoFi account') }}
+                    </flux:button>
+                    <p class="text-center text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+                        {{ __('Sign in with the account you use on KemoFi. Your KemoFi password stays with KemoFi.') }}
+                    </p>
+                </div>
             </div>
         </div>
 
