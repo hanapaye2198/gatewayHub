@@ -114,6 +114,7 @@ class KemoFiController extends Controller
                         'email' => $email,
                         'password' => Str::random(64),
                         'role' => User::ROLE_MERCHANT_USER,
+                        'is_active' => true,
                     ]);
                     $user->forceFill(['email_verified_at' => now()])->save();
                 }
