@@ -10,6 +10,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Gateway extends Model
 {
+    /**
+     * @var list<string>
+     */
+    private const PROVIDER_ONLY_CODES = ['paymongo'];
+
+    /**
+     * @var list<string>
+     */
+    private const RETIRED_CODES = ['coins', 'paypal'];
+
     /** @use HasFactory<\Database\Factories\GatewayFactory> */
     use HasFactory;
 
@@ -52,8 +62,19 @@ class Gateway extends Model
      */
     public function getCapability(): GatewayCapability
     {
-        $key = config('gateways.capabilities', [])[$this->driver_class] ?? 'api_only';
+        $capabilityByCode = config('gateways.capabilities_by_code', []);
+        $key = $capabilityByCode[$this->code] ?? config('gateways.capabilities', [])[$this->driver_class] ?? 'api_only';
 
         return GatewayCapability::tryFrom($key) ?? GatewayCapability::API_ONLY;
+    }
+
+    public function isProviderOnly(): bool
+    {
+        return in_array($this->code, self::PROVIDER_ONLY_CODES, true);
+    }
+
+    public function isRetired(): bool
+    {
+        return in_array($this->code, self::RETIRED_CODES, true);
     }
 }

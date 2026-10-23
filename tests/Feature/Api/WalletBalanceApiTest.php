@@ -49,6 +49,9 @@ class WalletBalanceApiTest extends TestCase
             'error' => null,
             'data' => [
                 'currency' => 'PHP',
+                'wallet_balance' => 0,
+                'available_balance' => 0,
+                'settled_balance' => 0,
                 'tunnel_balance' => 0,
                 'real_balance' => 0,
                 'pending_net_settlement' => 0,
@@ -134,6 +137,17 @@ class WalletBalanceApiTest extends TestCase
         ]);
 
         WalletTransaction::factory()->create([
+            'wallet_id' => $tunnelWallet->id,
+            'payment_id' => $payment->id,
+            'direction' => 'debit',
+            'entry_type' => WalletTransaction::ENTRY_SUREPAY_TAX_COLLECTED,
+            'amount' => 20.00,
+            'currency' => 'PHP',
+            'is_settled' => true,
+            'created_at' => now(),
+        ]);
+
+        WalletTransaction::factory()->create([
             'wallet_id' => $otherTunnelWallet->id,
             'payment_id' => $otherPayment->id,
             'direction' => 'credit',
@@ -162,12 +176,101 @@ class WalletBalanceApiTest extends TestCase
             'error' => null,
             'data' => [
                 'currency' => 'PHP',
+                'wallet_balance' => 1180,
+                'available_balance' => 980,
+                'settled_balance' => 200,
                 'tunnel_balance' => 980,
                 'real_balance' => 200,
                 'pending_net_settlement' => 980,
                 'today_gross' => 1000,
+                'today_platform_fees' => 20,
                 'today_net_settled' => 500,
             ],
         ]);
+    }
+
+    public function test_wallet_transactions_return_net_receipts_with_platform_fee_and_merchant_scoping(): void
+    {
+        $merchantToken = Str::random(64);
+        $otherMerchantToken = Str::random(64);
+        $merchant = User::factory()->withMerchantApiKey($merchantToken)->create();
+        $otherMerchant = User::factory()->withMerchantApiKey($otherMerchantToken)->create();
+
+        $payment = Payment::factory()->create([
+            'merchant_id' => $merchant->id,
+            'gateway_code' => 'qrph',
+            'reference_id' => 'ORDER-1001',
+            'provider_reference' => 'PAYMONGO-1001',
+            'amount' => 500,
+            'currency' => 'PHP',
+            'status' => 'paid',
+            'platform_fee' => 7.50,
+            'net_amount' => 492.50,
+        ]);
+        $otherPayment = Payment::factory()->create([
+            'merchant_id' => $otherMerchant->id,
+            'currency' => 'PHP',
+            'status' => 'paid',
+            'platform_fee' => 15,
+            'net_amount' => 985,
+        ]);
+
+        $merchantWallet = Wallet::factory()->create([
+            'merchant_id' => $merchant->id,
+            'wallet_type' => Wallet::TYPE_MERCHANT_CLEARING,
+            'currency' => 'PHP',
+            'balance' => 492.50,
+        ]);
+        $otherWallet = Wallet::factory()->create([
+            'merchant_id' => $otherMerchant->id,
+            'wallet_type' => Wallet::TYPE_MERCHANT_CLEARING,
+            'currency' => 'PHP',
+            'balance' => 985,
+        ]);
+
+        WalletTransaction::factory()->create([
+            'wallet_id' => $merchantWallet->id,
+            'payment_id' => $payment->id,
+            'entry_type' => WalletTransaction::ENTRY_TUNNEL_NET_AVAILABLE,
+            'amount' => 492.50,
+            'currency' => 'PHP',
+            'is_settled' => false,
+        ]);
+        WalletTransaction::factory()->create([
+            'wallet_id' => $otherWallet->id,
+            'payment_id' => $otherPayment->id,
+            'entry_type' => WalletTransaction::ENTRY_TUNNEL_NET_AVAILABLE,
+            'amount' => 985,
+            'currency' => 'PHP',
+            'is_settled' => false,
+        ]);
+
+        $this->withToken($merchantToken)
+            ->getJson('/api/wallets/transactions?currency=php&per_page=1')
+            ->assertOk()
+            ->assertJsonPath('data.currency', 'PHP')
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.transactions.0.reference', 'ORDER-1001')
+            ->assertJsonPath('data.transactions.0.gross_amount', 500)
+            ->assertJsonPath('data.transactions.0.platform_fee', 7.5)
+            ->assertJsonPath('data.transactions.0.net_amount', 492.5)
+            ->assertJsonPath('data.transactions.0.wallet_status', 'available')
+            ->assertJsonPath('data.transactions.0.provider_reference', 'PAYMONGO-1001');
+    }
+
+    public function test_wallet_transactions_reject_invalid_page_size(): void
+    {
+        $merchantToken = Str::random(64);
+        User::factory()->withMerchantApiKey($merchantToken)->create();
+
+        $this->withToken($merchantToken)
+            ->getJson('/api/wallets/transactions?per_page=101')
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_wallet_transactions_api_requires_authentication(): void
+    {
+        $this->getJson('/api/wallets/transactions')->assertUnauthorized();
     }
 }

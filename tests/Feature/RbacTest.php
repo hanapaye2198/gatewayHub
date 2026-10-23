@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
@@ -17,6 +19,13 @@ class RbacTest extends TestCase
         $merchant = User::factory()->create();
 
         $this->actingAs($merchant);
+
+        Cache::flush();
+        Http::fake([
+            'https://api.paymongo.com/v1/merchants/capabilities/payment_methods' => Http::response([
+                'data' => ['attributes' => ['payment_methods' => ['qrph', 'gcash', 'paymaya', 'grab_pay', 'shopeepay']]],
+            ], 200),
+        ]);
 
         $this->get(route('dashboard'))->assertOk();
         $this->get(route('dashboard.payments'))->assertOk();

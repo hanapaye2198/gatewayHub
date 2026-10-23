@@ -20,13 +20,13 @@
                         </span>
                     @else
                         <span
-                            class="flex size-11 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700 shadow-sm dark:bg-emerald-400/15 dark:text-emerald-300"
+                            class="flex size-11 items-center justify-center rounded-xl bg-violet-600/10 text-violet-700 shadow-sm dark:bg-violet-400/15 dark:text-violet-300"
                             aria-hidden="true"
                         >
                             <flux:icon name="wallet" class="size-6" />
                         </span>
                         <span class="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white">
-                            {{ config('app.name', 'GatewayHub') }}
+                            {{ config('app.name', 'KemoPay') }}
                         </span>
                     @endif
                 </a>

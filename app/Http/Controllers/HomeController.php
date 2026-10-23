@@ -15,6 +15,7 @@ class HomeController extends Controller
     public function __invoke(): View
     {
         $gateways = Gateway::query()
+            ->whereNotIn('code', ['paymongo', 'coins', 'paypal'])
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'is_global_enabled']);
 
@@ -54,11 +55,11 @@ class HomeController extends Controller
     private function gatewayCatalog(): array
     {
         return [
-            ['code' => 'gcash', 'name' => 'GCash', 'color' => '#007DFE', 'tag' => 'E-wallet', 'logo' => null],
-            ['code' => 'maya', 'name' => 'Maya', 'color' => '#00B14F', 'tag' => 'E-wallet', 'logo' => null],
-            ['code' => 'paypal', 'name' => 'PayPal', 'color' => '#003087', 'tag' => 'International', 'logo' => null],
-            ['code' => 'coins', 'name' => 'Coins.ph', 'color' => '#F7931A', 'tag' => 'Crypto & fiat', 'logo' => null],
-            ['code' => 'qrph', 'name' => 'QRPh', 'color' => '#204884', 'tag' => 'QR payments', 'logo' => 'images/logos/qrph.svg'],
+            ['code' => 'gcash', 'name' => 'GCash', 'color' => '#007DFE', 'tag' => 'PayMongo e-wallet', 'logo' => null],
+            ['code' => 'maya', 'name' => 'Maya', 'color' => '#00B14F', 'tag' => 'PayMongo e-wallet', 'logo' => null],
+            ['code' => 'grab_pay', 'name' => 'GrabPay', 'color' => '#00B140', 'tag' => 'PayMongo e-wallet', 'logo' => null],
+            ['code' => 'shopeepay', 'name' => 'ShopeePay', 'color' => '#EE4D2D', 'tag' => 'PayMongo e-wallet', 'logo' => null],
+            ['code' => 'qrph', 'name' => 'QR Ph', 'color' => '#204884', 'tag' => 'PayMongo QR', 'logo' => 'images/logos/qrph.svg'],
         ];
     }
 

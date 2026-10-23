@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Single, safe entry point for platform revenue.
- * Accepts Payment; calculates the GatewayHub fee from the configured global rate and creates the platform_fees record.
+ * Accepts Payment; calculates the KemoPay fee from the configured global rate and creates the platform_fees record.
  * Idempotent; uses transaction and payment row lock. No UI or gateway logic.
  */
 class PlatformFeeService
@@ -40,24 +40,54 @@ class PlatformFeeService
             }
 
             $gross = (float) $locked->amount;
-
-            $calculated = $this->calculateFromConfig($gross);
+            $productAmount = $locked->product_amount !== null
+                ? (float) $locked->product_amount
+                : $gross;
+            $calculated = $this->calculateFromConfig($productAmount);
+            $feeAmount = $locked->payer_fee_amount !== null
+                ? (float) $locked->payer_fee_amount
+                : $calculated['fee_amount'];
+            $feeRate = $locked->platform_fee_rate !== null
+                ? (float) $locked->platform_fee_rate
+                : $calculated['fee_rate'];
+            $netAmount = $locked->product_amount !== null
+                ? $productAmount
+                : $calculated['net_amount'];
 
             PlatformFee::query()->create([
                 'payment_id' => $locked->id,
                 'merchant_id' => $locked->merchant_id,
                 'gateway_code' => $locked->gateway_code,
                 'gross_amount' => $gross,
-                'fee_rate' => $calculated['fee_rate'],
-                'fee_amount' => $calculated['fee_amount'],
-                'net_amount' => $calculated['net_amount'],
+                'fee_rate' => $feeRate,
+                'fee_amount' => $feeAmount,
+                'net_amount' => $netAmount,
                 'status' => PlatformFeeStatus::Posted,
             ]);
 
-            $locked->platform_fee = $calculated['fee_amount'];
-            $locked->net_amount = $calculated['net_amount'];
+            $locked->platform_fee = $feeAmount;
+            $locked->net_amount = $netAmount;
             $locked->save();
         });
+    }
+
+    /**
+     * Calculate the customer charge while preserving the merchant's product value.
+     *
+     * @return array{fee_rate: float, fee_amount: float, product_amount: float, gross_amount: float}
+     */
+    public function calculatePayerChargedTotals(float $productAmount): array
+    {
+        $productAmount = round($productAmount, 2);
+        $calculated = $this->calculateFromConfig($productAmount);
+        $feeAmount = $calculated['fee_amount'];
+
+        return [
+            'fee_rate' => $calculated['fee_rate'],
+            'fee_amount' => $feeAmount,
+            'product_amount' => $productAmount,
+            'gross_amount' => round($productAmount + $feeAmount, 2),
+        ];
     }
 
     /**
@@ -79,7 +109,7 @@ class PlatformFeeService
     }
 
     /**
-     * Calculate the GatewayHub platform fee from gross amount.
+     * Calculate the KemoPay platform fee from gross amount.
      * Formula: fee = round(gross × configured percentage / 100, 2).
      * The percentage comes from the active global platform fee rule.
      *

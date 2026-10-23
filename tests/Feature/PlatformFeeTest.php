@@ -37,6 +37,45 @@ class PlatformFeeTest extends TestCase
         $this->assertSame(0.015, $calculated['fee_rate']);
     }
 
+    public function test_payer_charged_totals_add_the_fee_on_top_of_the_product_value(): void
+    {
+        config(['platform.fees' => ['percentage' => 1.5]]);
+        \App\Models\PlatformFeeRule::query()->delete();
+
+        $calculated = app(BillingPlatformFeeService::class)->calculatePayerChargedTotals(1.00);
+
+        $this->assertSame(1.00, $calculated['product_amount']);
+        $this->assertSame(0.02, $calculated['fee_amount']);
+        $this->assertSame(1.02, $calculated['gross_amount']);
+        $this->assertSame(0.015, $calculated['fee_rate']);
+    }
+
+    public function test_fee_ledger_uses_the_payer_fee_snapshot_and_keeps_the_product_value_for_the_merchant(): void
+    {
+        $user = User::factory()->create();
+        $payment = Payment::factory()->paid()->create([
+            'merchant_id' => $user->id,
+            'amount' => 1.02,
+            'product_amount' => 1.00,
+            'payer_fee_amount' => 0.02,
+            'platform_fee_rate' => 0.015,
+            'platform_fee' => null,
+            'net_amount' => null,
+        ]);
+
+        app(BillingPlatformFeeService::class)->record($payment);
+
+        $payment->refresh();
+        $ledger = $payment->platformFee;
+
+        $this->assertNotNull($ledger);
+        $this->assertSame('1.02', (string) $ledger->gross_amount);
+        $this->assertSame('0.02', (string) $ledger->fee_amount);
+        $this->assertSame('1.00', (string) $ledger->net_amount);
+        $this->assertSame('0.02', (string) $payment->platform_fee);
+        $this->assertSame('1.00', (string) $payment->net_amount);
+    }
+
     public function test_platform_fee_applied_when_payment_becomes_paid_via_webhook(): void
     {
         config(['platform.fees' => ['percentage' => 1.5]]);

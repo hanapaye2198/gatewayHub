@@ -23,6 +23,8 @@ class WalletFeatureToggleTest extends TestCase
             'success' => false,
             'error' => 'Not found.',
         ]);
+
+        $this->withToken($token)->getJson('/api/wallets/transactions')->assertNotFound();
     }
 
     public function test_admin_wallet_pages_return_not_found_when_wallet_feature_is_disabled(): void

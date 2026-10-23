@@ -6,29 +6,34 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Dashboard\StorePaymentRequest;
 use App\Models\Gateway;
 use App\Services\Gateways\Exceptions\GatewayException;
+use App\Services\Gateways\PayMongoMethodCapabilityService;
 use App\Services\PaymentCreationService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 
 class CreatePaymentController extends Controller
 {
-    public function create(): View
+    public function create(PayMongoMethodCapabilityService $payMongoMethodCapabilityService): View
     {
         $user = auth()->user();
         if ($user === null || $user->isPlatformOperator()) {
             abort(403);
         }
 
+        $availablePayMongoMethods = $payMongoMethodCapabilityService->availableGatewayCodes();
         $enabledGateways = Gateway::query()
             ->where('is_global_enabled', true)
+            ->whereIn('code', PayMongoMethodCapabilityService::gatewayCodes())
             ->whereHas('merchantGateways', function ($q) use ($user) {
                 $q->where('merchant_id', $user->merchant_id)->where('is_enabled', true);
             })
+            ->whereIn('code', $availablePayMongoMethods ?? [])
             ->orderBy('name')
             ->get(['id', 'code', 'name']);
 
         return view('dashboard.payments.create', [
             'enabledGateways' => $enabledGateways,
+            'payMongoAvailability' => $payMongoMethodCapabilityService->summary(),
         ]);
     }
 

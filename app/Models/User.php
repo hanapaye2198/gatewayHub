@@ -34,6 +34,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'kemofi_subject',
         'password',
         'role',
         'merchant_id',
@@ -54,6 +55,7 @@ class User extends Authenticatable
      */
     protected $hidden = [
         'password',
+        'kemofi_subject',
         'api_key_hash',
         'api_secret',
         'two_factor_secret',

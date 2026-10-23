@@ -2,50 +2,19 @@
 
 namespace App\Services\Gateways\Drivers;
 
-use App\Services\Gateways\Contracts\GatewayInterface;
-use Illuminate\Http\Request;
-
-class QrphDriver implements GatewayInterface
+/**
+ * Backward-compatible alias for older QR Ph payment records and integrations.
+ */
+class QrphDriver extends PayMongoDriver
 {
     /**
-     * @param  array<string, mixed>  $config
-     */
-    public function __construct(
-        protected array $config = []
-    ) {}
-
-    /**
+     * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public static function configValidationRules(): array
-    {
-        return CoinsDriver::configValidationRules();
-    }
-
-    /**
-     * @return list<string>
-     */
-    public static function getRequiredConfigKeys(): array
-    {
-        return CoinsDriver::getRequiredConfigKeys();
-    }
-
     public function createPayment(array $data): array
     {
-        $coinsDriver = new CoinsDriver($this->config);
+        $data['gateway_code'] ??= 'qrph';
 
-        return $coinsDriver->createPayment($data);
-    }
-
-    public function verifyWebhook(Request $request): bool
-    {
-        return false;
-    }
-
-    public function getPaymentStatus(string $reference): array
-    {
-        $coinsDriver = new CoinsDriver($this->config);
-
-        return $coinsDriver->getPaymentStatus($reference);
+        return parent::createPayment($data);
     }
 }

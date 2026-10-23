@@ -10,6 +10,8 @@ use App\Models\PlatformAuditLog;
 use App\Models\User;
 use App\Support\MerchantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -178,9 +180,17 @@ class MerchantContextTest extends TestCase
 
         $this->actingAs($admin)->post(route('admin.merchants.access', $merchantA));
 
+        Cache::flush();
+        Http::fake([
+            'https://api.paymongo.com/v1/merchants/capabilities/payment_methods' => Http::response([
+                'data' => ['attributes' => ['payment_methods' => ['qrph', 'gcash', 'paymaya', 'grab_pay', 'shopeepay']]],
+            ], 200),
+        ]);
+
         $this->get(route('dashboard.gateways'))
             ->assertOk()
-            ->assertSee('Coins.ph')
+            ->assertSee('GCash')
+            ->assertDontSee('Coins.ph')
             ->assertDontSee('merchant-a-gateway-secret')
             ->assertDontSee('merchant-b-gateway-secret');
 

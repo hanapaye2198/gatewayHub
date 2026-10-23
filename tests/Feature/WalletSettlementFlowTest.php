@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use App\Services\Billing\PlatformFeeService;
 use App\Services\Billing\WalletSettlementService;
 use App\Services\Coins\CoinsSignatureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -141,6 +142,53 @@ class WalletSettlementFlowTest extends TestCase
             'direction' => 'credit',
             'amount' => 985,
             'is_settled' => false,
+        ]);
+    }
+
+    public function test_payer_covers_platform_fee_and_merchant_wallet_receives_full_product_value(): void
+    {
+        config(['platform.fees' => ['percentage' => 1.5]]);
+        \App\Models\PlatformFeeRule::query()->delete();
+
+        $user = User::factory()->create();
+        $payment = Payment::factory()->paid()->create([
+            'merchant_id' => $user->id,
+            'gateway_code' => 'qrph',
+            'amount' => 1.02,
+            'product_amount' => 1.00,
+            'payer_fee_amount' => 0.02,
+            'platform_fee_rate' => 0.015,
+            'platform_fee' => null,
+            'net_amount' => null,
+        ]);
+
+        app(PlatformFeeService::class)->record($payment);
+        app(WalletSettlementService::class)->recordPaidPayment($payment->refresh());
+
+        $merchantWallet = Wallet::query()
+            ->where('merchant_id', $user->id)
+            ->where('wallet_type', Wallet::TYPE_MERCHANT_CLEARING)
+            ->where('currency', 'PHP')
+            ->firstOrFail();
+        $platformWallet = Wallet::query()
+            ->whereNull('merchant_id')
+            ->where('wallet_type', Wallet::TYPE_SYSTEM_TAX)
+            ->where('currency', 'PHP')
+            ->firstOrFail();
+
+        $this->assertSame('1.00', (string) $merchantWallet->balance);
+        $this->assertSame('0.02', (string) $platformWallet->balance);
+        $this->assertDatabaseHas('platform_fees', [
+            'payment_id' => $payment->id,
+            'gross_amount' => 1.02,
+            'fee_amount' => 0.02,
+            'net_amount' => 1.00,
+        ]);
+        $this->assertDatabaseHas('wallet_transactions', [
+            'payment_id' => $payment->id,
+            'entry_type' => WalletTransaction::ENTRY_TUNNEL_NET_AVAILABLE,
+            'direction' => 'credit',
+            'amount' => 1.00,
         ]);
     }
 

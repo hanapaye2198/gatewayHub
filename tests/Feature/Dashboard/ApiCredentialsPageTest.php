@@ -49,6 +49,47 @@ class ApiCredentialsPageTest extends TestCase
             ->assertSee('abcdefghijklmnop', false);
     }
 
+    public function test_merchant_can_toggle_api_key_view(): void
+    {
+        $user = User::factory()->create();
+        $apiKey = 'test-api-key-1234';
+        $merchant = $user->merchant;
+        $merchant->forceFill(['api_key' => $apiKey])->save();
+
+        $this->actingAs($user);
+
+        Livewire::test('pages::dashboard.api-credentials')
+            ->assertSet('showApiKey', false)
+            ->assertSee('****1234', false)
+            ->assertDontSee($apiKey, false)
+            ->call('toggleShowApiKey')
+            ->assertSet('showApiKey', true)
+            ->assertSee($apiKey, false);
+
+        $merchant->refresh();
+        $this->assertSame($apiKey, $merchant->api_key_encrypted);
+        $this->assertNotSame($apiKey, $merchant->getRawOriginal('api_key_encrypted'));
+        $this->assertSame(hash('sha256', $apiKey), $merchant->api_key_hash);
+    }
+
+    public function test_legacy_hash_only_key_cannot_be_revealed_until_regenerated(): void
+    {
+        $user = User::factory()->create();
+        $user->merchant->forceFill([
+            'api_key_hash' => hash('sha256', 'legacy-key-value'),
+            'api_key_last_four' => 'alue',
+            'api_key_encrypted' => null,
+        ])->save();
+
+        $this->actingAs($user);
+
+        Livewire::test('pages::dashboard.api-credentials')
+            ->assertSee('This key predates secure viewing.', false)
+            ->call('toggleShowApiKey')
+            ->assertSet('showApiKey', false)
+            ->assertDontSee('legacy-key-value', false);
+    }
+
     public function test_admin_cannot_access_api_credentials_page(): void
     {
         $admin = User::factory()->admin()->create();

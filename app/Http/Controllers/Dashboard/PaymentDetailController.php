@@ -50,7 +50,7 @@ class PaymentDetailController extends Controller
     }
 
     /**
-     * Return payment status and GatewayHub-owned fee fields for polling. Uses session auth.
+     * Return payment status and KemoPay-owned fee fields for polling. Uses session auth.
      * Marks expired pending payments as failed.
      */
     public function status(Payment $payment, PaymentStatusSyncService $paymentStatusSyncService): JsonResponse

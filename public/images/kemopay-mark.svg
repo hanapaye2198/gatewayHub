@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="KemoPay">
+    <defs>
+        <linearGradient id="kemopay-mark-gradient" x1="6" y1="5" x2="59" y2="61" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#8A62FF" />
+            <stop offset="1" stop-color="#5B3ADD" />
+        </linearGradient>
+    </defs>
+    <rect width="64" height="64" rx="16" fill="url(#kemopay-mark-gradient)" />
+    <path d="M17 16h9v15.2L41.2 16H53L37.3 32 53 48H41.2L26 32.8V48h-9V16Z" fill="#fff" />
+    <circle cx="48.5" cy="15.5" r="4.5" fill="#8EE9FF" />
+</svg>

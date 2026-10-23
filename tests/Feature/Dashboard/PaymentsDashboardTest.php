@@ -445,8 +445,8 @@ class PaymentsDashboardTest extends TestCase
         $worksheet = $this->readExcelEntry($workbook, 'xl/worksheets/sheet1.xml');
 
         $this->assertStringContainsString('Created At', $worksheet);
-        $this->assertStringContainsString('GatewayHub Platform Fee (%)', $worksheet);
-        $this->assertStringContainsString('Net After GatewayHub Fee', $worksheet);
+        $this->assertStringContainsString('KemoPay Platform Fee (%)', $worksheet);
+        $this->assertStringContainsString('Net After KemoPay Fee', $worksheet);
         $this->assertStringContainsString('M-EXPORT-PAID-001', $worksheet);
         $this->assertStringContainsString('200.00', $worksheet);
         $this->assertStringContainsString('1.50', $worksheet);

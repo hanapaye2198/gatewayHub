@@ -81,6 +81,14 @@ class UpdatePlatformGatewayConfigRequest extends FormRequest
                 }
             }
 
+            if ($gateway->code === 'paymongo' && $key === 'secret_key') {
+                $fieldRules[] = 'regex:/^sk_(test|live)_.+$/';
+            }
+
+            if ($gateway->code === 'paymongo' && $key === 'public_key') {
+                $fieldRules[] = 'regex:/^pk_(test|live)_.+$/';
+            }
+
             $rules['config.'.$key] = $fieldRules;
         }
 
@@ -91,7 +99,7 @@ class UpdatePlatformGatewayConfigRequest extends FormRequest
     {
         $validator->after(function ($validator): void {
             $gateway = $this->route('gateway');
-            if (! $gateway instanceof Gateway || $gateway->code !== 'coins') {
+            if (! $gateway instanceof Gateway || $gateway->code !== 'paymongo') {
                 return;
             }
 
@@ -100,7 +108,9 @@ class UpdatePlatformGatewayConfigRequest extends FormRequest
                 return;
             }
 
-            foreach (['client_id', 'client_secret', 'api_key', 'api_secret', 'webhook_secret'] as $key) {
+            $keys = ['secret_key', 'public_key', 'webhook_secret'];
+
+            foreach ($keys as $key) {
                 $value = $config[$key] ?? null;
                 if (! is_string($value)) {
                     continue;
@@ -114,11 +124,32 @@ class UpdatePlatformGatewayConfigRequest extends FormRequest
                 if ($this->isPlaceholderCredentialValue($trimmed)) {
                     $validator->errors()->add(
                         'config.'.$key,
-                        'Placeholder credentials are not allowed. Enter real Coins.ph values.'
+                        'Placeholder credentials are not allowed. Enter real PayMongo values.'
                     );
                 }
             }
+
+            if ($gateway->code === 'paymongo') {
+                $storedConfig = is_array($gateway->config_json) ? $gateway->config_json : [];
+                $incomingConfig = array_filter($config, static fn (mixed $value): bool => is_string($value) && trim($value) !== '');
+                $effectiveConfig = array_merge($storedConfig, $incomingConfig);
+                $secretMode = $this->paymongoKeyMode($effectiveConfig['secret_key'] ?? null, 'sk');
+                $publicMode = $this->paymongoKeyMode($effectiveConfig['public_key'] ?? null, 'pk');
+
+                if ($secretMode !== null && $publicMode !== null && $secretMode !== $publicMode) {
+                    $validator->errors()->add('config.public_key', 'PayMongo secret and public API keys must use the same mode.');
+                }
+            }
         });
+    }
+
+    private function paymongoKeyMode(mixed $key, string $prefix): ?string
+    {
+        if (! is_string($key) || ! preg_match('/^'.preg_quote($prefix, '/').'_(test|live)_/', trim($key), $matches)) {
+            return null;
+        }
+
+        return $matches[1];
     }
 
     private function isPlaceholderCredentialValue(string $value): bool
@@ -128,9 +159,14 @@ class UpdatePlatformGatewayConfigRequest extends FormRequest
             'your_real_client_id',
             'your_real_client_secret',
             'your_real_webhook_secret',
+            'your_real_public_key',
+            'sk_test_your_secret_key',
+            'pk_test_your_public_key',
+            'whsk_your_webhook_secret',
             'your_client_id',
             'your_client_secret',
             'your_webhook_secret',
+            'your_public_key',
             'your_api_key',
             'your_api_secret',
             'change_me',

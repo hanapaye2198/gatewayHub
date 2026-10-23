@@ -185,7 +185,7 @@ class MerchantWebhookDispatchTest extends TestCase
                 && $body['data']['gateway'] === 'gcash'
                 && $request->hasHeader('X-Merchant-Signature')
                 && $request->hasHeader('X-Merchant-Timestamp')
-                && $request->header('User-Agent')[0] === 'GatewayHub-Webhooks/1.0';
+                && $request->header('User-Agent')[0] === 'KemoPay-Webhooks/1.0';
         });
     }
 
@@ -212,11 +212,13 @@ class MerchantWebhookDispatchTest extends TestCase
         Http::assertSent(function ($request) use ($secret): bool {
             $timestamp = $request->header('X-Merchant-Timestamp')[0] ?? '';
             $signature = $request->header('X-Merchant-Signature')[0] ?? '';
-            $body = json_encode($request->data(), JSON_UNESCAPED_SLASHES);
+            $body = $request->body();
 
             $expected = hash_hmac('sha256', $timestamp.'.'.$body, $secret);
 
-            return $signature === $expected;
+            return $signature === $expected
+                && $request->header('Content-Type')[0] === 'application/json'
+                && json_decode($body, true)['event'] === 'payment.updated';
         });
     }
 

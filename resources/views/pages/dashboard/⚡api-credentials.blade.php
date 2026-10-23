@@ -59,14 +59,19 @@ new class extends Component
         $this->redirect(route('dashboard.api-credentials'), navigate: true);
     }
 
-    public function toggleShowApiKey(): void
-    {
-        $this->showApiKey = ! $this->showApiKey;
-    }
-
     public function toggleShowWebhookSecret(): void
     {
         $this->showWebhookSecret = ! $this->showWebhookSecret;
+    }
+
+    public function toggleShowApiKey(): void
+    {
+        $user = auth()->user();
+        if ($user === null || ! $user->isMerchantUser() || blank($user->merchant?->api_key_encrypted)) {
+            return;
+        }
+
+        $this->showApiKey = ! $this->showApiKey;
     }
 
     public function regenerateWebhookSecretNow(): void
@@ -175,24 +180,25 @@ new class extends Component
                         </div>
                     </div>
 
-                    @if ($user?->hasApiKey())
-                        <div class="flex items-center gap-1">
-                            <button
-                                type="button"
-                                wire:click="toggleShowApiKey"
-                                class="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-                            >
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-                                    @if($showApiKey)
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/>
-                                    @else
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/>
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                    @endif
-                                </svg>
-                            </button>
-                        </div>
+                    @if (filled($user?->merchant?->api_key_encrypted))
+                        <button
+                            type="button"
+                            wire:click="toggleShowApiKey"
+                            aria-label="{{ $showApiKey ? __('Hide API key') : __('Show API key') }}"
+                            aria-pressed="{{ $showApiKey ? 'true' : 'false' }}"
+                            class="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                        >
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                                @if ($showApiKey)
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/>
+                                @else
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                @endif
+                            </svg>
+                        </button>
                     @endif
+
                 </div>
 
                 @if ($user?->hasApiKey())
@@ -201,8 +207,8 @@ new class extends Component
                             <div class="flex items-start gap-3">
                                 <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.2)] dark:bg-emerald-400"></span>
                                 <div class="min-w-0 flex-1 break-all font-mono text-sm">
-                                    @if($showApiKey)
-                                        <span class="text-zinc-900 dark:text-zinc-50">{{ $user->api_key }}</span>
+                                    @if ($showApiKey && filled($user->merchant?->api_key_encrypted))
+                                        <span class="text-zinc-900 dark:text-zinc-50">{{ $user->merchant->api_key_encrypted }}</span>
                                     @else
                                         <span class="text-zinc-600 dark:text-zinc-400">{{ $user->masked_api_key }}</span>
                                     @endif
@@ -220,8 +226,13 @@ new class extends Component
                             </p>
                         @endif
                         <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-500">
-                            {{ __('For security, the full API key is shown only once. Regenerate to copy it again.') }}
+                            {{ __('API keys are encrypted at rest. Use the eye icon to view this key when needed.') }}
                         </p>
+                        @if (blank($user->merchant?->api_key_encrypted))
+                            <p class="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                                {{ __('This key predates secure viewing. Regenerate it to enable the view button.') }}
+                            </p>
+                        @endif
                     </div>
                 @else
                     <div class="mt-6 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/80 p-8 text-center dark:border-zinc-600 dark:bg-zinc-800/30">
@@ -257,7 +268,7 @@ new class extends Component
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <h3 class="text-base font-semibold text-amber-950 dark:text-amber-100">{{ __('Save your new API key now') }}</h3>
-                                    <p class="mt-1 text-sm text-amber-900/90 dark:text-amber-200/90">{{ __('This is the only time we will show it. Copy it and store it securely.') }}</p>
+                                    <p class="mt-1 text-sm text-amber-900/90 dark:text-amber-200/90">{{ __('Copy and store this key securely. You can view it again from API Credentials.') }}</p>
                                     <div class="mt-4">
                                         <div class="relative">
                                             <input
@@ -281,7 +292,7 @@ new class extends Component
                                         <svg class="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
                                         </svg>
-                                        <span>{{ __('If you lose this key, you will need to regenerate a new one. Your old key will no longer work.') }}</span>
+                                        <span>{{ __('Keep this key on your server. Never put it in browser or mobile app code.') }}</span>
                                     </p>
                                 </div>
                             </div>
@@ -357,7 +368,7 @@ new class extends Component
                         {{ __('Setting up your webhook / callback URL') }}
                     </h3>
                     <p class="mt-1.5 text-sm text-indigo-900/90 dark:text-indigo-200/90">
-                        {{ __('This is the server-to-server URL where GatewayHub posts payment status updates. It is not a browser redirect; your backend must accept our POST over HTTPS.') }}
+                        {{ __('This is the server-to-server URL where KemoPay posts payment status updates. It is not a browser redirect; your backend must accept our POST over HTTPS.') }}
                     </p>
                     <ol class="mt-3 list-decimal space-y-2.5 ps-5 text-sm text-indigo-900/95 dark:text-indigo-100/90">
                         <li>

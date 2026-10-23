@@ -4,13 +4,12 @@
 
 @php
     $sizeClass = match ($size) {
-        'sm' => 'landing-logo--sm',
-        default => 'landing-logo--md',
+        'sm' => 'kp-brand-logo--sm',
+        default => '',
     };
 @endphp
 
-<img
-    src="{{ asset('logo.svg') }}"
-    alt="GatewayHub"
-    {{ $attributes->merge(['class' => "landing-logo {$sizeClass}"]) }}
-/>
+<span {{ $attributes->merge(['class' => "kp-brand-logo {$sizeClass}"]) }}>
+    <img class="kp-brand-icon" src="{{ asset('Modern K Payment App Icon.png') }}" alt="" />
+    <span class="kp-brand-wordmark">KemoPay</span>
+</span>

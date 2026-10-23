@@ -13,7 +13,10 @@ class RegistrationTest extends TestCase
     {
         $response = $this->get(route('register'));
 
-        $response->assertOk();
+        $response->assertOk()
+            ->assertSee('Create your account', false)
+            ->assertSee('kp-auth-form-card', false)
+            ->assertSee('kp-auth-story', false);
     }
 
     public function test_new_users_can_register(): void

@@ -34,6 +34,10 @@ class WalletTransaction extends Model
 
     public const ENTRY_TUNNEL_FAILURE = 'tunnel_wallet_failure';
 
+    public const ENTRY_MERCHANT_PAYOUT = 'merchant_payout';
+
+    public const ENTRY_MERCHANT_PAYOUT_REVERSAL = 'merchant_payout_reversal';
+
     /**
      * @var list<string>
      */

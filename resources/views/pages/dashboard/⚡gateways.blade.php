@@ -2,8 +2,8 @@
 
 use App\Models\Gateway;
 use App\Models\MerchantGateway;
+use App\Services\Gateways\PayMongoMethodCapabilityService;
 use App\Support\MerchantContext;
-use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -15,8 +15,6 @@ new class extends Component
 
     public bool $readOnly = false;
 
-    public ?array $coinsPingMessage = null;
-
     public function mount(): void
     {
         $user = auth()->user();
@@ -26,7 +24,8 @@ new class extends Component
         }
 
         $this->readOnly = $user->isPlatformOperator();
-        $gateways = Gateway::query()->orderBy('name')->get();
+        $gateways = Gateway::query()->whereIn('code', PayMongoMethodCapabilityService::gatewayCodes())->orderBy('name')->get();
+        $payMongoMethodCapabilityService = app(PayMongoMethodCapabilityService::class);
 
         if ($this->readOnly) {
             $existing = MerchantGateway::query()
@@ -39,6 +38,7 @@ new class extends Component
                 $this->gatewayStates[$gateway->id] = [
                     'enabled' => (bool) ($row?->is_enabled),
                     'global_enabled' => (bool) $gateway->is_global_enabled,
+                    'provider_status' => $payMongoMethodCapabilityService->statusForGateway($gateway->code),
                 ];
             }
 
@@ -60,6 +60,7 @@ new class extends Component
             $this->gatewayStates[$gateway->id] = [
                 'enabled' => (bool) $merchantGateway->is_enabled,
                 'global_enabled' => (bool) $gateway->is_global_enabled,
+                'provider_status' => $payMongoMethodCapabilityService->statusForGateway($gateway->code),
             ];
         }
     }
@@ -67,7 +68,7 @@ new class extends Component
     #[Computed]
     public function gateways(): \Illuminate\Support\Collection
     {
-        return Gateway::query()->orderBy('name')->get();
+        return Gateway::query()->whereIn('code', PayMongoMethodCapabilityService::gatewayCodes())->orderBy('name')->get();
     }
 
     public function toggleEnabled(int $gatewayId): void
@@ -79,7 +80,7 @@ new class extends Component
         }
 
         $gateway = Gateway::query()->find($gatewayId);
-        if (! $gateway instanceof Gateway) {
+        if (! $gateway instanceof Gateway || $gateway->isProviderOnly()) {
             return;
         }
 
@@ -89,7 +90,22 @@ new class extends Component
         if ($targetEnabledState && ! $gateway->is_global_enabled) {
             $this->gatewayStates[$gatewayId]['enabled'] = false;
             $this->gatewayStates[$gatewayId]['global_enabled'] = false;
-            $this->addError('gateway.'.$gatewayId, __('Gateway is currently disabled by SurePay admin.'));
+            $this->addError('gateway.'.$gatewayId, __('Gateway is currently disabled by KemoPay admin.'));
+
+            return;
+        }
+
+        $providerStatus = app(PayMongoMethodCapabilityService::class)->statusForGateway($gateway->code);
+        if ($targetEnabledState && $providerStatus === 'unavailable') {
+            $this->gatewayStates[$gatewayId]['enabled'] = false;
+            $this->addError('gateway.'.$gatewayId, __('This method is not enabled for KemoPay’s PayMongo account. Ask the platform administrator to activate it in PayMongo.'));
+
+            return;
+        }
+
+        if ($targetEnabledState && $providerStatus === 'unverified') {
+            $this->gatewayStates[$gatewayId]['enabled'] = false;
+            $this->addError('gateway.'.$gatewayId, __('KemoPay could not verify this PayMongo method. Try again shortly.'));
 
             return;
         }
@@ -112,6 +128,7 @@ new class extends Component
 
         $this->gatewayStates[$gatewayId]['enabled'] = $targetEnabledState;
         $this->gatewayStates[$gatewayId]['global_enabled'] = (bool) $gateway->is_global_enabled;
+        $this->gatewayStates[$gatewayId]['provider_status'] = $providerStatus;
     }
 
     public function toggleFromButton(int $gatewayId): void
@@ -121,40 +138,6 @@ new class extends Component
         $this->toggleEnabled($gatewayId);
     }
 
-    public function pingCoinsPublicApi(): void
-    {
-        $this->coinsPingMessage = null;
-
-        $apiBase = (string) config('coins.gateway.api_base', 'sandbox');
-        $baseUrl = $apiBase === 'prod'
-            ? 'https://api.pro.coins.ph'
-            : 'https://api.9001.pl-qa.coinsxyz.me';
-
-        try {
-            $response = Http::timeout(10)->acceptJson()->get($baseUrl.'/openapi/v1/ping');
-        } catch (\Throwable $exception) {
-            $this->coinsPingMessage = [
-                'type' => 'error',
-                'message' => __('Ping failed: :message', ['message' => $exception->getMessage()]),
-            ];
-
-            return;
-        }
-
-        if (! $response->successful()) {
-            $this->coinsPingMessage = [
-                'type' => 'error',
-                'message' => __('Ping failed with HTTP :code.', ['code' => (string) $response->status()]),
-            ];
-
-            return;
-        }
-
-        $this->coinsPingMessage = [
-            'type' => 'success',
-            'message' => __('Coins API ping successful (HTTP :code).', ['code' => (string) $response->status()]),
-        ];
-    }
 }; ?>
 
 <div class="gh-page flex h-full w-full min-w-0 flex-1 flex-col gap-5 font-sans text-zinc-900 sm:gap-6 dark:text-zinc-100">
@@ -173,14 +156,14 @@ new class extends Component
                     <h1 class="text-lg font-bold tracking-tight text-zinc-900 sm:text-xl dark:text-zinc-50">{{ __('Payment Gateways') }}</h1>
                 </div>
                 <p class="mt-1 max-w-lg text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
-                    {{ __('Enable or disable payment gateways for your merchant account. Credentials are managed at the platform level.') }}
+                    {{ __('Enable or disable payment gateways for your merchant account. PayMongo methods are available only when activated on KemoPay’s platform account; credentials are managed by KemoPay.') }}
                 </p>
             </div>
 
             {{-- Summary badges + Ping button --}}
             <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                 @php
-                    $enabledCount  = collect($gatewayStates)->filter(fn($s) => ($s['global_enabled'] ?? false) && ($s['enabled'] ?? false))->count();
+                    $enabledCount  = collect($gatewayStates)->filter(fn($s) => ($s['global_enabled'] ?? false) && ($s['enabled'] ?? false) && in_array($s['provider_status'] ?? 'unverified', ['available', 'not_applicable'], true))->count();
                     $totalCount    = count($gatewayStates);
                 @endphp
                 <div class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 sm:w-auto sm:justify-start dark:border-zinc-600 dark:bg-zinc-800/90">
@@ -188,50 +171,9 @@ new class extends Component
                     <span class="text-sm font-bold tabular-nums text-zinc-900 dark:text-zinc-50">{{ $enabledCount }}<span class="font-normal text-zinc-500 dark:text-zinc-400">/{{ $totalCount }}</span></span>
                 </div>
 
-                <button
-                    type="button"
-                    class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 shadow-sm transition hover:bg-zinc-50 hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto dark:border-zinc-500 dark:bg-zinc-800 dark:text-zinc-100 dark:shadow-none dark:hover:border-zinc-400 dark:hover:bg-zinc-700"
-                    wire:click="pingCoinsPublicApi"
-                    wire:loading.attr="disabled"
-                    wire:target="pingCoinsPublicApi"
-                >
-                    <span wire:loading wire:target="pingCoinsPublicApi">
-                        <svg class="h-4 w-4 animate-spin text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-                        </svg>
-                    </span>
-                    <span wire:loading.remove wire:target="pingCoinsPublicApi">
-                        <svg class="h-4 w-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/>
-                        </svg>
-                    </span>
-                    {{ __('Ping Coins API') }}
-                </button>
             </div>
         </div>
 
-        {{-- Ping result banner --}}
-        @if($coinsPingMessage)
-            <div
-                @class([
-                    'mt-4 flex items-start gap-2.5 rounded-xl border px-3 py-3 text-sm font-medium transition-colors duration-200 sm:items-center sm:px-4',
-                    'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/35 dark:bg-emerald-950/50 dark:text-emerald-100' => $coinsPingMessage['type'] === 'success',
-                    'border-red-200 bg-red-50 text-red-900 dark:border-red-400/35 dark:bg-red-950/45 dark:text-red-100' => $coinsPingMessage['type'] !== 'success',
-                ])
-            >
-                @if($coinsPingMessage['type'] === 'success')
-                    <svg class="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                @else
-                    <svg class="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
-                    </svg>
-                @endif
-                <span>{{ $coinsPingMessage['message'] }}</span>
-            </div>
-        @endif
     </div>
 
     {{-- ── Gateway Cards ── --}}
@@ -240,17 +182,19 @@ new class extends Component
             @php
                 $state             = $gatewayStates[$gateway->id] ?? ['enabled' => false, 'global_enabled' => false];
                 $isGloballyEnabled = (bool) ($state['global_enabled'] ?? false);
-                $isEnabled         = $isGloballyEnabled && (bool) ($state['enabled'] ?? false);
+                $isMerchantEnabled = (bool) ($state['enabled'] ?? false);
+                $providerStatus    = (string) ($state['provider_status'] ?? 'unverified');
+                $isProviderReady   = in_array($providerStatus, ['available', 'not_applicable'], true);
+                $isEnabled         = $isGloballyEnabled && $isMerchantEnabled && $isProviderReady;
+                $canEnable         = $isProviderReady && $isGloballyEnabled;
 
                 $statusBorder = $isEnabled
                     ? 'border-l-emerald-500 dark:border-l-emerald-400'
                     : ($isGloballyEnabled ? 'border-l-amber-500 dark:border-l-amber-400' : 'border-l-slate-300 dark:border-l-slate-600');
 
                 $gatewayLogoFilenames = [
-                    'coins' => 'coins.png',
                     'gcash' => 'gcash.png',
                     'maya' => 'maya.png',
-                    'paypal' => 'paypal.png',
                     'qrph' => 'qrph.svg',
                 ];
                 $gatewayLogoFile = $gatewayLogoFilenames[strtolower((string) $gateway->code)] ?? null;
@@ -290,7 +234,15 @@ new class extends Component
                                 </span>
                             </div>
                             <p class="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">
-                                {{ $isEnabled ? __('Accepting payments') : ($isGloballyEnabled ? __('Currently inactive for your account') : __('Unavailable — contact SurePay admin')) }}
+                                @if (! $isGloballyEnabled)
+                                    {{ __('Unavailable — contact KemoPay admin') }}
+                                @elseif ($providerStatus === 'unavailable')
+                                    {{ __('Not enabled on the KemoPay PayMongo account') }}
+                                @elseif ($providerStatus === 'unverified')
+                                    {{ __('PayMongo availability could not be verified') }}
+                                @else
+                                    {{ $isEnabled ? __('Available for payments') : __('Currently inactive for your account') }}
+                                @endif
                             </p>
                         </div>
                     </div>
@@ -302,6 +254,14 @@ new class extends Component
                         @if (! $isGloballyEnabled)
                             <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                                 <span class="h-1.5 w-1.5 rounded-full bg-slate-500 dark:bg-slate-400"></span>{{ __('Globally Off') }}
+                            </span>
+                        @elseif ($providerStatus === 'unavailable')
+                            <span class="inline-flex items-center gap-1.5 rounded-full border border-rose-200/90 bg-rose-100 px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-rose-900 dark:border-rose-500/40 dark:bg-rose-950/60 dark:text-rose-200">
+                                <span class="h-1.5 w-1.5 rounded-full bg-rose-500 dark:bg-rose-400"></span>{{ __('PayMongo Off') }}
+                            </span>
+                        @elseif ($providerStatus === 'unverified')
+                            <span class="inline-flex items-center gap-1.5 rounded-full border border-amber-200/90 bg-amber-100 px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-amber-950 dark:border-amber-500/35 dark:bg-amber-950/50 dark:text-amber-100">
+                                <span class="h-1.5 w-1.5 rounded-full bg-amber-500 dark:bg-amber-400"></span>{{ __('Unverified') }}
                             </span>
                         @elseif ($isEnabled)
                             <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/90 bg-emerald-100 px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-950/60 dark:text-emerald-200">
@@ -319,10 +279,12 @@ new class extends Component
                             type="button"
                             @class([
                                 'inline-flex min-h-[2.5rem] items-center gap-1 rounded-lg border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0 sm:py-1.5',
-                                'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60' => ! $isEnabled,
-                                'border-orange-200 bg-orange-50 text-orange-900 hover:bg-orange-100 dark:border-red-500/40 dark:bg-red-950/45 dark:text-red-100 dark:hover:bg-red-950/70' => $isEnabled,
+                                'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60' => ! $isMerchantEnabled,
+                                'border-orange-200 bg-orange-50 text-orange-900 hover:bg-orange-100 dark:border-red-500/40 dark:bg-red-950/45 dark:text-red-100 dark:hover:bg-red-950/70' => $isMerchantEnabled,
+                                'cursor-not-allowed opacity-50' => ! $canEnable && ! $isMerchantEnabled,
                             ])
                             wire:click="toggleFromButton({{ $gateway->id }})"
+                            @disabled(! $canEnable && ! $isMerchantEnabled)
                             wire:loading.attr="disabled"
                             wire:target="toggleFromButton({{ $gateway->id }})"
                         >
@@ -333,7 +295,7 @@ new class extends Component
                                 </svg>
                             </span>
                             <span wire:loading.remove wire:target="toggleFromButton({{ $gateway->id }})">
-                                @if($isEnabled)
+                                @if($isMerchantEnabled)
                                     <svg class="-mt-0.5 me-1 inline-block h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                                     </svg>
@@ -343,7 +305,7 @@ new class extends Component
                                     </svg>
                                 @endif
                             </span>
-                            {{ $isEnabled ? __('Disable') : __('Enable') }}
+                            {{ $isMerchantEnabled ? __('Disable') : ($canEnable ? __('Enable') : __('Unavailable')) }}
                         </button>
 
                         {{-- Flux switch --}}
@@ -351,6 +313,7 @@ new class extends Component
                             <flux:switch
                                 wire:model.live="gatewayStates.{{ $gateway->id }}.enabled"
                                 wire:change="toggleEnabled({{ $gateway->id }})"
+                                :disabled="! $canEnable && ! $isMerchantEnabled"
                             />
                         </flux:field>
                         @endunless

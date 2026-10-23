@@ -5,7 +5,7 @@ namespace Tests\Feature\Api;
 use App\Models\Gateway;
 use App\Models\MerchantGateway;
 use App\Models\User;
-use App\Services\Gateways\Drivers\CoinsDriver;
+use App\Services\Gateways\Drivers\PayMongoDriver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -19,10 +19,19 @@ class ApiPaymentHardeningTest extends TestCase
     {
         parent::setUp();
 
-        Gateway::query()->create([
-            'code' => 'coins',
-            'name' => 'Coins.ph',
-            'driver_class' => CoinsDriver::class,
+        Gateway::query()->updateOrCreate(['code' => 'paymongo'], [
+            'name' => 'PayMongo',
+            'driver_class' => PayMongoDriver::class,
+            'is_global_enabled' => true,
+            'config_json' => [
+                'secret_key' => 'sk_test_kemopay',
+                'public_key' => 'pk_test_kemopay',
+                'webhook_secret' => 'whsk_test_kemopay',
+            ],
+        ]);
+        Gateway::query()->updateOrCreate(['code' => 'gcash'], [
+            'name' => 'GCash',
+            'driver_class' => PayMongoDriver::class,
             'is_global_enabled' => true,
         ]);
     }
@@ -32,18 +41,18 @@ class ApiPaymentHardeningTest extends TestCase
         $user = User::factory()->withMerchantApiKey('inactive-key')->create();
         $user->merchant->update(['is_active' => false]);
 
-        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
+        $gcashGateway = Gateway::query()->where('code', 'gcash')->firstOrFail();
         MerchantGateway::query()->create([
             'merchant_id' => $user->merchant_id,
-            'gateway_id' => $coinsGateway->id,
+            'gateway_id' => $gcashGateway->id,
             'is_enabled' => true,
-            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
+            'config_json' => [],
         ]);
 
         $response = $this->postJson('/api/payments', [
             'amount' => 100,
             'currency' => 'PHP',
-            'gateway' => 'coins',
+            'gateway' => 'gcash',
             'reference' => 'ref-1',
         ], ['Authorization' => 'Bearer inactive-key']);
 
@@ -56,7 +65,7 @@ class ApiPaymentHardeningTest extends TestCase
         $response = $this->postJson('/api/payments', [
             'amount' => 100,
             'currency' => 'PHP',
-            'gateway' => 'coins',
+            'gateway' => 'gcash',
             'reference' => 'ref-1',
         ], ['Authorization' => 'Bearer invalid-key']);
 
@@ -67,18 +76,18 @@ class ApiPaymentHardeningTest extends TestCase
     public function test_amount_zero_returns_422(): void
     {
         $user = User::factory()->withMerchantApiKey('key-1')->create();
-        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
+        $gcashGateway = Gateway::query()->where('code', 'gcash')->firstOrFail();
         MerchantGateway::query()->create([
             'merchant_id' => $user->merchant_id,
-            'gateway_id' => $coinsGateway->id,
+            'gateway_id' => $gcashGateway->id,
             'is_enabled' => true,
-            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
+            'config_json' => [],
         ]);
 
         $response = $this->postJson('/api/payments', [
             'amount' => 0,
             'currency' => 'PHP',
-            'gateway' => 'coins',
+            'gateway' => 'gcash',
             'reference' => 'ref-1',
         ], ['Authorization' => 'Bearer key-1']);
 
@@ -96,18 +105,18 @@ class ApiPaymentHardeningTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
+        $gcashGateway = Gateway::query()->where('code', 'gcash')->firstOrFail();
         MerchantGateway::query()->create([
             'merchant_id' => $user->merchant_id,
-            'gateway_id' => $coinsGateway->id,
+            'gateway_id' => $gcashGateway->id,
             'is_enabled' => true,
-            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
+            'config_json' => [],
         ]);
 
         $response = $this->postJson('/api/payments', [
             'amount' => 0,
             'currency' => 'PHP',
-            'gateway' => 'coins',
+            'gateway' => 'gcash',
             'reference' => 'ref-hash-only',
         ], ['Authorization' => 'Bearer key-hash-only']);
 
@@ -125,18 +134,18 @@ class ApiPaymentHardeningTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
+        $gcashGateway = Gateway::query()->where('code', 'gcash')->firstOrFail();
         MerchantGateway::query()->create([
             'merchant_id' => $user->merchant_id,
-            'gateway_id' => $coinsGateway->id,
+            'gateway_id' => $gcashGateway->id,
             'is_enabled' => true,
-            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
+            'config_json' => [],
         ]);
 
         $response = $this->postJson('/api/payments', [
             'amount' => 100,
             'currency' => 'PHP',
-            'gateway' => 'coins',
+            'gateway' => 'gcash',
             'reference' => 'ref-legacy-plaintext',
         ], ['Authorization' => 'Bearer legacy-plaintext-key']);
 
@@ -149,21 +158,21 @@ class ApiPaymentHardeningTest extends TestCase
 
     public function test_idempotency_key_returns_cached_response(): void
     {
-        Http::fake(['*' => Http::response(['code' => 0, 'data' => ['orderId' => 'ord-1', 'qrCode' => 'qr123']], 200)]);
+        $this->fakePayMongoPayment('pi_idempotency_001');
 
         $user = User::factory()->withMerchantApiKey('key-idem')->create();
-        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
+        $gcashGateway = Gateway::query()->where('code', 'gcash')->firstOrFail();
         MerchantGateway::query()->create([
             'merchant_id' => $user->merchant_id,
-            'gateway_id' => $coinsGateway->id,
+            'gateway_id' => $gcashGateway->id,
             'is_enabled' => true,
-            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
+            'config_json' => [],
         ]);
 
         $payload = [
             'amount' => 100,
             'currency' => 'PHP',
-            'gateway' => 'coins',
+            'gateway' => 'gcash',
             'reference' => 'ref-idem',
         ];
         $headers = [
@@ -186,21 +195,21 @@ class ApiPaymentHardeningTest extends TestCase
 
     public function test_api_response_format_has_success_data_error(): void
     {
-        Http::fake(['*' => Http::response(['code' => 0, 'data' => ['orderId' => 'x', 'qrCode' => 'y']], 200)]);
+        $this->fakePayMongoPayment('pi_format_001');
 
         $user = User::factory()->withMerchantApiKey('key-format')->create();
-        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
+        $gcashGateway = Gateway::query()->where('code', 'gcash')->firstOrFail();
         MerchantGateway::query()->create([
             'merchant_id' => $user->merchant_id,
-            'gateway_id' => $coinsGateway->id,
+            'gateway_id' => $gcashGateway->id,
             'is_enabled' => true,
-            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
+            'config_json' => [],
         ]);
 
         $response = $this->postJson('/api/payments', [
             'amount' => 100,
             'currency' => 'PHP',
-            'gateway' => 'coins',
+            'gateway' => 'gcash',
             'reference' => 'ref-format',
         ], ['Authorization' => 'Bearer key-format']);
 
@@ -212,5 +221,30 @@ class ApiPaymentHardeningTest extends TestCase
         $this->assertTrue($json['success']);
         $this->assertNull($json['error']);
         $this->assertArrayHasKey('payment_id', $json['data']);
+    }
+
+    private function fakePayMongoPayment(string $intentId): void
+    {
+        Http::fake(function ($request) use ($intentId) {
+            return match (parse_url($request->url(), PHP_URL_PATH)) {
+                '/v1/merchants/capabilities/payment_methods' => Http::response([
+                    'data' => ['attributes' => ['payment_methods' => ['qrph', 'gcash', 'paymaya', 'grab_pay', 'shopeepay']]],
+                ], 200),
+                '/v1/payment_intents' => Http::response([
+                    'data' => ['id' => $intentId, 'attributes' => ['client_key' => $intentId.'_client_key']],
+                ], 200),
+                '/v1/payment_methods' => Http::response(['data' => ['id' => 'pm_'.str_replace('pi_', '', $intentId)]], 200),
+                '/v1/payment_intents/'.$intentId.'/attach' => Http::response([
+                    'data' => [
+                        'id' => $intentId,
+                        'attributes' => [
+                            'status' => 'awaiting_next_action',
+                            'next_action' => ['redirect' => ['url' => 'https://wallet.example/gcash']],
+                        ],
+                    ],
+                ], 200),
+                default => Http::response(['message' => 'Unexpected PayMongo request.'], 404),
+            };
+        });
     }
 }

@@ -6,6 +6,8 @@ use App\Models\Gateway;
 use App\Models\MerchantGateway;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -28,6 +30,12 @@ class EnabledGatewaysApiTest extends TestCase
     public function test_enabled_gateways_endpoint_returns_only_enabled_and_global_gateways_for_merchant(): void
     {
         Gateway::query()->delete();
+        Cache::flush();
+        Http::fake([
+            'https://api.paymongo.com/v1/merchants/capabilities/payment_methods' => Http::response([
+                'data' => ['attributes' => ['payment_methods' => ['qrph', 'paymaya']]],
+            ], 200),
+        ]);
 
         $merchantToken = Str::random(64);
         $otherMerchantToken = Str::random(64);
@@ -74,7 +82,7 @@ class EnabledGatewaysApiTest extends TestCase
         MerchantGateway::query()->create([
             'merchant_id' => $merchant->id,
             'gateway_id' => $gcash->id,
-            'is_enabled' => false,
+            'is_enabled' => true,
             'config_json' => [],
         ]);
         MerchantGateway::query()->create([
@@ -108,7 +116,9 @@ class EnabledGatewaysApiTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('success', true);
         $response->assertJsonPath('error', null);
-        $response->assertJsonPath('data.count', 3);
+        $response->assertJsonPath('data.count', 2);
+        $response->assertJsonPath('data.provider_availability.paymongo.methods.gcash', 'unavailable');
+        $response->assertJsonPath('data.provider_availability.paymongo.methods.maya', 'available');
         $response->assertJsonStructure([
             'data' => [
                 'gateways',
@@ -122,8 +132,8 @@ class EnabledGatewaysApiTest extends TestCase
         ]);
 
         $gateways = $response->json('data.gateways');
+        $response->assertDontSee('PayPal');
         $this->assertSame([
-            ['code' => 'coins', 'name' => 'Coins.ph'],
             ['code' => 'maya', 'name' => 'Maya'],
             ['code' => 'qrph', 'name' => 'QRPH'],
         ], $gateways);

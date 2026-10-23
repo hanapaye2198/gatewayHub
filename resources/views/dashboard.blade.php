@@ -199,7 +199,7 @@
                         <flux:icon name="signal" class="size-4 text-zinc-400" />
                     </div>
                     <div class="space-y-3">
-                        @foreach($gatewayStatuses ?? [['name' => 'Stripe', 'status' => 'Operational', 'uptime' => '99.99%'], ['name' => 'PayPal', 'status' => 'Operational', 'uptime' => '99.95%'], ['name' => 'Mollie', 'status' => 'Degraded', 'uptime' => '97.2%']] as $gateway)
+                        @foreach($gatewayStatuses ?? [['name' => 'GCash', 'status' => 'Operational', 'uptime' => '99.99%'], ['name' => 'Maya', 'status' => 'Operational', 'uptime' => '99.95%'], ['name' => 'QR Ph', 'status' => 'Operational', 'uptime' => '99.95%']] as $gateway)
                         <div class="flex items-center justify-between border-b border-zinc-100 pb-3 last:border-0 last:pb-0 dark:border-zinc-700">
                             <div>
                                 <p class="font-medium text-zinc-900 dark:text-zinc-100">{{ $gateway['name'] }}</p>

@@ -6,7 +6,7 @@ use App\Models\Payment;
 use Illuminate\Contracts\View\View;
 
 /**
- * Public landing pages after Coins hosted checkout redirects.
+ * Public landing pages after hosted and e-wallet payment redirects.
  */
 class PaymentRedirectController extends Controller
 {

@@ -4,7 +4,6 @@ namespace Tests\Feature\Admin;
 
 use App\Models\Gateway;
 use App\Models\User;
-use App\Services\Gateways\Drivers\MayaDriver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -15,53 +14,83 @@ class PlatformGatewayConfigTest extends TestCase
     public function test_admin_can_update_platform_gateway_credentials(): void
     {
         $admin = User::factory()->admin()->create();
-        $gateway = Gateway::query()->create([
-            'code' => 'coins',
-            'name' => 'Coins.ph',
-            'driver_class' => \App\Services\Gateways\Drivers\CoinsDriver::class,
-            'is_global_enabled' => true,
-            'config_json' => [],
-        ]);
+        $gateway = Gateway::query()->where('code', 'paymongo')->firstOrFail();
 
         $response = $this->actingAs($admin)->patch(route('admin.gateways.platform-config', ['gateway' => $gateway]), [
             'config' => [
-                'client_id' => 'platform-client-id',
-                'client_secret' => 'platform-client-secret',
-                'api_base' => 'sandbox',
+                'secret_key' => 'sk_test_platform-key',
+                'public_key' => 'pk_test_platform-key',
                 'webhook_secret' => 'platform-webhook-secret',
             ],
         ]);
 
         $response->assertRedirect(route('admin.gateways.index'));
-        $response->assertSessionHas('status', 'Platform credentials updated for gateway "Coins.ph".');
+        $response->assertSessionHas('status', 'Platform credentials updated for gateway "PayMongo".');
 
         $gateway->refresh();
-        $this->assertSame('platform-client-id', $gateway->config_json['client_id'] ?? null);
-        $this->assertSame('sandbox', $gateway->config_json['api_base'] ?? null);
+        $this->assertSame('sk_test_platform-key', $gateway->config_json['secret_key'] ?? null);
+        $this->assertSame('pk_test_platform-key', $gateway->config_json['public_key'] ?? null);
         $this->assertSame('platform-webhook-secret', $gateway->config_json['webhook_secret'] ?? null);
+    }
+
+    public function test_admin_can_configure_shared_paymongo_credentials(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $gateway = Gateway::query()->where('code', 'paymongo')->firstOrFail();
+
+        $response = $this->actingAs($admin)->patch(route('admin.gateways.platform-config', ['gateway' => $gateway]), [
+            'config' => [
+                'secret_key' => 'sk_test_kemopay_platform',
+                'public_key' => 'pk_test_kemopay_platform',
+                'webhook_secret' => 'whsk_test_kemopay_platform',
+            ],
+        ]);
+
+        $response->assertRedirect(route('admin.gateways.index'));
+        $gateway->refresh();
+        $this->assertSame('sk_test_kemopay_platform', $gateway->config_json['secret_key'] ?? null);
+        $this->assertSame('pk_test_kemopay_platform', $gateway->config_json['public_key'] ?? null);
+        $this->assertSame('whsk_test_kemopay_platform', $gateway->config_json['webhook_secret'] ?? null);
+        $this->assertStringNotContainsString('sk_test_kemopay_platform', (string) $gateway->getRawOriginal('config_json'));
+    }
+
+    public function test_admin_cannot_configure_paymongo_api_keys_for_different_modes(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $gateway = Gateway::query()->where('code', 'paymongo')->firstOrFail();
+
+        $response = $this->actingAs($admin)->from(route('admin.gateways.index'))->patch(
+            route('admin.gateways.platform-config', ['gateway' => $gateway]),
+            [
+                'config' => [
+                    'secret_key' => 'sk_live_kemopay_platform',
+                    'public_key' => 'pk_test_kemopay_platform',
+                    'webhook_secret' => 'whsk_test_kemopay_platform',
+                ],
+            ]
+        );
+
+        $response->assertRedirect(route('admin.gateways.index'));
+        $response->assertSessionHasErrors('config.public_key');
+        $this->assertSame([], $gateway->fresh()->config_json);
     }
 
     public function test_admin_update_keeps_existing_masked_secrets_when_left_blank(): void
     {
         $admin = User::factory()->admin()->create();
-        $gateway = Gateway::query()->create([
-            'code' => 'coins',
-            'name' => 'Coins.ph',
-            'driver_class' => \App\Services\Gateways\Drivers\CoinsDriver::class,
-            'is_global_enabled' => true,
+        $gateway = Gateway::query()->where('code', 'paymongo')->firstOrFail();
+        $gateway->update([
             'config_json' => [
-                'client_id' => 'old-client-id',
-                'client_secret' => 'old-client-secret',
-                'api_base' => 'sandbox',
+                'secret_key' => 'sk_test_old-secret',
+                'public_key' => 'pk_test_old-public',
                 'webhook_secret' => 'old-webhook-secret',
             ],
         ]);
 
         $response = $this->actingAs($admin)->patch(route('admin.gateways.platform-config', ['gateway' => $gateway]), [
             'config' => [
-                'client_id' => 'new-client-id',
-                'client_secret' => '',
-                'api_base' => 'prod',
+                'secret_key' => 'sk_test_new-secret',
+                'public_key' => '',
                 'webhook_secret' => '',
             ],
         ]);
@@ -69,59 +98,48 @@ class PlatformGatewayConfigTest extends TestCase
         $response->assertRedirect(route('admin.gateways.index'));
 
         $gateway->refresh();
-        $this->assertSame('new-client-id', $gateway->config_json['client_id'] ?? null);
-        $this->assertSame('old-client-secret', $gateway->config_json['client_secret'] ?? null);
-        $this->assertSame('prod', $gateway->config_json['api_base'] ?? null);
+        $this->assertSame('sk_test_new-secret', $gateway->config_json['secret_key'] ?? null);
+        $this->assertSame('pk_test_old-public', $gateway->config_json['public_key'] ?? null);
         $this->assertSame('old-webhook-secret', $gateway->config_json['webhook_secret'] ?? null);
     }
 
     public function test_merchant_cannot_update_platform_gateway_credentials(): void
     {
         $merchant = User::factory()->create();
-        $gateway = Gateway::query()->create([
-            'code' => 'coins',
-            'name' => 'Coins.ph',
-            'driver_class' => \App\Services\Gateways\Drivers\CoinsDriver::class,
-            'is_global_enabled' => true,
-        ]);
+        $gateway = Gateway::query()->where('code', 'paymongo')->firstOrFail();
 
         $response = $this->actingAs($merchant)->patch(route('admin.gateways.platform-config', ['gateway' => $gateway]), [
             'config' => [
-                'client_id' => 'bad',
-                'client_secret' => 'bad',
-                'api_base' => 'sandbox',
+                'secret_key' => 'bad',
+                'public_key' => 'bad',
+                'webhook_secret' => 'bad',
             ],
         ]);
 
         $response->assertRedirect(url('/dashboard'));
     }
 
-    public function test_admin_cannot_save_placeholder_coins_credentials(): void
+    public function test_admin_cannot_save_placeholder_paymongo_credentials(): void
     {
         $admin = User::factory()->admin()->create();
-        $gateway = Gateway::query()->create([
-            'code' => 'coins',
-            'name' => 'Coins.ph',
-            'driver_class' => \App\Services\Gateways\Drivers\CoinsDriver::class,
-            'is_global_enabled' => true,
-            'config_json' => [],
-        ]);
+        $gateway = Gateway::query()->where('code', 'paymongo')->firstOrFail();
 
         $response = $this->actingAs($admin)->from(route('admin.gateways.index'))->patch(
             route('admin.gateways.platform-config', ['gateway' => $gateway]),
             [
                 'config' => [
-                    'client_id' => 'your_real_client_id',
-                    'client_secret' => 'your_real_client_secret',
-                    'api_base' => 'sandbox',
+                    'secret_key' => 'sk_test_your_secret_key',
+                    'public_key' => 'pk_test_your_public_key',
+                    'webhook_secret' => 'whsk_your_webhook_secret',
                 ],
             ]
         );
 
         $response->assertRedirect(route('admin.gateways.index'));
         $response->assertSessionHasErrors([
-            'config.client_id',
-            'config.client_secret',
+            'config.secret_key',
+            'config.public_key',
+            'config.webhook_secret',
         ]);
 
         $gateway->refresh();
@@ -131,13 +149,7 @@ class PlatformGatewayConfigTest extends TestCase
     public function test_non_coins_payment_option_does_not_accept_individual_platform_payment_credentials(): void
     {
         $admin = User::factory()->admin()->create();
-        $gateway = Gateway::query()->create([
-            'code' => 'maya',
-            'name' => 'Maya',
-            'driver_class' => MayaDriver::class,
-            'is_global_enabled' => true,
-            'config_json' => [],
-        ]);
+        $gateway = Gateway::query()->where('code', 'maya')->firstOrFail();
 
         $response = $this->actingAs($admin)->patch(route('admin.gateways.platform-config', ['gateway' => $gateway]), [
             'config' => [

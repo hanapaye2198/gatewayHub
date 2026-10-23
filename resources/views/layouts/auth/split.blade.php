@@ -1,110 +1,126 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         @include('partials.head')
+        @vite('resources/css/kemopay.css')
+        <link href="https://fonts.bunny.net/css?family=poppins:400,500,600,700" rel="stylesheet" />
     </head>
-    <body class="min-h-screen bg-white antialiased dark:bg-linear-to-b dark:from-neutral-950 dark:to-neutral-900">
-        <div class="grid min-h-svh w-full grid-cols-1 lg:grid-cols-2">
-            {{-- Left: product details (50% on large screens; hidden on small to prioritize the form) --}}
-            <aside
-                class="relative hidden min-h-svh flex-col justify-between overflow-hidden bg-linear-to-br from-zinc-900 via-zinc-900 to-emerald-950 px-8 py-10 text-white sm:px-12 lg:flex"
-            >
-                <div
-                    class="pointer-events-none absolute inset-0 opacity-[0.07]"
-                    style="background-image: url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"
-                    aria-hidden="true"
-                ></div>
+    <body class="kp-auth-body antialiased">
+        <a class="kp-auth-skip-link" href="#auth-form">{{ __('Skip to account form') }}</a>
 
-                <div class="relative z-10 flex flex-col gap-10">
-                    <a href="{{ route('home') }}" class="inline-flex items-center gap-3 font-medium" wire:navigate>
-                        <span
-                            class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-emerald-300 ring-1 ring-white/10"
-                            aria-hidden="true"
-                        >
-                            <flux:icon name="wallet" class="size-6" />
-                        </span>
-                        <span class="text-lg font-semibold tracking-tight">{{ config('app.name', 'GatewayHub') }}</span>
+        <div class="kp-auth-shell">
+            <div class="kp-auth-glow kp-auth-glow-one" aria-hidden="true"></div>
+            <div class="kp-auth-glow kp-auth-glow-two" aria-hidden="true"></div>
+
+            <header class="kp-auth-header">
+                <div class="kp-auth-header-inner">
+                    <a href="{{ route('home') }}" class="kp-auth-brand" wire:navigate aria-label="{{ __('KemoPay home') }}">
+                        <img
+                            class="kp-auth-logo"
+                            src="{{ asset('KemoPay Payment Gateway Logo.png') }}"
+                            alt="KemoPay Payment Gateway"
+                        />
                     </a>
 
-                    <div class="max-w-md space-y-6">
-                        <flux:heading size="xl" class="text-white">
-                            {{ __('Accept and track payments in one place') }}
-                        </flux:heading>
-                        <flux:subheading class="text-base text-zinc-300">
-                            {{ __('GatewayHub connects your business to secure checkout, dashboards, and APIs built for modern merchants.') }}
-                        </flux:subheading>
+                    <p class="kp-auth-header-note">
+                        <span class="kp-auth-header-dot" aria-hidden="true"></span>
+                        {{ __('A clearer way to manage payments') }}
+                    </p>
 
-                        <ul class="space-y-4 text-sm text-zinc-200">
-                            <li class="flex gap-3">
-                                <span
-                                    class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-300"
-                                    aria-hidden="true"
-                                >
-                                    <flux:icon name="shield-check" class="size-4" />
+                    <a href="{{ route('home') }}" class="kp-auth-home-link" wire:navigate>
+                        {{ __('Back to KemoPay') }}
+                        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                            <path d="M4.5 10h11m-4.5-4.5L15.5 10 11 14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </a>
+                </div>
+            </header>
+
+            <main id="auth-content" class="kp-auth-main">
+                <section class="kp-auth-story" aria-labelledby="kp-auth-story-title">
+                    <div class="kp-auth-story-copy">
+                        <p class="kp-auth-eyebrow">
+                            <span class="kp-auth-status-dot" aria-hidden="true"></span>
+                            {{ __('Payments, connected') }}
+                        </p>
+
+                        <h1 id="kp-auth-story-title">
+                            {{ __('One view.') }}<br />
+                            <span>{{ __('Every way to pay.') }}</span>
+                        </h1>
+
+                        <p class="kp-auth-story-description">
+                            {{ __('Bring your payment channels, transactions, and business tools together in one calm, clear workspace.') }}
+                        </p>
+
+                        <div class="kp-auth-preview-wrap" aria-hidden="true">
+                            <div class="kp-auth-preview">
+                                <div class="kp-auth-preview-top">
+                                    <span class="kp-auth-preview-brand">
+                                        <img src="{{ asset('Modern K Payment App Icon.png') }}" alt="" />
+                                        KemoPay
+                                    </span>
+                                    <span class="kp-auth-preview-live"><i></i>{{ __('Live workspace') }}</span>
+                                </div>
+
+                                <div class="kp-auth-preview-content">
+                                    <div class="kp-auth-preview-label">{{ __('Total payments') }}</div>
+                                    <div class="kp-auth-preview-amount">₱24,680<span>.00</span></div>
+                                    <div class="kp-auth-preview-caption"><i></i>{{ __('Your payment activity at a glance') }}</div>
+
+                                    <svg class="kp-auth-preview-chart" viewBox="0 0 360 92" fill="none" preserveAspectRatio="none">
+                                        <defs>
+                                            <linearGradient id="kp-auth-chart-fill" x1="180" y1="8" x2="180" y2="92" gradientUnits="userSpaceOnUse">
+                                                <stop stop-color="#8A6BFF" stop-opacity=".24" />
+                                                <stop offset="1" stop-color="#8A6BFF" stop-opacity="0" />
+                                            </linearGradient>
+                                        </defs>
+                                        <path d="M0 72C20 68 23 75 43 63S74 56 88 61s21 3 35-13 26-14 41-2 22 8 37-4 26-9 42-1 24 5 39-9 24-19 39-11 24 4 39-11v81H0V72Z" fill="url(#kp-auth-chart-fill)" />
+                                        <path d="M0 72C20 68 23 75 43 63S74 56 88 61s21 3 35-13 26-14 41-2 22 8 37-4 26-9 42-1 24 5 39-9 24-19 39-11 24 4 39-11" stroke="#7954F8" stroke-width="2.5" stroke-linecap="round" />
+                                    </svg>
+
+                                    <div class="kp-auth-preview-methods">
+                                        <span><i class="kp-auth-method-gcash">G</i>GCash</span>
+                                        <span><i class="kp-auth-method-maya">M</i>Maya</span>
+                                        <span class="kp-auth-method-count">+3 {{ __('more') }}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="kp-auth-floating-note">
+                                <span class="kp-auth-floating-icon">
+                                    <svg viewBox="0 0 20 20" fill="none">
+                                        <path d="m5 10.2 3.1 3.1L15.5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
                                 </span>
-                                <span>
-                                    <span class="font-medium text-white">{{ __('Secure sign-in') }}</span>
-                                    {{ __('— email and password.') }}
-                                </span>
-                            </li>
-                            <li class="flex gap-3">
-                                <span
-                                    class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-300"
-                                    aria-hidden="true"
-                                >
-                                    <flux:icon name="chart-bar-square" class="size-4" />
-                                </span>
-                                <span>
-                                    <span class="font-medium text-white">{{ __('Live visibility') }}</span>
-                                    {{ __('— monitor payments and activity from your dashboard.') }}
-                                </span>
-                            </li>
-                            <li class="flex gap-3">
-                                <span
-                                    class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-300"
-                                    aria-hidden="true"
-                                >
-                                    <flux:icon name="bolt" class="size-4" />
-                                </span>
-                                <span>
-                                    <span class="font-medium text-white">{{ __('Developer-friendly') }}</span>
-                                    {{ __('— API credentials and tools when you need automation.') }}
-                                </span>
-                            </li>
-                        </ul>
+                                <span><strong>{{ __('You’re all set') }}</strong><small>{{ __('Your business, in sync') }}</small></span>
+                            </div>
+                        </div>
+
+                        <div class="kp-auth-benefits">
+                            <span>
+                                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10.2 3.1 3.1L15.5 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                                {{ __('Secure access') }}
+                            </span>
+                            <span>
+                                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10.2 3.1 3.1L15.5 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                                {{ __('Clear payment tracking') }}
+                            </span>
+                        </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="relative z-10 mt-12 text-sm text-zinc-400">
-                    <p>&copy; {{ now()->year }} {{ config('app.name', 'GatewayHub') }}. {{ __('All rights reserved.') }}</p>
-                </div>
-            </aside>
-
-            {{-- Right: auth forms (full width mobile; 50% on lg) --}}
-            <div
-                class="flex min-h-svh flex-col justify-center bg-zinc-50/80 px-4 py-8 sm:px-8 lg:px-12 dark:bg-transparent"
-            >
-                <a
-                    href="{{ route('home') }}"
-                    class="mb-8 flex flex-col items-center gap-2.5 font-medium lg:hidden"
-                    wire:navigate
-                >
-                    <span
-                        class="flex size-11 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700 shadow-sm dark:bg-emerald-400/15 dark:text-emerald-300"
-                        aria-hidden="true"
-                    >
-                        <flux:icon name="wallet" class="size-6" />
-                    </span>
-                    <span class="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white">
-                        {{ config('app.name', 'GatewayHub') }}
-                    </span>
-                </a>
-
-                <div class="mx-auto w-full max-w-md">
+                <section id="auth-form" class="kp-auth-form-column" aria-label="{{ __('Account access') }}">
                     {{ $slot }}
-                </div>
-            </div>
+                </section>
+            </main>
+
+            <footer class="kp-auth-footer">
+                <span>&copy; {{ now()->year }} {{ config('app.name', 'KemoPay') }}</span>
+                <span class="kp-auth-footer-note">{{ __('Payments made clearer.') }}</span>
+            </footer>
         </div>
+
         @fluxScripts
     </body>
 </html>

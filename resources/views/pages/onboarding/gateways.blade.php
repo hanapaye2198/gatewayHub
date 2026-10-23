@@ -11,6 +11,12 @@
                     :description="__('Choose which gateways to enable for your account. You can change this later.')"
                 />
 
+                @if ($payMongoAvailability['status'] === 'unverified')
+                    <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                        {{ __('PayMongo payment methods are temporarily hidden because KemoPay could not verify the platform account capabilities.') }}
+                    </p>
+                @endif
+
                 <form method="POST" action="{{ route('onboarding.gateways.store') }}" class="flex flex-col gap-5">
                     @csrf
 

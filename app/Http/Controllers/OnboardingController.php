@@ -7,6 +7,7 @@ use App\Http\Requests\Onboarding\StoreOnboardingGatewaysRequest;
 use App\Models\Gateway;
 use App\Models\Merchant;
 use App\Models\User;
+use App\Services\Gateways\PayMongoMethodCapabilityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -73,7 +74,7 @@ class OnboardingController extends Controller
         return redirect()->route('onboarding.gateways');
     }
 
-    public function gateways(Request $request): View|RedirectResponse
+    public function gateways(Request $request, PayMongoMethodCapabilityService $payMongoMethodCapabilityService): View|RedirectResponse
     {
         /** @var User $user */
         $user = $request->user();
@@ -86,7 +87,12 @@ class OnboardingController extends Controller
             return redirect()->route('onboarding.business');
         }
 
-        $gateways = Gateway::query()->orderBy('name')->get();
+        $availablePayMongoMethods = $payMongoMethodCapabilityService->availableGatewayCodes();
+        $gateways = Gateway::query()
+            ->where('is_global_enabled', true)
+            ->whereIn('code', $availablePayMongoMethods ?? [])
+            ->orderBy('name')
+            ->get();
 
         $selectedIds = $user->merchant?->merchantGateways()->pluck('gateway_id')->all() ?? [];
 
@@ -95,11 +101,14 @@ class OnboardingController extends Controller
             'totalSteps' => 4,
             'gateways' => $gateways,
             'selectedIds' => $selectedIds,
+            'payMongoAvailability' => $payMongoMethodCapabilityService->summary(),
         ]);
     }
 
-    public function storeGateways(StoreOnboardingGatewaysRequest $request): RedirectResponse
-    {
+    public function storeGateways(
+        StoreOnboardingGatewaysRequest $request,
+        PayMongoMethodCapabilityService $payMongoMethodCapabilityService
+    ): RedirectResponse {
         /** @var User $user */
         $user = $request->user();
 
@@ -113,6 +122,13 @@ class OnboardingController extends Controller
         }
 
         $ids = $request->validated()['gateway_ids'] ?? [];
+        $availablePayMongoMethods = $payMongoMethodCapabilityService->availableGatewayCodes();
+        $ids = Gateway::query()
+            ->whereKey($ids)
+            ->where('is_global_enabled', true)
+            ->whereIn('code', $availablePayMongoMethods ?? [])
+            ->pluck('id')
+            ->all();
 
         DB::transaction(function () use ($merchant, $ids): void {
             $sync = [];

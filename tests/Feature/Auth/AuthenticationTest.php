@@ -17,6 +17,10 @@ class AuthenticationTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Log in to your account', false);
+        $response->assertSee('kp-auth-story', false);
+        $response->assertSee('kp-auth-form-card', false);
+        $response->assertSee('KemoPay Payment Gateway Logo.png', false);
+        $response->assertSee('Modern K Payment App Icon.png', false);
         $response->assertDontSee('Continue with Google', false);
         $response->assertDontSee('Sign in with email or Google', false);
     }

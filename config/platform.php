@@ -4,7 +4,7 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | GatewayHub Platform Transaction Fee
+    | KemoPay Platform Transaction Fee
     |--------------------------------------------------------------------------
     | Applied when webhook confirms successful payment. Formula:
     |   gatewayhub_platform_fee = gross * 1.5%

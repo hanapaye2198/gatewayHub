@@ -23,7 +23,7 @@
                 </div>
             @endif
             <flux:heading size="lg">{{ __('Create Payment') }}</flux:heading>
-            <flux:subheading class="mt-1">{{ __('Create a new payment. All options are collected via Coins dynamic QR.') }}</flux:subheading>
+            <flux:subheading class="mt-1">{{ __('Create a new payment using the gateway you select.') }}</flux:subheading>
 
             @if ($enabledGateways->isEmpty())
                 <flux:callout variant="warning" icon="exclamation-triangle" class="mt-6">
@@ -32,6 +32,11 @@
                         {{ __('View gateway status') }}
                     </flux:link>
                 </flux:callout>
+                @if ($payMongoAvailability['status'] === 'unverified')
+                    <p class="mt-3 text-sm text-amber-700 dark:text-amber-300">
+                        {{ __('KemoPay could not verify PayMongo payment method availability. Try again shortly or contact the platform administrator.') }}
+                    </p>
+                @endif
             @else
                 <form action="{{ route('dashboard.payments.store') }}" method="POST" class="mt-6 max-w-md space-y-6">
                     @csrf

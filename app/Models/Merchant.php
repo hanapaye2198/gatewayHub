@@ -16,9 +16,9 @@ use Illuminate\Support\Str;
  */
 class Merchant extends Model
 {
-    public const DEFAULT_THEME_COLOR = '#1D4ED8';
+    public const DEFAULT_THEME_COLOR = '#714AFC';
 
-    public const DEFAULT_DISPLAY_NAME = 'GatewayHub Merchant';
+    public const DEFAULT_DISPLAY_NAME = 'KemoPay Merchant';
 
     public const QR_MERCHANT_NAME_MAX_LENGTH = 64;
 
@@ -49,6 +49,7 @@ class Merchant extends Model
      */
     protected $hidden = [
         'api_key_hash',
+        'api_key_encrypted',
         'api_secret',
     ];
 
@@ -56,6 +57,7 @@ class Merchant extends Model
     {
         return [
             'api_key_generated_at' => 'datetime',
+            'api_key_encrypted' => 'encrypted',
             'is_active' => 'boolean',
             'webhook_secret' => 'encrypted',
         ];
@@ -118,7 +120,7 @@ class Merchant extends Model
             return Storage::disk('public')->url($path);
         }
 
-        return asset('logo.svg');
+        return asset('images/kemopay-mark.svg');
     }
 
     public function getThemeColor(): string
@@ -229,6 +231,14 @@ class Merchant extends Model
     }
 
     /**
+     * @return HasMany<MerchantPayout, $this>
+     */
+    public function payouts(): HasMany
+    {
+        return $this->hasMany(MerchantPayout::class);
+    }
+
+    /**
      * @return HasMany<MerchantWalletSetting, $this>
      */
     public function merchantWalletSettings(): HasMany
@@ -245,7 +255,7 @@ class Merchant extends Model
     }
 
     /**
-     * Regenerate API key. Returns plaintext once; store only on {@see Merchant}.
+     * Regenerate API key and keep an encrypted copy for the authenticated dashboard.
      */
     public function regenerateApiKey(): string
     {
@@ -254,6 +264,7 @@ class Merchant extends Model
             'api_key' => null,
             'api_key_hash' => hash('sha256', $newKey),
             'api_key_last_four' => substr($newKey, -4),
+            'api_key_encrypted' => $newKey,
             'api_key_generated_at' => now(),
         ])->save();
 
@@ -268,6 +279,7 @@ class Merchant extends Model
             $this->attributes['api_key'] = null;
             $this->attributes['api_key_hash'] = null;
             $this->attributes['api_key_last_four'] = null;
+            $this->attributes['api_key_encrypted'] = null;
 
             return;
         }
@@ -275,6 +287,7 @@ class Merchant extends Model
         $this->attributes['api_key'] = null;
         $this->attributes['api_key_hash'] = hash('sha256', $apiKey);
         $this->attributes['api_key_last_four'] = substr($apiKey, -4);
+        $this->setAttribute('api_key_encrypted', $apiKey);
     }
 
     public function hasApiKey(): bool

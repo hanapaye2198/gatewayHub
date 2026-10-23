@@ -76,7 +76,9 @@ class SendMerchantWebhookJob implements ShouldQueue
             'data' => [
                 'payment_id' => $payment->id,
                 'status' => $payment->status,
-                'amount' => (float) $payment->amount,
+                'amount' => $payment->product_amount !== null
+                    ? (float) $payment->product_amount
+                    : (float) $payment->amount,
                 'currency' => $payment->currency,
                 'gateway' => $payment->gateway_code,
                 'reference' => $payment->reference_id,
@@ -99,11 +101,12 @@ class SendMerchantWebhookJob implements ShouldQueue
         Http::timeout(10)
             ->acceptJson()
             ->withHeaders([
-                'User-Agent' => 'GatewayHub-Webhooks/1.0',
+                'User-Agent' => 'KemoPay-Webhooks/1.0',
                 'X-Merchant-Timestamp' => $timestamp,
                 'X-Merchant-Signature' => $signature,
             ])
-            ->post($webhookUrl, $payload)
+            ->withBody($body, 'application/json')
+            ->post($webhookUrl)
             ->throw();
 
         Log::info('Merchant webhook delivered', [

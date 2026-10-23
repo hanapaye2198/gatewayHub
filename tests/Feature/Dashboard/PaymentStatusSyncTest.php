@@ -66,8 +66,7 @@ class PaymentStatusSyncTest extends TestCase
 
     public function test_dashboard_status_poll_reconciles_pending_coins_payment_from_provider_status(): void
     {
-        Gateway::query()->create([
-            'code' => 'coins',
+        Gateway::query()->updateOrCreate(['code' => 'coins'], [
             'name' => 'Coins.ph',
             'driver_class' => CoinsDriver::class,
             'is_global_enabled' => true,
@@ -122,8 +121,7 @@ class PaymentStatusSyncTest extends TestCase
 
     public function test_sync_pending_payments_for_merchant_reconciles_using_provider_reference_when_raw_missing_gateway_ref(): void
     {
-        Gateway::query()->create([
-            'code' => 'coins',
+        Gateway::query()->updateOrCreate(['code' => 'coins'], [
             'name' => 'Coins.ph',
             'driver_class' => CoinsDriver::class,
             'is_global_enabled' => true,
@@ -170,8 +168,7 @@ class PaymentStatusSyncTest extends TestCase
 
         Http::fake();
 
-        Gateway::query()->create([
-            'code' => 'coins',
+        Gateway::query()->updateOrCreate(['code' => 'coins'], [
             'name' => 'Coins.ph',
             'driver_class' => CoinsDriver::class,
             'is_global_enabled' => true,
@@ -209,6 +206,27 @@ class PaymentStatusSyncTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_paymongo_payment_is_not_sent_to_the_legacy_coins_status_api(): void
+    {
+        Http::fake();
+
+        $merchant = User::factory()->create();
+        $payment = Payment::factory()->create([
+            'merchant_id' => $merchant->id,
+            'gateway_code' => 'qrph',
+            'provider_reference' => 'unexpected-reference-format',
+            'status' => 'pending',
+            'raw_response' => [
+                'payment_intent' => ['data' => ['id' => 'unexpected-reference-format']],
+            ],
+        ]);
+
+        app(PaymentStatusSyncService::class)->syncPendingPayment($payment);
+
+        $this->assertSame('pending', $payment->fresh()->status);
+        Http::assertNothingSent();
+    }
+
     public function test_payment_detail_page_does_not_auto_redirect_pending_payment_without_webhook_update(): void
     {
         Http::fake();
@@ -239,8 +257,7 @@ class PaymentStatusSyncTest extends TestCase
         $this->app['config']->set('coins.webhook.allow_dev_bypass', false);
         $this->app['config']->set('coins.webhook.secret', 'test-webhook-secret');
 
-        Gateway::query()->create([
-            'code' => 'coins',
+        Gateway::query()->updateOrCreate(['code' => 'coins'], [
             'name' => 'Coins.ph',
             'driver_class' => CoinsDriver::class,
             'is_global_enabled' => true,

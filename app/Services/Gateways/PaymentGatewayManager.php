@@ -10,17 +10,11 @@ use Illuminate\Contracts\Container\Container;
 
 class PaymentGatewayManager
 {
-    /**
-     * Payment options that are orchestrated through Coins Dynamic QR.
-     *
-     * @var list<string>
-     */
-    private const COINS_ORCHESTRATED_GATEWAYS = ['coins', 'gcash', 'maya', 'paypal', 'qrph'];
-
     public function __construct(
         protected Container $container,
         protected Gateway $gateway,
-        protected PlatformGatewayConfigService $platformGatewayConfigService
+        protected PlatformGatewayConfigService $platformGatewayConfigService,
+        protected PayMongoMethodCapabilityService $payMongoMethodCapabilityService
     ) {}
 
     /**
@@ -35,6 +29,18 @@ class PaymentGatewayManager
 
         if ($gateway === null) {
             throw new GatewayException("Gateway not found: {$gatewayCode}.");
+        }
+
+        if ($gateway->isProviderOnly()) {
+            throw new GatewayException('Select a payment method instead of a payment provider.');
+        }
+
+        if ($gateway->isRetired()) {
+            throw new GatewayException('This payment gateway is no longer available.');
+        }
+
+        if (! $this->payMongoMethodCapabilityService->isPayMongoMethod($gatewayCode)) {
+            throw new GatewayException('Only payment methods available through KemoPay PayMongo are supported.');
         }
 
         if (! $gateway->is_global_enabled) {
@@ -64,10 +70,25 @@ class PaymentGatewayManager
         $missing = $this->missingRequiredConfig($processingGateway->driver_class, $config);
         if ($missing !== null) {
             throw new GatewayException(sprintf(
-                'Gateway "%s" is missing required platform credentials: %s. Configure them in SurePay admin settings.',
+                'Gateway "%s" is missing required platform credentials: %s. Configure them in KemoPay admin settings.',
                 $processingGateway->name,
                 implode(', ', $missing)
             ));
+        }
+
+        if ($this->payMongoMethodCapabilityService->isPayMongoMethod($gatewayCode)) {
+            $capabilityStatus = $this->payMongoMethodCapabilityService->statusForGateway($gatewayCode);
+            if ($capabilityStatus === 'unavailable') {
+                throw new GatewayException(
+                    "This payment method is not enabled for KemoPay's PayMongo account. Activate it in PayMongo Settings > Payment Methods."
+                );
+            }
+
+            if ($capabilityStatus === 'unverified') {
+                throw new GatewayException(
+                    'KemoPay could not verify this PayMongo payment method right now. Please try again shortly.'
+                );
+            }
         }
 
         return $this->getDriver($processingGatewayCode, $config);
@@ -146,10 +167,6 @@ class PaymentGatewayManager
 
     private function processingGatewayCode(string $selectedGatewayCode): string
     {
-        if (in_array($selectedGatewayCode, self::COINS_ORCHESTRATED_GATEWAYS, true)) {
-            return 'coins';
-        }
-
-        return $selectedGatewayCode;
+        return 'paymongo';
     }
 }

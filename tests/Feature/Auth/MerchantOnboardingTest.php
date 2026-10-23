@@ -6,11 +6,25 @@ use App\Models\Gateway;
 use App\Models\Merchant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class MerchantOnboardingTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Cache::flush();
+        Http::fake([
+            'https://api.paymongo.com/v1/merchants/capabilities/payment_methods' => Http::response([
+                'data' => ['attributes' => ['payment_methods' => ['qrph', 'gcash', 'paymaya', 'grab_pay', 'shopeepay']]],
+            ], 200),
+        ]);
+    }
 
     public function test_incomplete_onboarding_cannot_access_dashboard(): void
     {
@@ -46,10 +60,9 @@ class MerchantOnboardingTest extends TestCase
 
     public function test_api_keys_step_shows_webhook_signing_secret_after_gateway_step(): void
     {
-        $gateway = Gateway::query()->create([
-            'code' => 'onb-test-wh-'.uniqid(),
-            'name' => 'Onboarding Webhook Gateway',
-            'driver_class' => 'App\Services\Gateways\Drivers\CoinsDriver',
+        $gateway = Gateway::query()->updateOrCreate(['code' => 'qrph'], [
+            'name' => 'QR Ph',
+            'driver_class' => 'App\Services\Gateways\Drivers\PayMongoDriver',
             'is_global_enabled' => true,
         ]);
 
@@ -74,10 +87,9 @@ class MerchantOnboardingTest extends TestCase
 
     public function test_gateway_step_syncs_and_advances_to_api_keys(): void
     {
-        $gateway = Gateway::query()->create([
-            'code' => 'onb-test-'.uniqid(),
-            'name' => 'Onboarding Test Gateway',
-            'driver_class' => 'App\Services\Gateways\Drivers\CoinsDriver',
+        $gateway = Gateway::query()->updateOrCreate(['code' => 'qrph'], [
+            'name' => 'QR Ph',
+            'driver_class' => 'App\Services\Gateways\Drivers\PayMongoDriver',
             'is_global_enabled' => true,
         ]);
 

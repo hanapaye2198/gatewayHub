@@ -149,9 +149,8 @@
                             body: JSON.stringify({
                                 amount: this.amount,
                                 currency: 'PHP',
-                                gateway: 'coins',
+                                gateway: 'gcash',
                                 reference: reference,
-                                checkout: true,
                             }),
                         });
 

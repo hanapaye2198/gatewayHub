@@ -40,10 +40,6 @@ class PlatformGatewayConfigService
 
         $overrides = $this->normalizeConfig($stored);
 
-        if ($code === 'qrph' && $overrides === []) {
-            return $this->forGatewayCodeWithMeta('coins');
-        }
-
         $resolvedConfig = array_merge($defaults, $overrides);
 
         return [
@@ -58,12 +54,19 @@ class PlatformGatewayConfigService
     public function defaultsForGatewayCode(string $code): array
     {
         return match ($code) {
-            'coins', 'qrph' => [
+            'coins' => [
                 'client_id' => (string) config('coins.gateway.client_id', config('coins.api_key', '')),
                 'client_secret' => (string) config('coins.gateway.client_secret', config('coins.secret_key', '')),
                 'api_base' => (string) config('coins.gateway.api_base', 'sandbox'),
                 'webhook_secret' => (string) config('coins.webhook.secret', ''),
                 'source' => (string) config('coins.gateway.source', config('coins.source', 'GATEWAYHUB')),
+            ],
+            'paymongo' => [
+                'secret_key' => (string) config('paymongo.gateway.secret_key', ''),
+                'public_key' => (string) config('paymongo.gateway.public_key', ''),
+                'webhook_secret' => (string) config('paymongo.gateway.webhook_secret', ''),
+                'expiry_seconds' => (int) config('paymongo.gateway.expiry_seconds', 1800),
+                'shopeepay_expiry_seconds' => (int) config('paymongo.gateway.shopeepay_expiry_seconds', 1200),
             ],
             'gcash' => [
                 'provider_mode' => (string) config('gcash.gateway.provider_mode', 'native_direct'),
@@ -150,9 +153,14 @@ class PlatformGatewayConfigService
             'your_real_client_id',
             'your_real_client_secret',
             'your_real_webhook_secret',
+            'your_real_public_key',
+            'sk_test_your_secret_key',
+            'pk_test_your_public_key',
+            'whsk_your_webhook_secret',
             'your_client_id',
             'your_client_secret',
             'your_webhook_secret',
+            'your_public_key',
             'your_api_key',
             'your_api_secret',
             'change_me',

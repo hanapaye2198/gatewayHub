@@ -10,7 +10,9 @@ use App\Services\Webhooks\MayaWebhookReplayValidator;
 use App\Services\Webhooks\Normalizers\CoinsWebhookNormalizer;
 use App\Services\Webhooks\Normalizers\GcashWebhookNormalizer;
 use App\Services\Webhooks\Normalizers\MayaWebhookNormalizer;
+use App\Services\Webhooks\Normalizers\PayMongoWebhookNormalizer;
 use App\Services\Webhooks\Normalizers\PayPalWebhookNormalizer;
+use App\Services\Webhooks\PayMongoWebhookReplayValidator;
 use App\Services\Webhooks\PayPalWebhookReplayValidator;
 use App\Services\Webhooks\WebhookProcessor;
 use Illuminate\Bus\Queueable;
@@ -81,6 +83,7 @@ class ProcessWebhookJob implements ShouldQueue
             'gcash' => app(GcashWebhookNormalizer::class),
             'maya' => app(MayaWebhookNormalizer::class),
             'paypal' => app(PayPalWebhookNormalizer::class),
+            'paymongo' => app(PayMongoWebhookNormalizer::class),
             default => throw new \InvalidArgumentException("Unknown webhook provider: {$this->provider}"),
         };
     }
@@ -92,6 +95,7 @@ class ProcessWebhookJob implements ShouldQueue
             'gcash' => app(GcashWebhookReplayValidator::class),
             'maya' => app(MayaWebhookReplayValidator::class),
             'paypal' => app(PayPalWebhookReplayValidator::class),
+            'paymongo' => app(PayMongoWebhookReplayValidator::class),
             default => throw new \InvalidArgumentException("Unknown webhook provider: {$this->provider}"),
         };
     }

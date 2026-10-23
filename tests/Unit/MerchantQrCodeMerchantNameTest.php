@@ -19,8 +19,8 @@ class MerchantQrCodeMerchantNameTest extends TestCase
 
     public function test_normalize_qr_code_merchant_name_falls_back_when_blank(): void
     {
-        $this->assertSame('GatewayHub Merchant', Merchant::normalizeQrCodeMerchantName(null));
-        $this->assertSame('GatewayHub Merchant', Merchant::normalizeQrCodeMerchantName('   '));
+        $this->assertSame('KemoPay Merchant', Merchant::normalizeQrCodeMerchantName(null));
+        $this->assertSame('KemoPay Merchant', Merchant::normalizeQrCodeMerchantName('   '));
         $this->assertSame('Acme', Merchant::normalizeQrCodeMerchantName('Acme'));
     }
 
@@ -29,6 +29,6 @@ class MerchantQrCodeMerchantNameTest extends TestCase
         $merchant = Merchant::factory()->create(['name' => '']);
 
         $this->assertNull($merchant->business_name);
-        $this->assertSame('GatewayHub Merchant', $merchant->qrCodeMerchantDisplayName());
+        $this->assertSame('KemoPay Merchant', $merchant->qrCodeMerchantDisplayName());
     }
 }

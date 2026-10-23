@@ -6,10 +6,9 @@ use App\Models\Gateway;
 use App\Models\MerchantGateway;
 use App\Models\Payment;
 use App\Models\User;
-use App\Services\Gateways\Drivers\CoinsDriver;
-use App\Services\Gateways\Drivers\MayaDriver;
-use App\Services\Gateways\Drivers\QrphDriver;
+use App\Services\Gateways\Drivers\PayMongoDriver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -21,33 +20,66 @@ class CreatePaymentTest extends TestCase
     {
         parent::setUp();
 
-        Gateway::query()->create([
-            'code' => 'coins',
-            'name' => 'Coins.ph',
-            'driver_class' => CoinsDriver::class,
+        Cache::flush();
+        Http::fake([
+            'https://api.paymongo.com/v1/merchants/capabilities/payment_methods' => Http::response([
+                'data' => ['attributes' => ['payment_methods' => ['qrph', 'gcash', 'paymaya', 'grab_pay', 'shopeepay']]],
+            ], 200),
+        ]);
+
+        Gateway::query()->updateOrCreate(['code' => 'paymongo'], [
+            'name' => 'PayMongo',
+            'driver_class' => PayMongoDriver::class,
             'is_global_enabled' => true,
+            'config_json' => [
+                'secret_key' => 'sk_test_kemopay',
+                'public_key' => 'pk_test_kemopay',
+                'webhook_secret' => 'whsk_test_kemopay',
+            ],
+        ]);
+
+        foreach ([
+            'gcash' => 'GCash',
+            'maya' => 'Maya',
+            'grab_pay' => 'GrabPay',
+            'shopeepay' => 'ShopeePay',
+            'qrph' => 'QR Ph',
+        ] as $code => $name) {
+            Gateway::query()->updateOrCreate(['code' => $code], [
+                'name' => $name,
+                'driver_class' => PayMongoDriver::class,
+                'is_global_enabled' => true,
+            ]);
+        }
+
+        Gateway::query()->updateOrCreate(['code' => 'coins'], [
+            'name' => 'Coins.ph',
+            'driver_class' => PayMongoDriver::class,
+            'is_global_enabled' => false,
         ]);
     }
 
-    public function test_create_payment_form_shows_enabled_gateways_only(): void
+    public function test_create_payment_form_shows_enabled_paymongo_methods_only(): void
     {
         $user = User::factory()->create();
-        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
+        $gcashGateway = Gateway::query()->where('code', 'gcash')->firstOrFail();
         MerchantGateway::query()->create([
             'merchant_id' => $user->id,
-            'gateway_id' => $coinsGateway->id,
+            'gateway_id' => $gcashGateway->id,
             'is_enabled' => true,
-            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
+            'config_json' => [],
         ]);
 
         $response = $this->actingAs($user)->get(route('dashboard.payments.create'));
 
         $response->assertOk();
         $response->assertSee('Create Payment');
-        $response->assertSee('Coins.ph');
+        $response->assertSee('GCash');
+        $response->assertDontSee('Coins.ph');
+        $response->assertDontSee('Maya');
     }
 
-    public function test_create_payment_form_redirects_when_no_enabled_gateways(): void
+    public function test_create_payment_form_shows_empty_state_when_no_gateways_are_enabled(): void
     {
         $user = User::factory()->create();
 
@@ -59,31 +91,57 @@ class CreatePaymentTest extends TestCase
         $response->assertDontSee('Configure gateways');
     }
 
-    public function test_store_creates_payment_and_redirects(): void
+    public function test_store_creates_paymongo_gcash_payment_and_redirects(): void
     {
-        Http::fake(['*' => Http::response(['code' => 0, 'data' => ['orderId' => 'ord-1', 'qrCode' => 'qr123']], 200)]);
+        Http::fake(function ($request) {
+            return match (parse_url($request->url(), PHP_URL_PATH)) {
+                '/v1/merchants/capabilities/payment_methods' => Http::response([
+                    'data' => ['attributes' => ['payment_methods' => ['qrph', 'gcash', 'paymaya', 'grab_pay', 'shopeepay']]],
+                ], 200),
+                '/v1/payment_intents' => Http::response([
+                    'data' => [
+                        'id' => 'pi_dashboard_gcash_001',
+                        'attributes' => ['client_key' => 'pi_dashboard_gcash_001_client_key'],
+                    ],
+                ], 200),
+                '/v1/payment_methods' => Http::response(['data' => ['id' => 'pm_dashboard_gcash_001']], 200),
+                '/v1/payment_intents/pi_dashboard_gcash_001/attach' => Http::response([
+                    'data' => [
+                        'id' => 'pi_dashboard_gcash_001',
+                        'attributes' => [
+                            'status' => 'awaiting_next_action',
+                            'next_action' => ['redirect' => ['url' => 'https://wallet.example/gcash/dashboard']],
+                        ],
+                    ],
+                ], 200),
+                default => Http::response(['message' => 'Unexpected PayMongo request.'], 404),
+            };
+        });
 
         $user = User::factory()->create();
-        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
+        $gcashGateway = Gateway::query()->where('code', 'gcash')->firstOrFail();
         MerchantGateway::query()->create([
             'merchant_id' => $user->id,
-            'gateway_id' => $coinsGateway->id,
+            'gateway_id' => $gcashGateway->id,
             'is_enabled' => true,
-            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
+            'config_json' => [],
         ]);
 
         $response = $this->actingAs($user)->post(route('dashboard.payments.store'), [
-            'amount' => 100,
+            'amount' => '100.00',
             'currency' => 'PHP',
-            'gateway' => 'coins',
+            'gateway' => 'gcash',
         ]);
 
-        $response->assertRedirect();
+        $response->assertRedirect('https://wallet.example/gcash/dashboard');
         $this->assertDatabaseHas('payments', [
             'merchant_id' => $user->id,
-            'gateway_code' => 'coins',
-            'amount' => 100,
+            'gateway_code' => 'gcash',
+            'amount' => 101.5,
+            'product_amount' => 100,
+            'payer_fee_amount' => 1.5,
             'currency' => 'PHP',
+            'provider_reference' => 'pi_dashboard_gcash_001',
             'status' => 'pending',
         ]);
 
@@ -98,119 +156,49 @@ class CreatePaymentTest extends TestCase
     public function test_store_validates_amount(): void
     {
         $user = User::factory()->create();
-        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
+        $gcashGateway = Gateway::query()->where('code', 'gcash')->firstOrFail();
         MerchantGateway::query()->create([
             'merchant_id' => $user->id,
-            'gateway_id' => $coinsGateway->id,
+            'gateway_id' => $gcashGateway->id,
             'is_enabled' => true,
-            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
+            'config_json' => [],
         ]);
 
         $response = $this->actingAs($user)->post(route('dashboard.payments.store'), [
             'amount' => '',
             'currency' => 'PHP',
-            'gateway' => 'coins',
+            'gateway' => 'gcash',
         ]);
 
         $response->assertSessionHasErrors('amount');
     }
 
-    public function test_store_creates_coins_dynamic_qr_when_maya_option_is_selected(): void
+    public function test_store_creates_paymongo_qrph_payment(): void
     {
-        Http::fake([
-            'api.9001.pl-qa.coinsxyz.me/openapi/fiat/v1/generate_qr_code' => Http::response([
-                'status' => 0,
-                'data' => [
-                    'orderId' => 'COINS-MAYA-ORD-123',
-                    'qrCode' => '000201010212...',
-                ],
-            ], 200),
-        ]);
-
-        Gateway::query()->create([
-            'code' => 'maya',
-            'name' => 'Maya',
-            'driver_class' => MayaDriver::class,
-            'is_global_enabled' => true,
-        ]);
-
-        $user = User::factory()->create();
-        $mayaGateway = Gateway::query()->where('code', 'maya')->firstOrFail();
-
-        MerchantGateway::query()->create([
-            'merchant_id' => $user->id,
-            'gateway_id' => $mayaGateway->id,
-            'is_enabled' => true,
-            'config_json' => [
-                'provider_mode' => 'native_checkout',
-                'client_id' => 'maya-client-id',
-                'client_secret' => 'maya-client-secret',
-                'api_base' => 'sandbox',
-            ],
-        ]);
-
-        $response = $this->actingAs($user)->post(route('dashboard.payments.store'), [
-            'amount' => 250,
-            'currency' => 'PHP',
-            'gateway' => 'maya',
-        ]);
-
-        $response->assertRedirect();
-        $this->assertStringContainsString('/dashboard/payments/', (string) $response->headers->get('Location'));
-        $this->assertDatabaseHas('payments', [
-            'merchant_id' => $user->id,
-            'gateway_code' => 'maya',
-            'provider_reference' => 'COINS-MAYA-ORD-123',
-            'status' => 'pending',
-        ]);
-    }
-
-    public function test_store_shows_actionable_message_when_coins_qr_feature_is_not_enabled(): void
-    {
-        Http::fake([
-            'api.9001.pl-qa.coinsxyz.me/openapi/fiat/v1/generate_qr_code' => Http::response([
-                'status' => 88010063,
-                'error' => 'You do not support this feature currently, please contact customer service.',
-                'data' => null,
-            ], 200),
-        ]);
-
-        $user = User::factory()->create();
-        $coinsGateway = Gateway::query()->where('code', 'coins')->firstOrFail();
-        MerchantGateway::query()->create([
-            'merchant_id' => $user->id,
-            'gateway_id' => $coinsGateway->id,
-            'is_enabled' => true,
-            'config_json' => ['client_id' => 'c', 'client_secret' => 's', 'api_base' => 'sandbox'],
-        ]);
-
-        $response = $this->from(route('dashboard.payments.create'))->actingAs($user)->post(route('dashboard.payments.store'), [
-            'amount' => 100,
-            'currency' => 'PHP',
-            'gateway' => 'coins',
-        ]);
-
-        $response->assertRedirect(route('dashboard.payments.create'));
-        $response->assertSessionHasErrors([
-            'gateway' => 'Coins.ph API error: Coins.ph account is not enabled for QR payment handling yet. Ask Coins support to enable QR integration for this account/API key.',
-        ]);
-        $this->assertDatabaseCount('payments', 1);
-        $this->assertDatabaseHas('payments', [
-            'merchant_id' => $user->id,
-            'gateway_code' => 'coins',
-            'status' => 'provisioning_failed',
-            'provider_reference' => null,
-        ]);
-    }
-
-    public function test_create_payment_form_shows_qrph_when_enabled_for_merchant(): void
-    {
-        Gateway::query()->updateOrCreate(['code' => 'qrph'], [
-            'code' => 'qrph',
-            'name' => 'QRPH',
-            'driver_class' => QrphDriver::class,
-            'is_global_enabled' => true,
-        ]);
+        Http::fake(function ($request) {
+            return match (parse_url($request->url(), PHP_URL_PATH)) {
+                '/v1/merchants/capabilities/payment_methods' => Http::response([
+                    'data' => ['attributes' => ['payment_methods' => ['qrph', 'gcash', 'paymaya', 'grab_pay', 'shopeepay']]],
+                ], 200),
+                '/v1/payment_intents' => Http::response([
+                    'data' => [
+                        'id' => 'pi_dashboard_qrph_001',
+                        'attributes' => ['client_key' => 'pi_dashboard_qrph_001_client_key'],
+                    ],
+                ], 200),
+                '/v1/payment_methods' => Http::response(['data' => ['id' => 'pm_dashboard_qrph_001']], 200),
+                '/v1/payment_intents/pi_dashboard_qrph_001/attach' => Http::response([
+                    'data' => [
+                        'id' => 'pi_dashboard_qrph_001',
+                        'attributes' => [
+                            'status' => 'awaiting_next_action',
+                            'next_action' => ['code' => ['image_url' => 'data:image/png;base64,DASHBOARDQR']],
+                        ],
+                    ],
+                ], 200),
+                default => Http::response(['message' => 'Unexpected PayMongo request.'], 404),
+            };
+        });
 
         $user = User::factory()->create();
         $qrphGateway = Gateway::query()->where('code', 'qrph')->firstOrFail();
@@ -221,10 +209,19 @@ class CreatePaymentTest extends TestCase
             'config_json' => [],
         ]);
 
-        $response = $this->actingAs($user)->get(route('dashboard.payments.create'));
+        $response = $this->actingAs($user)->post(route('dashboard.payments.store'), [
+            'amount' => 250,
+            'currency' => 'PHP',
+            'gateway' => 'qrph',
+        ]);
 
-        $response->assertOk();
-        $response->assertSee('QRPH');
-        $response->assertSee('value="qrph"', false);
+        $response->assertRedirect();
+        $this->assertStringContainsString('/dashboard/payments/', (string) $response->headers->get('Location'));
+        $this->assertDatabaseHas('payments', [
+            'merchant_id' => $user->id,
+            'gateway_code' => 'qrph',
+            'provider_reference' => 'pi_dashboard_qrph_001',
+            'status' => 'pending',
+        ]);
     }
 }

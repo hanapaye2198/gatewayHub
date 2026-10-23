@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\UpdatePlatformGatewayConfigRequest;
 use App\Models\Gateway;
 use App\Models\Merchant;
 use App\Models\MerchantGateway;
+use App\Services\Gateways\PayMongoMethodCapabilityService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 
@@ -16,6 +17,7 @@ class GatewaysController extends Controller
     public function index(): View
     {
         $gateways = Gateway::query()
+            ->whereIn('code', array_merge(['paymongo'], PayMongoMethodCapabilityService::gatewayCodes()))
             ->with('merchantGateways')
             ->orderBy('name')
             ->get();
@@ -42,6 +44,12 @@ class GatewaysController extends Controller
 
     public function toggleEnabled(Gateway $gateway): RedirectResponse
     {
+        if ($gateway->isRetired() || (! $gateway->isProviderOnly()
+            && ! app(PayMongoMethodCapabilityService::class)->isPayMongoMethod($gateway->code))) {
+            return redirect()->route('admin.gateways.index')
+                ->with('error', 'This payment method is no longer available.');
+        }
+
         try {
             $gateway->update(['is_global_enabled' => ! $gateway->is_global_enabled]);
 
@@ -60,6 +68,13 @@ class GatewaysController extends Controller
         Gateway $gateway,
         Merchant $merchant
     ): RedirectResponse {
+        if ($gateway->isProviderOnly() || $gateway->isRetired()
+            || ! app(PayMongoMethodCapabilityService::class)->isPayMongoMethod($gateway->code)) {
+            return redirect()
+                ->route('admin.gateways.index')
+                ->with('error', 'This payment method cannot be assigned to a merchant.');
+        }
+
         $isEnabled = (bool) $request->validated('is_enabled');
         if ($isEnabled && ! $gateway->is_global_enabled) {
             return redirect()
@@ -88,6 +103,12 @@ class GatewaysController extends Controller
         UpdatePlatformGatewayConfigRequest $request,
         Gateway $gateway
     ): RedirectResponse {
+        if ($gateway->code !== 'paymongo') {
+            return redirect()
+                ->route('admin.gateways.index')
+                ->with('error', 'Only the shared PayMongo provider configuration is supported.');
+        }
+
         $validated = $request->validated();
         $incomingConfig = is_array($validated['config'] ?? null) ? $validated['config'] : [];
         $existingConfig = is_array($gateway->config_json) ? $gateway->config_json : [];
@@ -135,6 +156,10 @@ class GatewaysController extends Controller
         $gateway->update([
             'config_json' => $normalizedConfig,
         ]);
+
+        if ($gateway->code === 'paymongo') {
+            app(PayMongoMethodCapabilityService::class)->forgetCurrentAccountCache();
+        }
 
         return redirect()
             ->route('admin.gateways.index')

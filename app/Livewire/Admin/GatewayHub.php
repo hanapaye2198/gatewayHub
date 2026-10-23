@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Models\Gateway;
 use App\Models\Merchant;
 use App\Models\MerchantGateway;
+use App\Services\Gateways\PayMongoMethodCapabilityService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
@@ -38,7 +39,7 @@ class GatewayHub extends Component
 
     public bool $selectAll = false;
 
-    public string $bulkAction = '';
+    public string $selectedBulkAction = '';
 
     public bool $showSuccessMessage = false;
 
@@ -97,7 +98,7 @@ class GatewayHub extends Component
     public function updatedSelectAll(bool $value): void
     {
         if ($value) {
-            $this->selectedGateways = Gateway::pluck('id')->map(fn ($id) => (string) $id)->all();
+            $this->selectedGateways = Gateway::query()->whereIn('code', PayMongoMethodCapabilityService::gatewayCodes())->pluck('id')->map(fn ($id) => (string) $id)->all();
         } else {
             $this->selectedGateways = [];
         }
@@ -106,6 +107,12 @@ class GatewayHub extends Component
     public function toggleGatewayGlobal(int $gatewayId): void
     {
         $gateway = Gateway::findOrFail($gatewayId);
+
+        if ($gateway->isRetired() || (! $gateway->isProviderOnly() && ! app(PayMongoMethodCapabilityService::class)->isPayMongoMethod($gateway->code))) {
+            $this->showError('This payment method is no longer available.');
+
+            return;
+        }
 
         DB::transaction(function () use ($gateway): void {
             $oldStatus = $gateway->is_global_enabled;
@@ -121,6 +128,14 @@ class GatewayHub extends Component
             if (! $gateway->is_global_enabled) {
                 MerchantGateway::where('gateway_id', $gateway->id)
                     ->update(['is_enabled' => false]);
+
+                if ($gateway->code === 'paymongo') {
+                    $payMongoMethodIds = Gateway::query()
+                        ->whereIn('code', ['qrph', 'gcash', 'maya', 'grab_pay', 'shopeepay'])
+                        ->pluck('id');
+                    Gateway::query()->whereIn('id', $payMongoMethodIds)->update(['is_global_enabled' => false]);
+                    MerchantGateway::query()->whereIn('gateway_id', $payMongoMethodIds)->update(['is_enabled' => false]);
+                }
             }
         });
 
@@ -131,6 +146,12 @@ class GatewayHub extends Component
     {
         $gateway = Gateway::findOrFail($gatewayId);
         $merchant = Merchant::findOrFail($merchantId);
+
+        if ($gateway->isProviderOnly() || $gateway->isRetired() || ! app(PayMongoMethodCapabilityService::class)->isPayMongoMethod($gateway->code)) {
+            $this->showError('Provider credentials are configured globally and cannot be assigned to merchants.');
+
+            return;
+        }
 
         if (! $gateway->is_global_enabled) {
             $this->showError('Cannot enable because gateway is globally disabled.');
@@ -170,12 +191,18 @@ class GatewayHub extends Component
         }
 
         $gateway = Gateway::findOrFail($id);
+        if ($gateway->code !== 'paymongo') {
+            $this->showError('Only the shared PayMongo provider configuration is supported.');
+
+            return;
+        }
+
         $fields = config('gateway_credentials.'.$gateway->code, []);
         if (! is_array($fields) || $fields === []) {
             $this->showConfigModal = false;
             $this->editingGateway = null;
             $this->config = [];
-            $this->showError('This payment option uses the shared Coins.ph platform configuration.');
+            $this->showError('This gateway has no platform credential fields to configure.');
 
             return;
         }
@@ -193,6 +220,10 @@ class GatewayHub extends Component
                 ['updated_fields' => array_keys($normalizedConfig)]
             );
         });
+
+        if ($gateway->code === 'paymongo') {
+            app(PayMongoMethodCapabilityService::class)->forgetCurrentAccountCache();
+        }
 
         $this->showConfigModal = false;
         $this->editingGateway = null;
@@ -234,7 +265,7 @@ class GatewayHub extends Component
         return $normalized;
     }
 
-    public function bulkAction(): void
+    public function applyBulkAction(): void
     {
         if ($this->selectedGateways === []) {
             $this->showError('Please select at least one gateway.');
@@ -242,12 +273,12 @@ class GatewayHub extends Component
             return;
         }
 
-        match ($this->bulkAction) {
+        match ($this->selectedBulkAction) {
             'enable_global' => $this->confirmBulkAction('Enable selected gateways globally?', 'executeBulkEnableGlobal'),
             'disable_global' => $this->confirmBulkAction('Disable selected gateways globally?', 'executeBulkDisableGlobal'),
             'enable_for_merchants' => $this->handleBulkEnableForMerchants(),
             'disable_for_merchants' => $this->handleBulkDisableForMerchants(),
-            default => null,
+            default => $this->showError('Please choose a bulk action.'),
         };
     }
 
@@ -275,6 +306,7 @@ class GatewayHub extends Component
     {
         DB::transaction(function (): void {
             Gateway::whereIn('id', $this->selectedGateways)
+                ->whereIn('code', PayMongoMethodCapabilityService::gatewayCodes())
                 ->update(['is_global_enabled' => true]);
 
             $this->logActivity('Bulk enable global', (string) count($this->selectedGateways).' gateways');
@@ -288,6 +320,7 @@ class GatewayHub extends Component
     {
         DB::transaction(function (): void {
             Gateway::whereIn('id', $this->selectedGateways)
+                ->whereIn('code', PayMongoMethodCapabilityService::gatewayCodes())
                 ->update(['is_global_enabled' => false]);
 
             MerchantGateway::whereIn('gateway_id', $this->selectedGateways)
@@ -305,7 +338,9 @@ class GatewayHub extends Component
         DB::transaction(function (): void {
             foreach ($this->selectedGateways as $gatewayId) {
                 $gateway = Gateway::find($gatewayId);
-                if ($gateway && $gateway->is_global_enabled) {
+                if ($gateway && ! $gateway->isProviderOnly() && ! $gateway->isRetired()
+                    && app(PayMongoMethodCapabilityService::class)->isPayMongoMethod($gateway->code)
+                    && $gateway->is_global_enabled) {
                     foreach ($this->selectedMerchants as $merchantId) {
                         MerchantGateway::updateOrCreate(
                             [
@@ -331,7 +366,10 @@ class GatewayHub extends Component
     public function executeBulkDisableForMerchants(): void
     {
         DB::transaction(function (): void {
-            MerchantGateway::whereIn('gateway_id', $this->selectedGateways)
+            MerchantGateway::whereIn('gateway_id', Gateway::query()
+                ->whereIn('id', $this->selectedGateways)
+                ->whereIn('code', PayMongoMethodCapabilityService::gatewayCodes())
+                ->pluck('id'))
                 ->whereIn('merchant_id', $this->selectedMerchants)
                 ->update(['is_enabled' => false]);
 
@@ -367,15 +405,21 @@ class GatewayHub extends Component
         $this->selectedGateways = [];
         $this->selectedMerchants = [];
         $this->selectAll = false;
-        $this->bulkAction = '';
+        $this->selectedBulkAction = '';
     }
 
     public function editConfig(int $gatewayId): void
     {
         $gateway = Gateway::findOrFail($gatewayId);
+        if ($gateway->code !== 'paymongo') {
+            $this->showError('Only the shared PayMongo provider configuration is supported.');
+
+            return;
+        }
+
         $fields = config('gateway_credentials.'.$gateway->code, []);
         if (! is_array($fields) || $fields === []) {
-            $this->showError('This payment option uses the shared Coins.ph platform configuration.');
+            $this->showError('This gateway has no platform credential fields to configure.');
 
             return;
         }
@@ -430,6 +474,7 @@ class GatewayHub extends Component
     public function render()
     {
         $gateways = Gateway::query()
+            ->whereIn('code', array_merge(['paymongo'], PayMongoMethodCapabilityService::gatewayCodes()))
             ->with(['merchantGateways' => fn ($q) => $q->whereIn('merchant_id', Merchant::query()->pluck('id'))])
             ->when($this->search !== '', function ($query): void {
                 $query->where(function ($q): void {
@@ -445,6 +490,8 @@ class GatewayHub extends Component
             })
             ->orderBy($this->sortField, $this->sortDirection)
             ->get();
+
+        $merchantAccessGateways = $gateways->reject(fn (Gateway $gateway): bool => $gateway->isProviderOnly())->values();
 
         $merchants = Merchant::query()
             ->when($this->merchantFilter !== 'all', function ($query): void {
@@ -478,6 +525,7 @@ class GatewayHub extends Component
 
         return view('livewire.admin.gateway-hub', [
             'gateways' => $gateways,
+            'merchantAccessGateways' => $merchantAccessGateways,
             'merchants' => $merchants,
             'merchantAccessMerchants' => $merchantAccessMerchants,
             'credentialFields' => $credentialFields,

@@ -31,6 +31,9 @@ class Payment extends Model
         'merchant_id',
         'gateway_code',
         'amount',
+        'product_amount',
+        'payer_fee_amount',
+        'platform_fee_rate',
         'currency',
         'platform_fee',
         'net_amount',
@@ -61,6 +64,9 @@ class Payment extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'product_amount' => 'decimal:2',
+            'payer_fee_amount' => 'decimal:2',
+            'platform_fee_rate' => 'decimal:6',
             'platform_fee' => 'decimal:2',
             'net_amount' => 'decimal:2',
             'raw_response' => 'array',
@@ -69,10 +75,10 @@ class Payment extends Model
     }
 
     /**
-     * Return only GatewayHub-owned financial fields for API and webhook payloads.
+     * Return only KemoPay-owned financial fields for API and webhook payloads.
      * Provider response fields such as conversion fees are intentionally excluded.
      *
-     * @return array{gross_amount: float, gatewayhub_platform_fee_percent: float, gatewayhub_platform_fee: float|null, gatewayhub_net_amount: float|null}
+     * @return array{product_amount: float, gross_amount: float, gatewayhub_platform_fee_percent: float, gatewayhub_platform_fee: float|null, gatewayhub_net_amount: float|null}
      */
     public function gatewayHubFeeData(): array
     {
@@ -80,16 +86,25 @@ class Payment extends Model
         $hasLedger = $ledger instanceof PlatformFee;
 
         return [
+            'product_amount' => $this->product_amount !== null
+                ? (float) $this->product_amount
+                : (float) $this->amount,
             'gross_amount' => (float) $this->amount,
             'gatewayhub_platform_fee_percent' => $hasLedger
                 ? (float) $ledger->fee_rate * 100
-                : PlatformFeeRule::configuredPercentage(),
+                : ($this->platform_fee_rate !== null
+                    ? (float) $this->platform_fee_rate * 100
+                    : PlatformFeeRule::configuredPercentage()),
             'gatewayhub_platform_fee' => $hasLedger
                 ? (float) $ledger->fee_amount
-                : ($this->platform_fee !== null ? (float) $this->platform_fee : null),
+                : ($this->platform_fee !== null
+                    ? (float) $this->platform_fee
+                    : ($this->payer_fee_amount !== null ? (float) $this->payer_fee_amount : null)),
             'gatewayhub_net_amount' => $hasLedger
                 ? (float) $ledger->net_amount
-                : ($this->net_amount !== null ? (float) $this->net_amount : null),
+                : ($this->net_amount !== null
+                    ? (float) $this->net_amount
+                    : ($this->product_amount !== null ? (float) $this->product_amount : null)),
         ];
     }
 

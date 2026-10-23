@@ -19,6 +19,11 @@ abstract class TestCase extends BaseTestCase
         config()->set('coins.gateway.api_base', 'sandbox');
         config()->set('coins.webhook.secret', 'test-coins-webhook-secret');
 
+        config()->set('paymongo.gateway.secret_key', 'sk_test_kemopay');
+        config()->set('paymongo.gateway.public_key', 'pk_test_kemopay');
+        config()->set('paymongo.gateway.webhook_secret', 'whsk_test_kemopay');
+        config()->set('paymongo.gateway.expiry_seconds', 1800);
+
         config()->set('gcash.gateway.provider_mode', 'native_direct');
         config()->set('gcash.gateway.client_id', 'test-gcash-client-id');
         config()->set('gcash.gateway.client_secret', 'test-gcash-client-secret');

@@ -2,11 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\CoinsTransaction;
-use App\Models\Gateway;
 use App\Models\User;
-use App\Services\Coins\CoinsGenerateQrSigner;
-use App\Services\Gateways\Drivers\CoinsDriver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -22,430 +18,89 @@ class CoinsQrGenerationTest extends TestCase
         parent::setUp();
 
         $this->user = User::factory()->create();
-
-        config([
-            'coins.auth.generate_qr.strategy' => 'auto',
-            'coins.auth.generate_qr.timestamp_unit' => 'milliseconds',
-            'coins.auth.generate_qr.signature_encoding' => 'hex_lower',
-            'coins.auth.generate_qr.max_attempts' => 4,
-        ]);
+        Http::fake();
     }
 
-    public function test_generate_qr_page_loads(): void
+    public function test_legacy_coins_qr_page_is_no_longer_available(): void
     {
-        $response = $this->actingAs($this->user)->get(route('coins.qr'));
-
-        $response->assertStatus(200);
-        $response->assertViewIs('coins.qr');
+        $this->actingAs($this->user)->get('/coins/qr')->assertNotFound();
     }
 
-    public function test_generate_qr_requires_authentication(): void
+    public function test_legacy_coins_qr_api_is_unavailable_without_authentication(): void
     {
-        $response = $this->postJson(route('coins.generate-qr'), ['amount' => 100]);
-
-        $this->assertContains($response->status(), [401, 403]);
+        $this->postJson('/coins/generate-qr', ['amount' => 100])->assertNotFound();
     }
 
-    public function test_generate_qr_validates_amount_required(): void
+    public function test_legacy_coins_qr_api_does_not_validate_amounts_or_start_provider_requests(): void
     {
-        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), []);
-
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors('amount');
+        $this->assertLegacyCoinsQrApiIsUnavailable([]);
     }
 
-    public function test_generate_qr_validates_amount_min_one(): void
+    public function test_legacy_coins_qr_api_does_not_accept_below_minimum_amounts(): void
     {
-        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 0.5]);
-
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors('amount');
+        $this->assertLegacyCoinsQrApiIsUnavailable(['amount' => 0.5]);
     }
 
-    public function test_generate_qr_calls_api_saves_transaction_and_returns_qr(): void
+    public function test_legacy_coins_qr_api_does_not_create_a_transaction(): void
     {
-        config([
-            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
-            'coins.api_key' => 'test-key',
-            'coins.secret_key' => 'test-secret',
-        ]);
-        Http::fake([
-            'api.9001.pl-qa.coinsxyz.me/*' => Http::response([
-                'status' => 0,
-                'data' => [
-                    'orderId' => 'coins-order-123',
-                    'qrCode' => '00020126...qr-payload',
-                ],
-            ], 200),
-        ]);
-
-        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 100]);
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'success' => true,
-            'status' => 'PENDING',
-            'amount' => 100,
-            'currency' => 'PHP',
-            'qr_code_string' => '00020126...qr-payload',
-        ]);
-        $response->assertJsonStructure(['request_id', 'reference_id']);
-
-        $this->assertDatabaseCount('coins_transactions', 1);
-        $tx = CoinsTransaction::first();
-        $this->assertNotNull($tx->request_id);
-        $this->assertSame('coins-order-123', $tx->reference_id);
-        $this->assertSame('100.00', $tx->amount);
-        $this->assertSame('PHP', $tx->currency);
-        $this->assertSame('PENDING', $tx->status);
-        $this->assertSame('00020126...qr-payload', $tx->qr_code_string);
-        $this->assertIsArray($tx->raw_response);
-        $this->assertArrayHasKey('status', $tx->raw_response);
-        $this->assertSame(0, $tx->raw_response['status']);
+        $this->assertLegacyCoinsQrApiIsUnavailable(['amount' => 100]);
     }
 
-    public function test_generate_qr_returns_error_when_api_fails(): void
+    public function test_legacy_coins_qr_api_does_not_call_the_provider_on_error_responses(): void
     {
-        config([
-            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
-            'coins.api_key' => 'test-key',
-            'coins.secret_key' => 'test-secret',
-        ]);
-        Http::fake([
-            'api.9001.pl-qa.coinsxyz.me/*' => Http::response([
-                'status' => -1001,
-                'msg' => 'Invalid API key',
-            ], 200),
-        ]);
-
-        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 50]);
-
-        $response->assertStatus(200);
-        $response->assertJson(['success' => false, 'message' => 'Coins API error: Invalid API key']);
-        $this->assertDatabaseCount('coins_transactions', 0);
+        $this->assertLegacyCoinsQrApiIsUnavailable(['amount' => 100]);
     }
 
-    public function test_generate_qr_maps_qr_feature_not_enabled_error_to_actionable_message(): void
+    public function test_legacy_coins_qr_api_does_not_expose_provider_feature_errors(): void
     {
-        config([
-            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
-            'coins.api_key' => 'test-key',
-            'coins.secret_key' => 'test-secret',
-        ]);
-        Http::fake([
-            'api.9001.pl-qa.coinsxyz.me/*' => Http::response([
-                'status' => 88010063,
-                'error' => 'You do not support this feature currently, please contact customer service.',
-                'data' => null,
-            ], 200),
-        ]);
-
-        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 50]);
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'success' => false,
-            'message' => 'Coins API error: Coins.ph account is not enabled for QR payment handling yet. Ask Coins support to enable QR integration for this account/API key.',
-        ]);
-        $this->assertDatabaseCount('coins_transactions', 0);
+        $this->assertLegacyCoinsQrApiIsUnavailable(['amount' => 100]);
     }
 
-    public function test_generate_qr_retries_with_unsorted_signature_when_signature_is_rejected(): void
+    public function test_legacy_coins_qr_api_does_not_retry_signature_strategies(): void
     {
-        config([
-            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
-            'coins.api_key' => 'test-key',
-            'coins.secret_key' => 'test-secret',
-        ]);
-
-        $requestCount = 0;
-        $signer = new CoinsGenerateQrSigner;
-
-        Http::fake([
-            'api.9001.pl-qa.coinsxyz.me/*' => function ($request) use (&$requestCount, $signer) {
-                $requestCount++;
-
-                $timestamp = (string) ($request->header('Timestamp')[0] ?? '');
-                $signature = (string) ($request->header('Signature')[0] ?? '');
-                $body = json_decode((string) $request->body(), true) ?? [];
-
-                $expected = $signer->sign(
-                    $body,
-                    'test-secret',
-                    $timestamp,
-                    $requestCount === 1 ? CoinsGenerateQrSigner::STRATEGY_RAW_JSON : CoinsGenerateQrSigner::STRATEGY_KV_SORTED_WITH_TIMESTAMP
-                );
-
-                $this->assertNotSame('', $timestamp);
-                $this->assertSame($expected['signature'], $signature);
-
-                if ($requestCount === 1) {
-                    return Http::response([
-                        'status' => -1022,
-                        'msg' => 'Signature for this request is not valid.',
-                    ], 200);
-                }
-
-                return Http::response([
-                    'status' => 0,
-                    'data' => [
-                        'orderId' => 'retry-coins-order-123',
-                        'qrCode' => 'retry-qr-payload',
-                    ],
-                ], 200);
-            },
-        ]);
-
-        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 55]);
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'success' => true,
-            'status' => 'PENDING',
-            'qr_code_string' => 'retry-qr-payload',
-            'reference_id' => 'retry-coins-order-123',
-        ]);
-
-        $this->assertSame(2, $requestCount);
-        $this->assertDatabaseCount('coins_transactions', 1);
+        $this->assertLegacyCoinsQrApiIsUnavailable(['amount' => 50]);
     }
 
-    public function test_generate_qr_retries_with_raw_json_seconds_on_fourth_attempt(): void
+    public function test_legacy_coins_qr_api_does_not_retry_raw_json_signatures(): void
     {
-        config([
-            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
-            'coins.api_key' => 'test-key',
-            'coins.secret_key' => 'test-secret',
-        ]);
-
-        $requestCount = 0;
-        $signer = new CoinsGenerateQrSigner;
-        $timestamps = [];
-
-        Http::fake([
-            'api.9001.pl-qa.coinsxyz.me/*' => function ($request) use (&$requestCount, $signer, &$timestamps) {
-                $requestCount++;
-
-                $timestamp = (string) ($request->header('Timestamp')[0] ?? '');
-                $timestamps[] = $timestamp;
-                $signature = (string) ($request->header('Signature')[0] ?? '');
-                $body = json_decode((string) $request->body(), true) ?? [];
-
-                if ($requestCount === 1) {
-                    $expected = $signer->sign($body, 'test-secret', $timestamp, CoinsGenerateQrSigner::STRATEGY_RAW_JSON);
-                    $this->assertSame($expected['signature'], $signature);
-                } elseif ($requestCount === 2) {
-                    $expected = $signer->sign($body, 'test-secret', $timestamp, CoinsGenerateQrSigner::STRATEGY_KV_SORTED_WITH_TIMESTAMP);
-                    $this->assertSame($expected['signature'], $signature);
-                } elseif ($requestCount === 3) {
-                    $expected = $signer->sign($body, 'test-secret', $timestamp, CoinsGenerateQrSigner::STRATEGY_KV_INPUT_ORDER_WITH_TIMESTAMP);
-                    $this->assertSame($expected['signature'], $signature);
-                } else {
-                    $expected = $signer->sign($body, 'test-secret', $timestamp, CoinsGenerateQrSigner::STRATEGY_RAW_JSON);
-                    $this->assertSame($expected['signature'], $signature);
-                    $this->assertSame(10, strlen($timestamp));
-                }
-
-                if ($requestCount < 4) {
-                    return Http::response([
-                        'status' => -1022,
-                        'msg' => 'Signature for this request is not valid.',
-                    ], 200);
-                }
-
-                return Http::response([
-                    'status' => 0,
-                    'data' => [
-                        'orderId' => 'retry-raw-seconds-order-123',
-                        'qrCode' => 'retry-raw-seconds-qr-payload',
-                    ],
-                ], 200);
-            },
-        ]);
-
-        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 65]);
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'success' => true,
-            'status' => 'PENDING',
-            'qr_code_string' => 'retry-raw-seconds-qr-payload',
-            'reference_id' => 'retry-raw-seconds-order-123',
-        ]);
-
-        $this->assertSame(4, $requestCount);
-        $this->assertSame($timestamps[0], $timestamps[1]);
-        $this->assertSame($timestamps[1], $timestamps[2]);
-        $this->assertNotSame($timestamps[2], $timestamps[3]);
-        $this->assertDatabaseCount('coins_transactions', 1);
+        $this->assertLegacyCoinsQrApiIsUnavailable(['amount' => 50]);
     }
 
-    public function test_generate_qr_does_not_fallback_when_strategy_is_not_auto(): void
+    public function test_legacy_coins_qr_api_does_not_use_a_timestamp_unit(): void
     {
-        config([
-            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
-            'coins.api_key' => 'test-key',
-            'coins.secret_key' => 'test-secret',
-            'coins.auth.generate_qr.strategy' => 'raw_json',
-            'coins.auth.generate_qr.timestamp_unit' => 'milliseconds',
-        ]);
-
-        $requestCount = 0;
-        Http::fake([
-            'api.9001.pl-qa.coinsxyz.me/*' => function () use (&$requestCount) {
-                $requestCount++;
-
-                return Http::response([
-                    'status' => -1022,
-                    'msg' => 'Signature for this request is not valid.',
-                ], 200);
-            },
-        ]);
-
-        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 65]);
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'success' => false,
-            'message' => 'Coins API error: Signature for this request is not valid.',
-        ]);
-        $this->assertSame(1, $requestCount);
-        $this->assertDatabaseCount('coins_transactions', 0);
+        $this->assertLegacyCoinsQrApiIsUnavailable(['amount' => 50]);
     }
 
-    public function test_generate_qr_uses_seconds_timestamp_unit_when_configured(): void
+    public function test_legacy_coins_qr_api_does_not_return_provider_error_keys(): void
     {
-        config([
-            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
-            'coins.api_key' => 'test-key',
-            'coins.secret_key' => 'test-secret',
-            'coins.auth.generate_qr.strategy' => 'raw_json',
-            'coins.auth.generate_qr.timestamp_unit' => 'seconds',
-        ]);
-
-        Http::fake([
-            'api.9001.pl-qa.coinsxyz.me/*' => function ($request) {
-                $timestamp = (string) ($request->header('Timestamp')[0] ?? '');
-                $this->assertSame(10, strlen($timestamp));
-
-                return Http::response([
-                    'status' => 0,
-                    'data' => [
-                        'orderId' => 'seconds-order-123',
-                        'qrCode' => 'seconds-qr-payload',
-                    ],
-                ], 200);
-            },
-        ]);
-
-        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 75]);
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'success' => true,
-            'reference_id' => 'seconds-order-123',
-            'qr_code_string' => 'seconds-qr-payload',
-        ]);
+        $this->assertLegacyCoinsQrApiIsUnavailable(['amount' => 50]);
     }
 
-    public function test_generate_qr_returns_error_key_when_response_code_1006(): void
+    public function test_legacy_coins_qr_api_does_not_use_shared_provider_credentials(): void
     {
-        config([
-            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
-            'coins.api_key' => 'test-key',
-            'coins.secret_key' => 'test-secret',
-        ]);
-        Http::fake([
-            'api.9001.pl-qa.coinsxyz.me/*' => Http::response([
-                'status' => 1006,
-                'code' => 1006,
-                'msg' => 'IP not allowed',
-            ], 200),
-        ]);
-
-        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 10]);
-
-        $response->assertStatus(403);
-        $response->assertJson([
-            'error' => 'IP not whitelisted. Please contact Coins to whitelist server IP.',
-        ]);
-        $this->assertDatabaseCount('coins_transactions', 0);
+        $this->assertLegacyCoinsQrApiIsUnavailable(['amount' => 50]);
     }
 
-    public function test_generate_qr_uses_shared_platform_gateway_credentials_when_legacy_env_values_are_missing(): void
+    public function test_legacy_coins_qr_api_does_not_parse_plain_text_provider_errors(): void
     {
-        config([
-            'coins.base_url' => '',
-            'coins.api_key' => '',
-            'coins.secret_key' => '',
-        ]);
-
-        Gateway::query()->create([
-            'code' => 'coins',
-            'name' => 'Coins.ph',
-            'driver_class' => CoinsDriver::class,
-            'is_global_enabled' => true,
-            'config_json' => [
-                'client_id' => 'db-client-id',
-                'client_secret' => 'db-client-secret',
-                'api_base' => 'sandbox',
-                'source' => 'PLATFORM-SOURCE',
-            ],
-        ]);
-
-        $signer = new CoinsGenerateQrSigner;
-
-        Http::fake([
-            'api.9001.pl-qa.coinsxyz.me/*' => function ($request) use ($signer) {
-                $timestamp = (string) ($request->header('Timestamp')[0] ?? '');
-                $signature = (string) ($request->header('Signature')[0] ?? '');
-                $apiKey = (string) ($request->header('X-COINS-APIKEY')[0] ?? '');
-                $body = json_decode((string) $request->body(), true) ?? [];
-
-                $this->assertSame('db-client-id', $apiKey);
-                $this->assertSame('PLATFORM-SOURCE', $body['source'] ?? null);
-
-                $expected = $signer->sign($body, 'db-client-secret', $timestamp, CoinsGenerateQrSigner::STRATEGY_RAW_JSON);
-                $this->assertSame($expected['signature'], $signature);
-
-                return Http::response([
-                    'status' => 0,
-                    'data' => [
-                        'orderId' => 'db-config-order-123',
-                        'qrCode' => 'db-config-qr-payload',
-                    ],
-                ], 200);
-            },
-        ]);
-
-        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 25]);
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'success' => true,
-            'reference_id' => 'db-config-order-123',
-            'qr_code_string' => 'db-config-qr-payload',
-        ]);
+        $this->assertLegacyCoinsQrApiIsUnavailable(['amount' => 25]);
     }
 
-    public function test_generate_qr_returns_error_key_when_plain_text_response_code_1006_is_returned(): void
+    public function test_legacy_coins_qr_api_does_not_fallback_to_legacy_credentials(): void
     {
-        config([
-            'coins.base_url' => 'https://api.9001.pl-qa.coinsxyz.me',
-            'coins.api_key' => 'test-key',
-            'coins.secret_key' => 'test-secret',
-        ]);
+        config(['coins.api_key' => '', 'coins.secret_key' => '']);
 
-        Http::fake([
-            'api.9001.pl-qa.coinsxyz.me/*' => Http::response('error code: 1006', 403),
-        ]);
+        $this->assertLegacyCoinsQrApiIsUnavailable(['amount' => 10]);
+    }
 
-        $response = $this->actingAs($this->user)->postJson(route('coins.generate-qr'), ['amount' => 10]);
+    /**
+     * @param  array<string, int|float|string>  $payload
+     */
+    private function assertLegacyCoinsQrApiIsUnavailable(array $payload): void
+    {
+        $this->actingAs($this->user)->postJson('/coins/generate-qr', $payload)->assertNotFound();
 
-        $response->assertStatus(403);
-        $response->assertJson([
-            'error' => 'IP not whitelisted. Please contact Coins to whitelist server IP.',
-        ]);
+        Http::assertNothingSent();
         $this->assertDatabaseCount('coins_transactions', 0);
     }
 }

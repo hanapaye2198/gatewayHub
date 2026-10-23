@@ -95,6 +95,22 @@ class WebhookProcessor
             }
 
             $payment = $resolution['payment'];
+            if ($providerName === 'paymongo'
+                && $normalized['status'] === 'paid'
+                && ! $this->payMongoPaymentDetailsMatch($payment, $normalized)) {
+                Log::warning('paymongo.webhook.payment_details_mismatch', [
+                    'event_id' => $eventId,
+                    'payment_id' => $payment->id,
+                    'provider_amount' => $normalized['amount'],
+                    'provider_currency' => $normalized['currency'],
+                    'expected_amount' => (string) $payment->amount,
+                    'expected_currency' => $payment->currency,
+                ]);
+                $this->markEventProcessed($event, $payment->id);
+
+                return $this->acknowledge();
+            }
+
             if ($payment->status === 'paid' && in_array($normalized['status'], ['paid', 'pending'], true)) {
                 $this->markEventProcessed($event, $payment->id);
 
@@ -150,10 +166,8 @@ class WebhookProcessor
      *  - paid   -> *        : BLOCKED. paid is financial finality; reversals
      *                         must go through an explicit reconciliation flow,
      *                         never a late-arriving webhook.
-     *  - failed -> paid     : allowed only for an authenticated Coins callback
-     *                         that resolves to this exact payment. This is the
-     *                         provider-confirmed reconciliation path for a
-     *                         payment that GatewayHub previously marked failed.
+     *  - failed -> paid     : allowed only for an authenticated provider callback
+     *                         that resolves to this exact payment.
      *  - refunded / failed_after_paid / provisioning_failed
      *                       : terminal states, webhook cannot mutate.
      *
@@ -169,7 +183,7 @@ class WebhookProcessor
      * transition map above. Returns true when the payment's status actually
      * changed, false when the inbound webhook was ignored (same-state delivery
      * or a blocked transition). A failed payment may only be reconciled to paid
-     * by a verified Coins webhook resolved against its exact provider reference.
+     * by a verified Coins or PayMongo callback for the matching gateway.
      *
      * @param  array{status: 'paid'|'failed'|'pending'|'refunded'|'failed_after_paid', paid_at?: int|null}  $normalized
      */
@@ -190,9 +204,13 @@ class WebhookProcessor
         $isCoinsReconciliation = $current === 'failed'
             && $incoming === 'paid'
             && $providerName === 'coins'
-            && in_array((string) $payment->gateway_code, ['coins', 'gcash', 'maya', 'paypal', 'qrph'], true);
+            && $this->isLegacyCoinsPayment($payment);
+        $isPayMongoReconciliation = $current === 'failed'
+            && $incoming === 'paid'
+            && $providerName === 'paymongo'
+            && in_array((string) $payment->gateway_code, ['qrph', 'gcash', 'maya', 'grab_pay', 'shopeepay'], true);
 
-        if (! in_array($incoming, $allowed, true) && ! $isCoinsReconciliation) {
+        if (! in_array($incoming, $allowed, true) && ! $isCoinsReconciliation && ! $isPayMongoReconciliation) {
             Log::warning('webhook.payment_transition_blocked', [
                 'payment_id' => $payment->id,
                 'current_status' => $current,
@@ -203,7 +221,7 @@ class WebhookProcessor
             return false;
         }
 
-        if ($isCoinsReconciliation) {
+        if ($isCoinsReconciliation || $isPayMongoReconciliation) {
             Log::warning('webhook.payment_reconciled', [
                 'payment_id' => $payment->id,
                 'previous_status' => $current,
@@ -250,6 +268,34 @@ class WebhookProcessor
         }
 
         return 'transition_not_allowed';
+    }
+
+    /**
+     * @param  array<string, mixed>  $normalized
+     */
+    private function payMongoPaymentDetailsMatch(Payment $payment, array $normalized): bool
+    {
+        $providerAmount = $normalized['amount'] ?? null;
+        if ((! is_int($providerAmount) && ! is_string($providerAmount))
+            || ! ctype_digit((string) $providerAmount)) {
+            return false;
+        }
+
+        $providerCurrency = strtoupper((string) ($normalized['currency'] ?? ''));
+        if ($providerCurrency === '' || $providerCurrency !== strtoupper((string) $payment->currency)) {
+            return false;
+        }
+
+        if (! preg_match('/^(\d+)\.(\d{2})$/', (string) $payment->amount, $matches)) {
+            return false;
+        }
+
+        $expectedAmount = ltrim($matches[1].$matches[2], '0');
+        $expectedAmount = $expectedAmount === '' ? '0' : $expectedAmount;
+        $receivedAmount = ltrim((string) $providerAmount, '0');
+        $receivedAmount = $receivedAmount === '' ? '0' : $receivedAmount;
+
+        return $receivedAmount === $expectedAmount;
     }
 
     /**
@@ -406,7 +452,18 @@ class WebhookProcessor
     {
         $baseQuery = Payment::query()->where(function ($gatewayQuery) use ($provider): void {
             if ($provider === 'coins') {
-                $gatewayQuery->whereIn('gateway_code', ['coins', 'gcash', 'maya', 'paypal', 'qrph']);
+                $gatewayQuery->where('gateway_code', 'coins')
+                    ->orWhere(function (EloquentBuilder $legacyGatewayQuery): void {
+                        $legacyGatewayQuery
+                            ->whereIn('gateway_code', ['gcash', 'maya', 'qrph'])
+                            ->whereNull('raw_response->payment_intent');
+                    });
+
+                return;
+            }
+
+            if ($provider === 'paymongo') {
+                $gatewayQuery->whereIn('gateway_code', ['qrph', 'gcash', 'maya', 'grab_pay', 'shopeepay']);
 
                 return;
             }
@@ -429,6 +486,20 @@ class WebhookProcessor
                     ->orWhere('reference_id', $paymentReference);
             })
         );
+    }
+
+    private function isLegacyCoinsPayment(Payment $payment): bool
+    {
+        if ($payment->gateway_code === 'coins') {
+            return true;
+        }
+
+        if (! in_array($payment->gateway_code, ['gcash', 'maya', 'qrph'], true)) {
+            return false;
+        }
+
+        return ! is_array($payment->raw_response)
+            || ! array_key_exists('payment_intent', $payment->raw_response);
     }
 
     /**

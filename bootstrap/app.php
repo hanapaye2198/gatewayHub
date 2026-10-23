@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trustProxies(at: '*');
         $middleware->alias([
             'merchant.onboarding' => \App\Http\Middleware\EnsureOnboardingComplete::class,
             'super-admin' => \App\Http\Middleware\EnsureSuperAdmin::class,

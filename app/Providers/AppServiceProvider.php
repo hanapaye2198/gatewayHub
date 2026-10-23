@@ -117,10 +117,6 @@ class AppServiceProvider extends ServiceProvider
     {
         Date::use(CarbonImmutable::class);
 
-        if (! app()->environment('testing')) {
-            config()->set('surepay.features.wallet_settlement', false);
-        }
-
         DB::prohibitDestructiveCommands(
             app()->isProduction(),
         );

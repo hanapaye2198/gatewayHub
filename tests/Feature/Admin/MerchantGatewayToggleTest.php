@@ -5,6 +5,7 @@ namespace Tests\Feature\Admin;
 use App\Models\Gateway;
 use App\Models\MerchantGateway;
 use App\Models\User;
+use App\Services\Gateways\Drivers\PayMongoDriver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -16,10 +17,9 @@ class MerchantGatewayToggleTest extends TestCase
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $merchant = User::factory()->create();
-        $gateway = Gateway::query()->create([
-            'code' => 'coins',
-            'name' => 'Coins.ph',
-            'driver_class' => 'App\Services\Gateways\Drivers\CoinsDriver',
+        $gateway = Gateway::query()->updateOrCreate(['code' => 'gcash'], [
+            'name' => 'GCash',
+            'driver_class' => PayMongoDriver::class,
             'is_global_enabled' => true,
         ]);
 
@@ -38,14 +38,39 @@ class MerchantGatewayToggleTest extends TestCase
         ]);
     }
 
+    public function test_admin_cannot_enable_a_retired_coins_gateway_for_a_merchant(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $merchant = User::factory()->create();
+        $gateway = Gateway::query()->updateOrCreate(['code' => 'coins'], [
+            'name' => 'Coins.ph',
+            'driver_class' => 'App\\Services\\Gateways\\Drivers\\CoinsDriver',
+            'is_global_enabled' => false,
+        ]);
+
+        $response = $this->actingAs($admin)->patch(route('admin.gateways.merchant-update', [
+            'gateway' => $gateway,
+            'merchant' => $merchant->merchant,
+        ]), [
+            'is_enabled' => true,
+        ]);
+
+        $response->assertRedirect(route('admin.gateways.index'));
+        $response->assertSessionHas('error');
+        $this->assertDatabaseMissing('merchant_gateways', [
+            'merchant_id' => $merchant->id,
+            'gateway_id' => $gateway->id,
+            'is_enabled' => true,
+        ]);
+    }
+
     public function test_admin_cannot_enable_gateway_for_merchant_when_gateway_is_globally_disabled(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $merchant = User::factory()->create();
-        $gateway = Gateway::query()->create([
-            'code' => 'maya',
+        $gateway = Gateway::query()->updateOrCreate(['code' => 'maya'], [
             'name' => 'Maya',
-            'driver_class' => 'App\Services\Gateways\Drivers\MayaDriver',
+            'driver_class' => PayMongoDriver::class,
             'is_global_enabled' => false,
         ]);
 
@@ -69,8 +94,7 @@ class MerchantGatewayToggleTest extends TestCase
     {
         $merchantActor = User::factory()->create();
         $merchant = User::factory()->create();
-        $gateway = Gateway::query()->create([
-            'code' => 'paypal',
+        $gateway = Gateway::query()->updateOrCreate(['code' => 'paypal'], [
             'name' => 'PayPal',
             'driver_class' => 'App\Services\Gateways\Drivers\PaypalDriver',
             'is_global_enabled' => true,

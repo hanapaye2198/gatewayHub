@@ -12,10 +12,14 @@ class WalletBalanceQueryService
     /**
      * @return array{
      *   currency: string,
+     *   wallet_balance: float,
+     *   available_balance: float,
+     *   settled_balance: float,
      *   tunnel_balance: float,
      *   real_balance: float,
      *   pending_net_settlement: float,
      *   today_gross: float,
+     *   today_platform_fees: float,
      *   today_net_settled: float,
      *   as_of: string
      * }
@@ -61,12 +65,29 @@ class WalletBalanceQueryService
             ->whereHas('payment', fn ($paymentQuery) => $paymentQuery->where('merchant_id', $merchant->id))
             ->sum('amount');
 
+        $todayPlatformFees = (float) WalletTransaction::query()
+            ->where('entry_type', WalletTransaction::ENTRY_SUREPAY_TAX_COLLECTED)
+            ->where('direction', 'debit')
+            ->where('currency', $normalizedCurrency)
+            ->where('created_at', '>=', $today)
+            ->whereHas('wallet', fn ($walletQuery) => $walletQuery
+                ->where('merchant_id', $merchant->id)
+                ->where('wallet_type', Wallet::TYPE_MERCHANT_CLEARING))
+            ->whereHas('payment', fn ($paymentQuery) => $paymentQuery->where('merchant_id', $merchant->id))
+            ->sum('amount');
+
+        $walletBalance = round($tunnelBalance + $realBalance, 2);
+
         return [
             'currency' => $normalizedCurrency,
+            'wallet_balance' => $walletBalance,
+            'available_balance' => round($tunnelBalance, 2),
+            'settled_balance' => round($realBalance, 2),
             'tunnel_balance' => round($tunnelBalance, 2),
             'real_balance' => round($realBalance, 2),
             'pending_net_settlement' => round($pendingNetSettlement, 2),
             'today_gross' => round($todayGross, 2),
+            'today_platform_fees' => round($todayPlatformFees, 2),
             'today_net_settled' => round($todayNetSettled, 2),
             'as_of' => now()->toIso8601String(),
         ];

@@ -40,6 +40,18 @@ class HomePageBusinessDataTest extends TestCase
             'driver_class' => 'App\\Services\\Gateways\\Drivers\\CoinsDriver',
             'is_global_enabled' => false,
         ]);
+        Gateway::query()->create([
+            'code' => 'paymongo',
+            'name' => 'PayMongo',
+            'driver_class' => 'App\\Services\\Gateways\\Drivers\\PayMongoDriver',
+            'is_global_enabled' => true,
+        ]);
+        Gateway::query()->create([
+            'code' => 'coins',
+            'name' => 'Coins.ph',
+            'driver_class' => 'App\\Services\\Gateways\\Drivers\\CoinsDriver',
+            'is_global_enabled' => false,
+        ]);
 
         Payment::factory()->paid()->create([
             'merchant_id' => $merchantA->id,
@@ -67,12 +79,14 @@ class HomePageBusinessDataTest extends TestCase
         $response->assertSee('AlphaPay');
         $response->assertSee('BetaPay');
         $response->assertSee('GammaPay');
+        $response->assertDontSee('Coins.ph');
         $response->assertSee('GCash');
-        $response->assertSee('How it works');
-        $response->assertSee('Built for platform operators');
+        $response->assertDontSee('PayPal');
+        $response->assertSee('KemoPay');
+        $response->assertSee('Payments and operations, working together.');
         $response->assertSee('Instant propagation to merchants');
-        $response->assertSee('Common questions');
-        $response->assertSee('logo.svg', false);
+        $response->assertSee('A straightforward path from API to payment.');
+        $response->assertSee('Modern K Payment App Icon.png', false);
         $response->assertDontSee('No gateways configured yet.');
     }
 
@@ -88,6 +102,18 @@ class HomePageBusinessDataTest extends TestCase
         $response->assertSee('No gateways configured yet.');
         $response->assertSee('GCash');
         $response->assertSee('Try live demo');
+    }
+
+    public function test_home_page_uses_forwarded_https_scheme_for_generated_urls(): void
+    {
+        $response = $this->withHeaders([
+            'X-Forwarded-Proto' => 'https',
+            'X-Forwarded-Host' => 'pay.kemofi.com',
+        ])->get(route('home'));
+
+        $response->assertOk();
+        $response->assertSee('content="https://pay.kemofi.com"', false);
+        $response->assertSee('https://pay.kemofi.com/Modern K Payment App Icon.png', false);
     }
 
     public function test_home_page_routes_authenticated_admin_to_admin_dashboard(): void

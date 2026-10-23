@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\Merchant;
 use App\Models\Payment;
-use App\Services\Gateways\Drivers\CoinsDriver;
+use App\Services\Billing\PlatformFeeService as BillingPlatformFeeService;
 use App\Services\Gateways\Exceptions\GatewayException;
 use App\Services\Gateways\PaymentGatewayManager;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +30,8 @@ class PaymentCreationService
     private const STATUS_PENDING = 'pending';
 
     public function __construct(
-        protected PaymentGatewayManager $gatewayManager
+        protected PaymentGatewayManager $gatewayManager,
+        protected BillingPlatformFeeService $platformFeeService
     ) {}
 
     /**
@@ -44,17 +45,19 @@ class PaymentCreationService
      */
     public function create(Merchant $merchant, string $gatewayCode, array $data): array
     {
-        if (($data['checkout'] ?? false) === true) {
-            return $this->createCoinsCheckoutPayment($merchant, $gatewayCode, $data);
-        }
-
         $driver = $this->gatewayManager->resolve($merchant, $gatewayCode);
         $gatewayRequestReference = $this->buildGatewayRequestReference($merchant);
+        $productAmount = round((float) $data['amount'], 2);
+        $payerChargedTotals = $this->platformFeeService->calculatePayerChargedTotals($productAmount);
+        $chargedAmount = $payerChargedTotals['gross_amount'];
 
         $payment = DB::transaction(fn (): Payment => Payment::query()->create([
             'merchant_id' => $merchant->id,
             'gateway_code' => $gatewayCode,
-            'amount' => $data['amount'],
+            'amount' => $chargedAmount,
+            'product_amount' => $productAmount,
+            'payer_fee_amount' => $payerChargedTotals['fee_amount'],
+            'platform_fee_rate' => $payerChargedTotals['fee_rate'],
             'currency' => $data['currency'],
             'reference_id' => $data['reference'],
             'provider_reference' => null,
@@ -68,10 +71,13 @@ class PaymentCreationService
 
         try {
             $response = $driver->createPayment([
-                'amount' => $data['amount'],
+                'amount' => $chargedAmount,
                 'currency' => $data['currency'],
                 'reference' => $gatewayRequestReference,
+                'payment_id' => $payment->id,
+                'gateway_code' => $gatewayCode,
                 'qr_code_merchant_name' => $merchant->getQrMerchantName(),
+                'qr_expiry_seconds' => $data['qr_expiry_seconds'] ?? null,
             ]);
         } catch (Throwable $e) {
             $this->markProvisioningFailed($payment, $gatewayRequestReference, $data['reference'], $e);
@@ -113,96 +119,6 @@ class PaymentCreationService
     }
 
     /**
-     * @param  array{amount: float|int|string, currency: string, reference: string, product_name?: string|null}  $data
-     * @return array{payment: Payment, qr_data: null, expires_at: null, redirect_url: string|null}
-     */
-    private function createCoinsCheckoutPayment(Merchant $merchant, string $gatewayCode, array $data): array
-    {
-        if ($gatewayCode !== 'coins') {
-            throw new GatewayException('Checkout flow is only available for gateway "coins".');
-        }
-
-        $driver = $this->gatewayManager->resolve($merchant, $gatewayCode);
-        if (! $driver instanceof CoinsDriver) {
-            throw new GatewayException('Checkout flow requires the Coins gateway driver.');
-        }
-
-        $gatewayRequestReference = $this->buildGatewayRequestReference($merchant);
-
-        $payment = DB::transaction(fn (): Payment => Payment::query()->create([
-            'merchant_id' => $merchant->id,
-            'gateway_code' => $gatewayCode,
-            'amount' => $data['amount'],
-            'currency' => $data['currency'],
-            'reference_id' => $data['reference'],
-            'provider_reference' => null,
-            'status' => self::STATUS_PROVISIONING,
-            'raw_response' => [
-                'gateway_request_reference' => $gatewayRequestReference,
-                'merchant_reference' => $data['reference'],
-                'checkout' => true,
-            ],
-            'paid_at' => null,
-        ]));
-
-        $redirectUrls = $this->buildCheckoutRedirectUrls($payment);
-
-        $productName = $data['product_name'] ?? null;
-        $productName = is_string($productName) && trim($productName) !== '' ? trim($productName) : null;
-
-        $sessionPayload = [
-            'reference' => $gatewayRequestReference,
-            'amount' => $data['amount'],
-            'currency' => $data['currency'],
-            'merchant_name' => $merchant->getDisplayName(),
-            'redirect_urls' => $redirectUrls,
-        ];
-        if ($productName !== null) {
-            $sessionPayload['product_name'] = $productName;
-        }
-
-        try {
-            $response = $driver->createCheckoutSession($sessionPayload);
-        } catch (Throwable $e) {
-            $this->markProvisioningFailed(
-                $payment,
-                $gatewayRequestReference,
-                $data['reference'],
-                $e,
-                ['checkout' => true]
-            );
-
-            throw $e;
-        }
-
-        $externalPaymentId = $response['external_payment_id'] ?? null;
-        $rawToStore = $response['raw'] ?? [];
-        $rawToStore = array_merge(is_array($rawToStore) ? $rawToStore : [], [
-            'gateway_request_reference' => $gatewayRequestReference,
-            'merchant_reference' => $data['reference'],
-            'checkout' => true,
-        ]);
-
-        DB::transaction(function () use ($payment, $externalPaymentId, $rawToStore): void {
-            $payment->update([
-                'provider_reference' => $externalPaymentId,
-                'status' => self::STATUS_PENDING,
-                'raw_response' => $rawToStore,
-            ]);
-        });
-
-        $redirectUrl = $response['redirect_url'] ?? null;
-        $redirectUrl = is_string($redirectUrl) && $redirectUrl !== '' ? $redirectUrl : null;
-
-        return [
-            'payment' => $payment->refresh(),
-            'qr_data' => null,
-            'expires_at' => null,
-            'redirect_url' => $redirectUrl,
-        ];
-    }
-
-    /**
      * Transition a provisioning Payment to the failed state while preserving audit
      * context. The row is never deleted so every gateway call has a DB record.
      *
@@ -230,24 +146,6 @@ class PaymentCreationService
                 ]),
             ]);
         });
-    }
-
-    /**
-     * @return array{success: string, failure: string, cancel: string, default: string}
-     */
-    private function buildCheckoutRedirectUrls(Payment $payment): array
-    {
-        $id = $payment->getKey();
-        if (! is_string($id) || $id === '') {
-            throw new GatewayException('Invalid payment identifier for checkout redirects.');
-        }
-
-        return [
-            'success' => route('payment.success', ['transaction' => $id], absolute: true),
-            'failure' => route('payment.failure', ['transaction' => $id], absolute: true),
-            'cancel' => route('payment.cancel', ['transaction' => $id], absolute: true),
-            'default' => route('payment.default', ['transaction' => $id], absolute: true),
-        ];
     }
 
     private function buildGatewayRequestReference(Merchant $merchant): string

@@ -13,8 +13,10 @@ use Illuminate\Support\Facades\Crypt;
 class PartiallyEncryptedJsonCast implements CastsAttributes
 {
     private const SENSITIVE_KEYS = [
+        'secret_key',
         'client_secret',
         'api_secret',
+        'public_key',
         'webhook_secret',
         'webhook_key',
     ];

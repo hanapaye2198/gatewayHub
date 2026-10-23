@@ -198,9 +198,12 @@
                         <select wire:model.live="gatewayTypeFilter"
                                 class="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900">
                             <option value="all">All Types</option>
-                            <option value="coins">Coins.ph</option>
+                            <option value="paymongo">PayMongo</option>
                             <option value="gcash">GCash</option>
-                            <option value="paymaya">PayMaya</option>
+                            <option value="maya">Maya</option>
+                            <option value="grab_pay">GrabPay</option>
+                            <option value="shopeepay">ShopeePay</option>
+                            <option value="qrph">QR Ph</option>
                         </select>
                     </div>
                 </div>

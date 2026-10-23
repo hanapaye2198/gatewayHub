@@ -1,0 +1,97 @@
+name: kemopay
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kemopay-app:production
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      - kemopay-storage:/app/storage
+    networks:
+      app-private: {}
+      edge:
+        aliases:
+          - kemopay-app
+    expose:
+      - "8080"
+
+  worker:
+    image: kemopay-app:production
+    restart: unless-stopped
+    entrypoint: ["php"]
+    command:
+      - artisan
+      - queue:work
+      - --queue=default
+      - --sleep=3
+      - --tries=3
+      - --max-time=3600
+    env_file: .env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+    healthcheck:
+      disable: true
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      - kemopay-storage:/app/storage
+    networks:
+      - app-private
+
+  scheduler:
+    image: kemopay-app:production
+    restart: unless-stopped
+    entrypoint: ["php"]
+    command: ["artisan", "schedule:work"]
+    env_file: .env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+    healthcheck:
+      disable: true
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      - kemopay-storage:/app/storage
+    networks:
+      - app-private
+
+  database:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:?Set DB_DATABASE in .env}
+      POSTGRES_USER: ${DB_USERNAME:?Set DB_USERNAME in .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    volumes:
+      - kemopay-database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-private
+
+networks:
+  app-private:
+    driver: bridge
+  edge:
+    external: true
+    name: pisowifi-license_license-net
+
+volumes:
+  kemopay-database:
+  kemopay-storage:

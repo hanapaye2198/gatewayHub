@@ -23,8 +23,8 @@
                         </span>
                     </div>
                     <p class="mt-1 text-base text-zinc-300">Centralized payment gateway management with real-time controls</p>
-                    <p class="mt-2 text-sm text-zinc-400">Current model: customer-facing options (GCash, Maya, PayPal, QRPH) are collected through Coins dynamic QR.</p>
-                    <p class="mt-1 text-sm text-zinc-400">Only Coins.ph has platform payment credentials. All customer-facing payment options share that single Coins.ph payment configuration.</p>
+                    <p class="mt-2 text-sm text-zinc-400">KemoPay offers QR Ph, GCash, Maya, GrabPay, and ShopeePay through one PayMongo account.</p>
+                    <p class="mt-1 text-sm text-zinc-400">Configure shared PayMongo credentials on the PayMongo provider row.</p>
                 </div>
             </div>
 
@@ -130,7 +130,7 @@
             <form wire:submit.prevent="updateGatewayConfig">
                 <div class="max-h-[60vh] overflow-y-auto px-6 py-4">
                     <div class="space-y-4">
-                        @foreach (($credentialFields[optional($editingGateway)->code ?? 'coins'] ?? []) as $field)
+                        @foreach (($credentialFields[optional($editingGateway)->code ?? 'paymongo'] ?? []) as $field)
                             <div>
                                 <label class="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                                     {{ $field['label'] }}
@@ -193,11 +193,12 @@
                         <select wire:model.live="gatewayTypeFilter"
                                 class="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900">
                             <option value="all">All Types</option>
-                            <option value="coins">Coins.ph</option>
                             <option value="gcash">GCash</option>
                             <option value="maya">Maya</option>
-                            <option value="paypal">PayPal</option>
-                            <option value="qrph">QRPH</option>
+                            <option value="grab_pay">GrabPay</option>
+                            <option value="shopeepay">ShopeePay</option>
+                            <option value="paymongo">PayMongo provider</option>
+                            <option value="qrph">QR Ph</option>
                         </select>
                     </div>
                 </div>
@@ -278,7 +279,7 @@
                                     </td>
                                     <td class="px-6 py-4 text-right">
                                         <div class="flex items-center justify-end gap-2">
-                                            @if ($gateway->code === 'coins')
+                                            @if (! empty($credentialFields[$gateway->code] ?? []))
                                                 <button wire:click="editConfig({{ $gateway->id }})"
                                                         class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-300">
                                                     <span>config</span>
@@ -289,7 +290,7 @@
                                                 </button>
                                             @else
                                                 <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
-                                                    Uses Coins config
+                                                    {{ $gateway->driver_class === \App\Services\Gateways\Drivers\PayMongoDriver::class ? 'Uses shared PayMongo config' : 'Credentials managed separately' }}
                                                 </span>
                                             @endif
                                         </div>
@@ -306,16 +307,16 @@
                             <span class="text-sm text-zinc-600 dark:text-zinc-400">
                                 {{ count($selectedGateways) }} gateway(s) selected
                             </span>
-                            <select wire:model="bulkAction"
+                            <select wire:model.live="selectedBulkAction"
                                     class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900">
-                                <option value="">Bulk Actions</option>
+                                <option value="">Choose an action</option>
                                 <option value="enable_global">Enable Globally</option>
                                 <option value="disable_global">Disable Globally</option>
                                 <option value="enable_for_merchants">Enable for Merchants</option>
                                 <option value="disable_for_merchants">Disable for Merchants</option>
                             </select>
 
-                            @if(in_array($bulkAction, ['enable_for_merchants', 'disable_for_merchants']))
+                            @if(in_array($selectedBulkAction, ['enable_for_merchants', 'disable_for_merchants']))
                                 <select wire:model="selectedMerchants" multiple
                                         class="min-w-[200px] rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900">
                                     @foreach($merchants as $merchant)
@@ -324,7 +325,10 @@
                                 </select>
                             @endif
 
-                            <button wire:click="bulkAction"
+                            <button type="button"
+                                    wire:click="applyBulkAction"
+                                    wire:loading.attr="disabled"
+                                    wire:target="applyBulkAction"
                                     class="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">
                                 Apply
                             </button>
@@ -363,7 +367,7 @@
                         <thead class="bg-zinc-50 dark:bg-zinc-900/50">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Merchant</th>
-                                @foreach($gateways->where('is_global_enabled', true) as $g)
+                                @foreach($merchantAccessGateways->where('is_global_enabled', true) as $g)
                                     <th class="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-zinc-500">
                                         <div class="flex flex-col items-center">
                                             <span>{{ $g->name }}</span>
@@ -388,7 +392,7 @@
                                             </div>
                                         </div>
                                     </td>
-                                    @foreach($gateways->where('is_global_enabled', true) as $gateway)
+                                    @foreach($merchantAccessGateways->where('is_global_enabled', true) as $gateway)
                                         @php
                                             $isEnabled = $gateway->merchantGateways
                                                 ->where('merchant_id', $merchant->id)

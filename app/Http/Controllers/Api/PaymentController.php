@@ -58,6 +58,8 @@ class PaymentController extends Controller
                 $status = match (true) {
                     str_contains($msg, 'not found') => 404,
                     str_contains($msg, 'missing required') => 422,
+                    str_contains($msg, 'not enabled for KemoPay') => 422,
+                    str_contains($msg, 'could not verify this PayMongo') => 503,
                     default => 403,
                 };
 
@@ -70,7 +72,9 @@ class PaymentController extends Controller
                 'payment_id' => $payment->id,
                 'transaction_id' => $payment->id,
                 'gateway' => $payment->gateway_code,
-                'amount' => (float) $payment->amount,
+                'amount' => $payment->product_amount !== null
+                    ? (float) $payment->product_amount
+                    : (float) $payment->amount,
                 'currency' => $payment->currency,
                 'status' => $payment->status,
                 'qr_data' => $result['qr_data'],

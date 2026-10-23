@@ -129,7 +129,7 @@ class CoinsDriverCreatePaymentTest extends TestCase
             'api.9001.pl-qa.coinsxyz.me/*' => function (\Illuminate\Http\Client\Request $request) {
                 $body = json_decode($request->body(), true);
                 $this->assertIsArray($body);
-                $this->assertSame('GatewayHub Merchant', $body['qrCodeMerchantName'] ?? null);
+                $this->assertSame('KemoPay Merchant', $body['qrCodeMerchantName'] ?? null);
 
                 return Http::response([
                     'status' => 0,
