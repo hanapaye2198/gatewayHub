@@ -59,6 +59,24 @@ class PayMongoMethodCapabilityServiceTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_it_reads_a_top_level_capability_list_and_shopee_pay_identifier(): void
+    {
+        Http::fake([
+            'https://api.paymongo.com/v1/merchants/capabilities/payment_methods' => Http::response([
+                'qrph',
+                'gcash',
+                'paymaya',
+                'grab_pay',
+                'shopee_pay',
+            ]),
+        ]);
+
+        $service = app(PayMongoMethodCapabilityService::class);
+
+        $this->assertSame(['qrph', 'gcash', 'maya', 'grab_pay', 'shopeepay'], $service->availableGatewayCodes());
+        $this->assertSame('available', $service->statusForGateway('shopeepay'));
+    }
+
     public function test_it_reports_unverified_when_the_capability_request_fails(): void
     {
         Http::fake([

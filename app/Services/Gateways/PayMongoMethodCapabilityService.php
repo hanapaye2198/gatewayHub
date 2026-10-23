@@ -24,7 +24,7 @@ class PayMongoMethodCapabilityService
         'gcash' => ['gcash'],
         'maya' => ['paymaya', 'maya'],
         'grab_pay' => ['grab_pay'],
-        'shopeepay' => ['shopeepay'],
+        'shopeepay' => ['shopeepay', 'shopee_pay'],
     ];
 
     public function __construct(
@@ -190,6 +190,10 @@ class PayMongoMethodCapabilityService
         $data = $body['data'] ?? null;
         if (is_array($data) && array_is_list($data)) {
             return $this->normalizePaymentMethodTypes($data);
+        }
+
+        if (array_is_list($body)) {
+            return $this->normalizePaymentMethodTypes($body);
         }
 
         return null;
