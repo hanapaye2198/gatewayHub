@@ -65,7 +65,7 @@
                     {{ __('Continue with your KemoFi account') }}
                 </flux:button>
                 <p class="kp-auth-security-note">
-                    {{ __('Your first KemoFi sign-in creates or links your KemoPay merchant account.') }}
+                    {{ __('Your KemoFi password stays with KemoFi. Your first sign-in creates or links your KemoPay merchant account.') }}
                 </p>
             </div>
         </section>

@@ -128,10 +128,18 @@ new class extends Component {
         return $payment instanceof Payment ? $payment : null;
     }
 
-    public function selectPayment(string $id): void
+    public function selectPayment(string $id, PaymentStatusSyncService $paymentStatusSyncService): void
     {
         $this->selectedPaymentId = $id;
         $this->showPaymentDetail = true;
+
+        $payment = $this->selectedPayment;
+        if (! $payment instanceof Payment || $payment->getQrData() !== null) {
+            return;
+        }
+
+        $paymentStatusSyncService->syncPendingPayment($payment);
+        unset($this->selectedPayment);
     }
 
     public function closeDetail(): void
@@ -467,9 +475,11 @@ new class extends Component {
                     <tr>
                         <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Reference</th>
                         <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Gateway</th>
+                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Product Value</th>
+                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">KemoPay Fee</th>
+                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Convenience Fee</th>
                         <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Customer Paid</th>
-                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">KemoPay Fee (Payer)</th>
-                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Merchant Net</th>
+                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Merchant Receives</th>
                         <th class="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Status</th>
                         <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Created</th>
                         <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Actions</th>
@@ -490,13 +500,23 @@ new class extends Component {
                                 </span>
                             </td>
                             <td class="whitespace-nowrap px-5 py-4 text-right font-mono text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                {{ number_format($payment->amount, 2) }} {{ $payment->currency }}
+                                {{ number_format((float) ($payment->product_amount ?? $payment->amount), 2) }} {{ $payment->currency }}
                             </td>
                             <td class="whitespace-nowrap px-5 py-4 text-right font-mono text-sm text-zinc-500 dark:text-zinc-400">
-                                {{ $payment->platformFee ? number_format($payment->platformFee->fee_amount, 2) . ' ' . $payment->currency : '—' }}
+                                {{ number_format((float) ($payment->platform_fee ?? $payment->platformFee?->fee_amount ?? $payment->payer_fee_amount ?? 0), 2) }} {{ $payment->currency }}
+                            </td>
+                            <td class="whitespace-nowrap px-5 py-4 text-right font-mono text-sm text-zinc-500 dark:text-zinc-400">
+                                @if ($payment->usesAdditivePricing())
+                                    {{ number_format((float) $payment->convenience_fee, 2) }} {{ $payment->currency }}
+                                @else
+                                    —
+                                @endif
                             </td>
                             <td class="whitespace-nowrap px-5 py-4 text-right font-mono text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                                {{ $payment->platformFee ? number_format($payment->platformFee->net_amount, 2) . ' ' . $payment->currency : '—' }}
+                                {{ number_format((float) ($payment->customer_total ?? $payment->amount), 2) }} {{ $payment->currency }}
+                            </td>
+                            <td class="whitespace-nowrap px-5 py-4 text-right font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                                {{ number_format((float) ($payment->net_amount ?? $payment->product_amount ?? $payment->platformFee?->net_amount ?? $payment->amount), 2) }} {{ $payment->currency }}
                             </td>
                             <td class="whitespace-nowrap px-5 py-4 text-center">
                                 @php $rowDisplayStatus = $this->displayStatus($payment); @endphp
@@ -518,7 +538,7 @@ new class extends Component {
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-5 py-12 text-center">
+                            <td colspan="10" class="px-5 py-12 text-center">
                                 <div class="flex flex-col items-center gap-3">
                                     <div class="flex size-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-700/50">
                                         <flux:icon name="document-text" class="size-8 text-zinc-400" />
@@ -552,7 +572,7 @@ new class extends Component {
                             {{ $this->selectedPayment->reference_id }}
                         </flux:heading>
                         <flux:subheading class="mt-1 text-zinc-600 dark:text-zinc-400">
-                            {{ number_format($this->selectedPayment->amount, 2) }} {{ $this->selectedPayment->currency }}
+                            {{ number_format($this->selectedPayment->usesAdditivePricing() ? (float) $this->selectedPayment->customer_total : $this->selectedPayment->amountIncludingPlatformFee(), 2) }} {{ $this->selectedPayment->currency }}
                             • {{ $this->selectedPayment->gateway?->name ?? ucfirst($this->selectedPayment->gateway_code) }}
                         </flux:subheading>
                     </div>
@@ -560,25 +580,7 @@ new class extends Component {
                     <x-status-badge :status="$modalDisplayStatus->value" :label="$modalDisplayStatus->label()" class="px-3 py-1" />
                 </div>
 
-                @if ($this->selectedPayment->status === 'paid' && $this->selectedPayment->platform_fee !== null)
-                    <div class="rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900/40">
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-zinc-600 dark:text-zinc-400">{{ $this->selectedPayment->product_amount !== null ? __('Customer Paid') : __('Gross Amount') }}</span>
-                            <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ number_format($this->selectedPayment->amount, 2) }} {{ $this->selectedPayment->currency }}</span>
-                        </div>
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-zinc-600 dark:text-zinc-400">{{ $this->selectedPayment->product_amount !== null ? __('KemoPay Fee (paid by customer)') : __('KemoPay Platform Fee') }}</span>
-                            <span class="font-medium text-rose-600 dark:text-rose-400">{{ $this->selectedPayment->product_amount !== null ? number_format($this->selectedPayment->platform_fee, 2) : '-' . number_format($this->selectedPayment->platform_fee, 2) }} {{ $this->selectedPayment->currency }}</span>
-                        </div>
-                        <div class="mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-700">
-                            <div class="flex items-center justify-between text-sm font-semibold">
-                                <span class="text-zinc-900 dark:text-zinc-100">{{ $this->selectedPayment->product_amount !== null ? __('Merchant Net') : __('Net After KemoPay Fee') }}</span>
-                                <span class="text-emerald-600 dark:text-emerald-400">{{ number_format($this->selectedPayment->net_amount, 2) }} {{ $this->selectedPayment->currency }}</span>
-                            </div>
-                        </div>
-                        <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">{{ __('KemoPay adds the configured fee to the customer total, leaving the merchant with the full product value. Provider processing or conversion fees are separate.') }}</p>
-                    </div>
-                @endif
+                @include('partials.payment-amount-breakdown', ['payment' => $this->selectedPayment])
 
                 <div class="min-h-[220px] flex flex-col items-center justify-center rounded-xl bg-zinc-50 p-6 dark:bg-zinc-900/40">
                     @if ($this->selectedPayment->status === 'pending')

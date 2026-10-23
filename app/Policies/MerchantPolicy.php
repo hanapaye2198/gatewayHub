@@ -50,4 +50,12 @@ class MerchantPolicy
         return $user->merchant_id !== null
             && (int) $user->merchant_id === (int) $merchant->id;
     }
+
+    /**
+     * Only the Super Admin can permanently delete a merchant and its data.
+     */
+    public function delete(User $user, Merchant $merchant): bool
+    {
+        return $user->isSuperAdmin();
+    }
 }

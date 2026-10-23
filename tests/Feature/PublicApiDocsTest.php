@@ -44,7 +44,7 @@ class PublicApiDocsTest extends TestCase
         $response->assertSee('Security Notes', false);
         $response->assertSee('/api/payments', false);
         $response->assertSee('/api/gateways/enabled', false);
-        $response->assertSee('provider_availability.paymongo.status', false);
+        $response->assertSee('provider_availability.paymongo.methods', false);
         $response->assertSee('payment_method_not_allowed', false);
         $response->assertSee('HTTP 422', false);
         $response->assertSee('HTTP 503', false);
@@ -52,7 +52,7 @@ class PublicApiDocsTest extends TestCase
         $response->assertSee('/api/wallets/transactions', false);
         $response->assertSee('/api/wallets/payout-institutions', false);
         $response->assertSee('/api/wallets/payouts', false);
-        $response->assertSee("customer's total includes the KemoPay platform fee", false);
+        $response->assertSee("The customer's total includes the KemoPay platform fee", false);
         $response->assertSee('PayMongo powers QR Ph, GCash, Maya, GrabPay, and ShopeePay', false);
         $response->assertSee('provider-only', false);
         $response->assertSee('submission_unknown', false);

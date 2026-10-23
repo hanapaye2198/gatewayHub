@@ -74,6 +74,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'must_change_password' => 'boolean',
             'onboarding_gateways_at' => 'datetime',
             'onboarding_completed_at' => 'datetime',
         ];

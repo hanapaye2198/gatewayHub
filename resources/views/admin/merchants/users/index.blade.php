@@ -51,6 +51,11 @@
                                         <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium {{ $user->is_active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' : 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400' }}">
                                             {{ $user->is_active ? __('Active') : __('Disabled') }}
                                         </span>
+                                        @if ($user->must_change_password)
+                                            <span class="ms-1 inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
+                                                {{ __('Password change required') }}
+                                            </span>
+                                        @endif
                                     </td>
                                     <td class="px-6 py-4 text-zinc-600 dark:text-zinc-300">{{ $user->created_at?->format('M d, Y') }}</td>
                                     <td class="px-6 py-4">
@@ -58,6 +63,13 @@
                                             <flux:button variant="ghost" size="sm" :href="route('admin.merchants.users.edit', [$merchant, $user])" wire:navigate>
                                                 {{ __('Edit') }}
                                             </flux:button>
+                                            @if (auth()->user()->isSuperAdmin())
+                                                <form action="{{ route('admin.merchants.users.reset-password', [$merchant, $user]) }}" method="POST" onsubmit="return confirm(@js(__('Reset the password of :email to the default password?', ['email' => $user->email])))">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <flux:button type="submit" variant="filled" size="sm" icon="key">{{ __('Reset Password') }}</flux:button>
+                                                </form>
+                                            @endif
                                             <form action="{{ route('admin.merchants.users.toggle', [$merchant, $user]) }}" method="POST">
                                                 @csrf
                                                 @method('PATCH')

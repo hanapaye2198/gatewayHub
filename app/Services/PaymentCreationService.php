@@ -47,17 +47,12 @@ class PaymentCreationService
     {
         $driver = $this->gatewayManager->resolve($merchant, $gatewayCode);
         $gatewayRequestReference = $this->buildGatewayRequestReference($merchant);
-        $productAmount = round((float) $data['amount'], 2);
-        $payerChargedTotals = $this->platformFeeService->calculatePayerChargedTotals($productAmount);
-        $chargedAmount = $payerChargedTotals['gross_amount'];
+        $quote = $this->quoteFor($merchant, $gatewayCode, $data);
 
         $payment = DB::transaction(fn (): Payment => Payment::query()->create([
             'merchant_id' => $merchant->id,
             'gateway_code' => $gatewayCode,
-            'amount' => $chargedAmount,
-            'product_amount' => $productAmount,
-            'payer_fee_amount' => $payerChargedTotals['fee_amount'],
-            'platform_fee_rate' => $payerChargedTotals['fee_rate'],
+            ...$quote['attributes'],
             'currency' => $data['currency'],
             'reference_id' => $data['reference'],
             'provider_reference' => null,
@@ -71,7 +66,7 @@ class PaymentCreationService
 
         try {
             $response = $driver->createPayment([
-                'amount' => $chargedAmount,
+                'amount' => $quote['customer_total'],
                 'currency' => $data['currency'],
                 'reference' => $gatewayRequestReference,
                 'payment_id' => $payment->id,
@@ -94,6 +89,7 @@ class PaymentCreationService
             'gateway_request_reference' => $gatewayRequestReference,
             'merchant_reference' => $data['reference'],
         ]);
+        $rawToStore = $this->withSavedQrPayload($rawToStore, $response);
 
         DB::transaction(function () use ($payment, $externalPaymentId, $rawToStore): void {
             $payment->update([
@@ -150,6 +146,66 @@ class PaymentCreationService
 
     private function buildGatewayRequestReference(Merchant $merchant): string
     {
-        return sprintf('GH-%d-%s', $merchant->id, Str::upper((string) Str::ulid()));
+        return sprintf('KP-%d-%s', $merchant->id, Str::upper((string) Str::ulid()));
+    }
+
+    /**
+     * Keep the scannable payload beside the provider body so a later status merge cannot drop it.
+     *
+     * @param  array<string, mixed>  $rawToStore
+     * @param  array<string, mixed>  $response
+     * @return array<string, mixed>
+     */
+    private function withSavedQrPayload(array $rawToStore, array $response): array
+    {
+        $qr = Payment::extractQrData($response) ?? Payment::extractQrData($rawToStore);
+        if ($qr === null) {
+            return $rawToStore;
+        }
+
+        if ($qr['type'] === 'image') {
+            $rawToStore['qr_image'] = $qr['value'];
+
+            return $rawToStore;
+        }
+
+        $rawToStore['qr_string'] = $qr['value'];
+
+        return $rawToStore;
+    }
+
+    /**
+     * Snapshot fees from the base amount. The gateway is charged customer_total.
+     *
+     * @param  array{amount: float|int|string}  $data
+     * @return array{
+     *     customer_total: string,
+     *     attributes: array{
+     *         amount: float,
+     *         platform_fee: float,
+     *         platform_fee_rate: float,
+     *         convenience_fee: float,
+     *         customer_total: float,
+     *         net_amount: float
+     *     }
+     * }
+     */
+    private function quoteFor(Merchant $merchant, string $gatewayCode, array $data): array
+    {
+        $quote = $this->platformFeeService->quote((float) $data['amount'], (int) $merchant->id, $gatewayCode);
+
+        return [
+            'customer_total' => number_format($quote['customer_total'], 2, '.', ''),
+            'attributes' => [
+                'amount' => $quote['base_amount'],
+                'product_amount' => $quote['base_amount'],
+                'payer_fee_amount' => round($quote['customer_total'] - $quote['base_amount'], 2),
+                'platform_fee' => $quote['platform_fee'],
+                'platform_fee_rate' => $quote['platform_fee_rate'],
+                'convenience_fee' => $quote['convenience_fee'],
+                'customer_total' => $quote['customer_total'],
+                'net_amount' => $quote['merchant_settlement'],
+            ],
+        ];
     }
 }

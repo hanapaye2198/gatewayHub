@@ -22,6 +22,8 @@ class PlatformAuditLog extends Model
 
     public const ACTION_MERCHANT_SUSPENDED = 'merchant.suspended';
 
+    public const ACTION_MERCHANT_DELETED = 'merchant.deleted';
+
     public const ACTION_MERCHANT_USER_CREATED = 'merchant_user.created';
 
     public const ACTION_MERCHANT_USER_UPDATED = 'merchant_user.updated';
@@ -29,6 +31,8 @@ class PlatformAuditLog extends Model
     public const ACTION_MERCHANT_USER_ENABLED = 'merchant_user.enabled';
 
     public const ACTION_MERCHANT_USER_DISABLED = 'merchant_user.disabled';
+
+    public const ACTION_MERCHANT_USER_PASSWORD_RESET = 'merchant_user.password_reset';
 
     public const ACTION_MERCHANT_CONTEXT_ENTERED = 'merchant.context_entered';
 
@@ -44,6 +48,10 @@ class PlatformAuditLog extends Model
 
     public const ACTION_PLATFORM_FEE_UPDATED = 'platform_fee.updated';
 
+    public const ACTION_MERCHANT_PLATFORM_FEE_UPDATED = 'merchant_platform_fee.updated';
+
+    public const ACTION_MERCHANT_CONVENIENCE_FEE_UPDATED = 'merchant_convenience_fee.updated';
+
     /**
      * @var list<string>
      */
@@ -52,10 +60,12 @@ class PlatformAuditLog extends Model
         self::ACTION_MERCHANT_UPDATED,
         self::ACTION_MERCHANT_ACTIVATED,
         self::ACTION_MERCHANT_SUSPENDED,
+        self::ACTION_MERCHANT_DELETED,
         self::ACTION_MERCHANT_USER_CREATED,
         self::ACTION_MERCHANT_USER_UPDATED,
         self::ACTION_MERCHANT_USER_ENABLED,
         self::ACTION_MERCHANT_USER_DISABLED,
+        self::ACTION_MERCHANT_USER_PASSWORD_RESET,
         self::ACTION_MERCHANT_CONTEXT_ENTERED,
         self::ACTION_MERCHANT_CONTEXT_EXITED,
         self::ACTION_ADMIN_CREATED,
@@ -63,6 +73,8 @@ class PlatformAuditLog extends Model
         self::ACTION_ADMIN_ENABLED,
         self::ACTION_ADMIN_DISABLED,
         self::ACTION_PLATFORM_FEE_UPDATED,
+        self::ACTION_MERCHANT_PLATFORM_FEE_UPDATED,
+        self::ACTION_MERCHANT_CONVENIENCE_FEE_UPDATED,
     ];
 
     /**

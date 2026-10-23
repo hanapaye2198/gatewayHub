@@ -16,12 +16,25 @@ class QrCodeGenerator
 
         try {
             $qrCode = \Endroid\QrCode\QrCode::create($payload)->setSize($size);
-            $writer = new \Endroid\QrCode\Writer\PngWriter;
-            $result = $writer->write($qrCode);
+            $writers = [];
+            if (class_exists(\Endroid\QrCode\Writer\SvgWriter::class)) {
+                $writers[] = new \Endroid\QrCode\Writer\SvgWriter;
+            }
+            if (class_exists(\Endroid\QrCode\Writer\PngWriter::class)) {
+                $writers[] = new \Endroid\QrCode\Writer\PngWriter;
+            }
 
-            return $result->getDataUri();
+            foreach ($writers as $writer) {
+                try {
+                    return $writer->write($qrCode)->getDataUri();
+                } catch (\Throwable) {
+                    continue;
+                }
+            }
         } catch (\Throwable) {
             return null;
         }
+
+        return null;
     }
 }

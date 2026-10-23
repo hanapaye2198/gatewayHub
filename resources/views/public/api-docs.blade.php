@@ -222,7 +222,7 @@
 
             <section class="{{ $cardWrap }}">
                 <h2 class="{{ $sectionHeading }}">Create Payment</h2>
-                <p class="{{ $bodyText }}">Creates a PHP payment and returns the data you need to collect funds (QR or redirect URL). The request amount is the product value. KemoPay adds its configured platform fee to the amount charged to the customer, so the merchant receives the full requested product value after the KemoPay fee is allocated. PayMongo methods currently accept amounts from PHP 1.00; GCash, Maya, GrabPay, and ShopeePay are capped at PHP 100,000, while QR Ph is capped at PHP 9,999,999.99.</p>
+                <p class="{{ $bodyText }}">Creates a PHP payment and returns the data you need to collect funds (QR or redirect URL). The request amount is the product value. KemoPay adds the configured platform fee and convenience fee to the customer total, so the merchant receives the full requested product value. PayMongo methods currently accept amounts from PHP 1.00; GCash, Maya, GrabPay, and ShopeePay are capped at PHP 100,000, while QR Ph is capped at PHP 9,999,999.99.</p>
 
                 <h3 class="{{ $subHeading }}">Sample Request</h3>
                 <pre class="{{ $codeCard }}"><span style="color:#34d399">POST</span> <span style="color:#f4f4f5">/api/payments HTTP/1.1</span>
@@ -260,9 +260,12 @@
   <span style="color:#67e8f9">"amount"</span>: <span style="color:#c4b5fd">500</span>,
   <span style="color:#67e8f9">"product_amount"</span>: <span style="color:#c4b5fd">500</span>,
   <span style="color:#67e8f9">"currency"</span>: <span style="color:#fcd34d">"PHP"</span>,
-  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">507.5</span>,
+  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">527.5</span>,
   <span style="color:#67e8f9">"gatewayhub_platform_fee_percent"</span>: <span style="color:#c4b5fd">1.5</span>,
   <span style="color:#67e8f9">"gatewayhub_platform_fee"</span>: <span style="color:#c4b5fd">7.5</span>,
+  <span style="color:#67e8f9">"payer_fee_amount"</span>: <span style="color:#c4b5fd">27.5</span>,
+  <span style="color:#67e8f9">"convenience_fee"</span>: <span style="color:#c4b5fd">20</span>,
+  <span style="color:#67e8f9">"customer_total"</span>: <span style="color:#c4b5fd">527.5</span>,
   <span style="color:#67e8f9">"gatewayhub_net_amount"</span>: <span style="color:#c4b5fd">500</span>,
   <span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"pending"</span>,
   <span style="color:#67e8f9">"qr_data"</span>: <span style="color:#fcd34d">"000201..."</span>,
@@ -318,7 +321,7 @@
                     </div>
                     <div>
                         <dt class="{{ $fieldKey }}">gross_amount</dt>
-                        <dd class="mt-0.5">The total charged to the customer: product_amount plus the KemoPay platform fee.</dd>
+                        <dd class="mt-0.5">The full customer charge: product value plus the KemoPay platform fee and convenience fee.</dd>
                     </div>
                     <div>
                         <dt class="{{ $fieldKey }}">product_amount</dt>
@@ -326,15 +329,39 @@
                     </div>
                     <div>
                         <dt class="{{ $fieldKey }}">gatewayhub_platform_fee_percent</dt>
-                        <dd class="mt-0.5">The configured KemoPay platform fee rate. The example value is illustrative and may change with platform settings.</dd>
+                        <dd class="mt-0.5">KemoPay platform fee percentage snapshotted for this payment. It is calculated from the product value, not from the customer total.</dd>
                     </div>
                     <div>
                         <dt class="{{ $fieldKey }}">gatewayhub_platform_fee</dt>
-                        <dd class="mt-0.5">The KemoPay fee added to the customer total, rounded to two decimals. The quoted fee is returned on creation. Provider fees are not included.</dd>
+                        <dd class="mt-0.5">KemoPay platform fee added on top of the product value. Older payments may still show the fee that was deducted when they were paid.</dd>
+                    </div>
+                    <div>
+                        <dt class="{{ $fieldKey }}">base_amount</dt>
+                        <dd class="mt-0.5">Product value. Same value as amount and product_amount.</dd>
+                    </div>
+                    <div>
+                        <dt class="{{ $fieldKey }}">platform_fee_rate</dt>
+                        <dd class="mt-0.5">Snapshotted platform fee percentage points, such as 3.00 for 3%.</dd>
+                    </div>
+                    <div>
+                        <dt class="{{ $fieldKey }}">platform_fee</dt>
+                        <dd class="mt-0.5">Same amount as gatewayhub_platform_fee; the field name is retained for API compatibility.</dd>
+                    </div>
+                    <div>
+                        <dt class="{{ $fieldKey }}">payer_fee_amount</dt>
+                        <dd class="mt-0.5">Total amount added to the product value for the payer, including the platform fee and convenience fee.</dd>
+                    </div>
+                    <div>
+                        <dt class="{{ $fieldKey }}">convenience_fee</dt>
+                        <dd class="mt-0.5">Fixed convenience fee added on top of the base amount. Null on payments created before this fee.</dd>
+                    </div>
+                    <div>
+                        <dt class="{{ $fieldKey }}">customer_total</dt>
+                        <dd class="mt-0.5">Amount sent to PayMongo: product value plus platform fee plus convenience fee.</dd>
                     </div>
                     <div>
                         <dt class="{{ $fieldKey }}">gatewayhub_net_amount</dt>
-                        <dd class="mt-0.5">The merchant's expected net after the KemoPay fee. For a successful payment, it equals product_amount.</dd>
+                        <dd class="mt-0.5">Merchant settlement amount. For current payments this is the full product value because payer fees are added on top. Older payments keep their original net after the platform fee was deducted.</dd>
                     </div>
                 </dl>
                 <p class="mt-3 text-xs text-zinc-500 dark:text-zinc-400">The fee fields retain their existing JSON names for API compatibility. They represent KemoPay platform fees.</p>
@@ -361,9 +388,12 @@
 <span style="color:#67e8f9">"data"</span>: {
   <span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"success"</span>,
   <span style="color:#67e8f9">"product_amount"</span>: <span style="color:#c4b5fd">500</span>,
-  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">507.5</span>,
+  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">527.5</span>,
   <span style="color:#67e8f9">"gatewayhub_platform_fee_percent"</span>: <span style="color:#c4b5fd">1.5</span>,
   <span style="color:#67e8f9">"gatewayhub_platform_fee"</span>: <span style="color:#c4b5fd">7.5</span>,
+  <span style="color:#67e8f9">"payer_fee_amount"</span>: <span style="color:#c4b5fd">27.5</span>,
+  <span style="color:#67e8f9">"convenience_fee"</span>: <span style="color:#c4b5fd">20</span>,
+  <span style="color:#67e8f9">"customer_total"</span>: <span style="color:#c4b5fd">527.5</span>,
   <span style="color:#67e8f9">"gatewayhub_net_amount"</span>: <span style="color:#c4b5fd">500</span>
 },
 <span style="color:#67e8f9">"error"</span>: <span style="color:#fda4af">null</span>
@@ -417,7 +447,7 @@
       <span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"paid"</span>,
       <span style="color:#67e8f9">"currency"</span>: <span style="color:#fcd34d">"PHP"</span>,
       <span style="color:#67e8f9">"product_amount"</span>: <span style="color:#c4b5fd">500</span>,
-      <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">507.5</span>,
+      <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">527.5</span>,
       <span style="color:#67e8f9">"platform_fee"</span>: <span style="color:#c4b5fd">7.50</span>,
       <span style="color:#67e8f9">"net_amount"</span>: <span style="color:#c4b5fd">500.00</span>,
       <span style="color:#67e8f9">"wallet_status"</span>: <span style="color:#fcd34d">"available"</span>,
@@ -533,9 +563,12 @@
   <span style="color:#67e8f9">"gateway"</span>: <span style="color:#fcd34d">"gcash"</span>,
   <span style="color:#67e8f9">"reference"</span>: <span style="color:#fcd34d">"ORDER-20260228-0001"</span>,
   <span style="color:#67e8f9">"product_amount"</span>: <span style="color:#c4b5fd">500</span>,
-  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">507.5</span>,
+  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">527.5</span>,
   <span style="color:#67e8f9">"gatewayhub_platform_fee_percent"</span>: <span style="color:#c4b5fd">1.5</span>,
   <span style="color:#67e8f9">"gatewayhub_platform_fee"</span>: <span style="color:#c4b5fd">7.5</span>,
+  <span style="color:#67e8f9">"payer_fee_amount"</span>: <span style="color:#c4b5fd">27.5</span>,
+  <span style="color:#67e8f9">"convenience_fee"</span>: <span style="color:#c4b5fd">20</span>,
+  <span style="color:#67e8f9">"customer_total"</span>: <span style="color:#c4b5fd">527.5</span>,
   <span style="color:#67e8f9">"gatewayhub_net_amount"</span>: <span style="color:#c4b5fd">500</span>,
   <span style="color:#67e8f9">"provider_reference"</span>: <span style="color:#fcd34d">"provider-ref-optional"</span>,
   <span style="color:#67e8f9">"paid_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:01:42+08:00"</span>,

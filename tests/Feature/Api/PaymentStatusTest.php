@@ -134,7 +134,8 @@ class PaymentStatusTest extends TestCase
 
         $data = $response->json('data');
         $this->assertIsArray($data);
-        $this->assertArrayNotHasKey('platform_fee', $data);
+        $this->assertSame(42.79, $data['platform_fee']);
+        $this->assertNull($data['convenience_fee']);
         $this->assertArrayNotHasKey('conv_fee', $data);
     }
 

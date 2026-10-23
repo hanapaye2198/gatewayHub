@@ -8,10 +8,10 @@
                 {{ __('Current Rate: :rate%', ['rate' => $percentage]) }}
             </p>
             <p class="mt-3 max-w-2xl text-sm text-zinc-600 dark:text-zinc-300">
-                {{ __('This percentage is calculated from the product value, then added to the customer total.') }}
+                {{ __('This percentage is calculated from the product value and added to the customer total.') }}
             </p>
             <p class="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-300">
-                {{ __('KemoPay adds this fee to the customer total. After the KemoPay fee is allocated, the merchant receives the full product value. PayMongo processing fees are separate.') }}
+                {{ __('KemoPay also adds the convenience fee of :fee. The merchant receives the full product value; PayMongo processing fees are separate.', ['fee' => $convenienceFee]) }}
             </p>
         </div>
 
@@ -40,7 +40,7 @@
                         required
                         autofocus
                     />
-                    <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Percent of the product value. Example: 1.50') }}</p>
+                    <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Percent of the product value. Example: 1.50 for 1.50%.') }}</p>
                     <flux:error name="percentage" />
                 </flux:field>
 

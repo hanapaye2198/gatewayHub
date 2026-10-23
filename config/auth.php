@@ -127,4 +127,16 @@ return [
         'password' => env('SUPER_ADMIN_PASSWORD'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Merchant user default password
+    |--------------------------------------------------------------------------
+    |
+    | Password assigned when a super admin resets a merchant user's password.
+    | The merchant user must change it right after signing in.
+    |
+    */
+
+    'merchant_default_password' => env('MERCHANT_DEFAULT_PASSWORD', 'ChangeMe@123'),
+
 ];

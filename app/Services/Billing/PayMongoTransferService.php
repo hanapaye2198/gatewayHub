@@ -154,7 +154,7 @@ class PayMongoTransferService
 
     private function secretKey(): string
     {
-        $secretKey = trim((string) ($this->gatewayConfigService->forGatewayCode('qrph')['secret_key'] ?? ''));
+        $secretKey = trim((string) ($this->gatewayConfigService->forGatewayCode('paymongo')['secret_key'] ?? ''));
         if (! preg_match('/^sk_(test|live)_.+$/', $secretKey)) {
             throw new PayMongoTransferException('PayMongo secret API key is not configured for wallet payouts.');
         }

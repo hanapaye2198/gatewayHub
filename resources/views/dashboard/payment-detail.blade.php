@@ -77,35 +77,9 @@
                             <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Gateway') }}</flux:text>
                             <flux:text class="mt-1 block">{{ $payment->gateway?->name ?? ucfirst($payment->gateway_code) }}</flux:text>
                         </div>
-                        @if ($payment->product_amount !== null)
-                            <div>
-                                <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Customer Pays') }}</flux:text>
-                                <flux:text class="mt-1 block">{{ number_format($payment->amount, 2) }} {{ $payment->currency }}</flux:text>
-                            </div>
-                            <div>
-                                <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('KemoPay Fee (paid by customer)') }}</flux:text>
-                                <flux:text class="mt-1 block">{{ number_format($payment->payer_fee_amount, 2) }} {{ $payment->currency }}</flux:text>
-                            </div>
-                            <div>
-                                <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Merchant Receives') }}</flux:text>
-                                <flux:text class="mt-1 block">{{ number_format($payment->product_amount, 2) }} {{ $payment->currency }}</flux:text>
-                            </div>
-                        @else
-                            <div>
-                                <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Gross Amount') }}</flux:text>
-                                <flux:text class="mt-1 block">{{ number_format($payment->amount, 2) }} {{ $payment->currency }}</flux:text>
-                            </div>
-                        @endif
-                        @if ($payment->status === 'paid' && $payment->platform_fee !== null && $payment->product_amount === null)
-                            <div>
-                                <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('KemoPay Platform Fee') }}</flux:text>
-                                <flux:text class="mt-1 block">-{{ number_format($payment->platform_fee, 2) }} {{ $payment->currency }}</flux:text>
-                            </div>
-                            <div>
-                                <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Net After KemoPay Fee') }}</flux:text>
-                                <flux:text class="mt-1 block">{{ number_format($payment->net_amount, 2) }} {{ $payment->currency }}</flux:text>
-                            </div>
-                        @endif
+                        <div class="sm:col-span-2">
+                            @include('partials.payment-amount-breakdown', ['payment' => $payment])
+                        </div>
                         <div>
                             <flux:text class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Status') }}</flux:text>
                             <div class="mt-1">

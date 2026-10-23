@@ -22,7 +22,7 @@ class MerchantUsersController extends Controller
         $users = $merchant->users()
             ->where('role', User::ROLE_MERCHANT_USER)
             ->orderBy('name')
-            ->get(['id', 'name', 'email', 'role', 'is_active', 'created_at']);
+            ->get(['id', 'name', 'email', 'role', 'is_active', 'must_change_password', 'created_at']);
 
         return view('admin.merchants.users.index', [
             'title' => $merchant->name.' users',
@@ -101,5 +101,20 @@ class MerchantUsersController extends Controller
         return redirect()
             ->route('admin.merchants.users.index', $merchant)
             ->with('status', $merchantUser->is_active ? 'Merchant user enabled.' : 'Merchant user disabled.');
+    }
+
+    public function resetPassword(Merchant $merchant, int $user): RedirectResponse
+    {
+        $this->authorize('manageUsers', $merchant);
+
+        $merchantUser = $this->merchantUsers->find($merchant, $user);
+        $this->merchantUsers->resetPasswordToDefault($merchant, $merchantUser);
+
+        return redirect()
+            ->route('admin.merchants.users.index', $merchant)
+            ->with('status', __('Password of :email was reset to the default password (:password). They must change it after signing in.', [
+                'email' => $merchantUser->email,
+                'password' => config('auth.merchant_default_password'),
+            ]));
     }
 }

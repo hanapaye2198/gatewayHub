@@ -29,7 +29,7 @@ class PlatformAdministratorTest extends TestCase
             ->get(route('admin.platform-fee.edit'))
             ->assertOk()
             ->assertSee('Current Rate: 1.50%')
-            ->assertSee('deducts this fee from the merchant proceeds');
+            ->assertSee('added on top of it');
 
         $this->actingAs($superAdmin)
             ->get(route('admin.index'))

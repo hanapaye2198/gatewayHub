@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\DestroyMerchantRequest;
 use App\Http\Requests\Admin\StoreMerchantRequest;
 use App\Http\Requests\Admin\UpdateMerchantRequest;
 use App\Models\Merchant;
 use App\Models\MerchantGateway;
 use App\Models\PlatformAuditLog;
+use App\Models\PlatformFeeRule;
+use App\Services\Admin\MerchantDeleter;
 use App\Services\Admin\PlatformAuditService;
+use App\Services\Billing\PlatformFeeService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -69,7 +73,7 @@ class MerchantsController extends Controller
             ->with('status', 'Merchant created.');
     }
 
-    public function show(Merchant $merchant): View
+    public function show(Merchant $merchant, PlatformFeeService $platformFees): View
     {
         $this->authorize('view', $merchant);
 
@@ -81,6 +85,10 @@ class MerchantsController extends Controller
             'enabledGateways' => $this->enabledGateways($merchant),
             'apiKeyConfigured' => $merchant->hasApiKey(),
             'webhookSecretConfigured' => filled($merchant->getRawOriginal('webhook_secret')),
+            'merchantPlatformFeePercentage' => PlatformFeeRule::activeMerchantPercentageRule((int) $merchant->id)?->percentage(),
+            'globalPlatformFeePercentage' => number_format(PlatformFeeRule::configuredPercentage(), 2, '.', ''),
+            'merchantConvenienceFee' => $merchant->convenience_fee_override === null ? null : number_format((float) $merchant->convenience_fee_override, 2, '.', ''),
+            'globalConvenienceFee' => number_format($platformFees->convenienceFeeAmount(), 2, '.', ''),
         ]);
     }
 
@@ -145,6 +153,16 @@ class MerchantsController extends Controller
 
         return redirect()->route('admin.merchants.index')
             ->with('status', $merchant->is_active ? 'Merchant activated.' : 'Merchant suspended.');
+    }
+
+    public function destroy(DestroyMerchantRequest $request, Merchant $merchant, MerchantDeleter $deleter): RedirectResponse
+    {
+        $name = $merchant->name;
+
+        $deleter->delete($merchant);
+
+        return redirect()->route('admin.merchants.index')
+            ->with('status', __('Merchant :name was deleted.', ['name' => $name]));
     }
 
     /**

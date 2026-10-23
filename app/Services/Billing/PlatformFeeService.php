@@ -3,21 +3,26 @@
 namespace App\Services\Billing;
 
 use App\Enums\PlatformFeeStatus;
+use App\Models\Merchant;
 use App\Models\Payment;
 use App\Models\PlatformFee;
 use App\Models\PlatformFeeRule;
+use DateTimeInterface;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Single, safe entry point for platform revenue.
- * Accepts Payment; calculates the KemoPay fee from the configured global rate and creates the platform_fees record.
- * Idempotent; uses transaction and payment row lock. No UI or gateway logic.
+ * Single entry point for platform revenue.
+ * New payments snapshot an additive fee at creation. Paid effects copy that snapshot into the ledger.
+ * Payments created before the additive model still use the original deduction when they are marked paid.
  */
 class PlatformFeeService
 {
+    public function __construct(private FeeRuleResolver $feeRuleResolver) {}
+
     /**
-     * Record platform fee when payment has transitioned to paid. Call after webhook verification and idempotency checks.
-     * Aborts if status != paid or ledger already exists. Uses DB transaction and payment row lock.
+     * Record platform fee when payment has transitioned to paid.
+     * Aborts if status is not paid or a ledger row already exists.
+     * Snapshotted payments are not recalculated.
      */
     public function record(Payment $payment): void
     {
@@ -39,40 +44,80 @@ class PlatformFeeService
                 return;
             }
 
+            if ($locked->customer_total !== null || $locked->platform_fee !== null || $locked->product_amount !== null) {
+                $baseAmount = $locked->product_amount !== null
+                    ? (float) $locked->product_amount
+                    : (float) $locked->amount;
+                $calculated = $this->calculateFromConfig($baseAmount);
+                $feeAmount = $locked->platform_fee !== null
+                    ? (float) $locked->platform_fee
+                    : ($locked->payer_fee_amount !== null
+                        ? (float) $locked->payer_fee_amount
+                        : $calculated['fee_amount']);
+                $feeRate = $locked->platform_fee_rate !== null
+                    ? (float) $locked->platform_fee_rate
+                    : $calculated['fee_rate'];
+                $gross = $locked->customer_total !== null
+                    ? (float) $locked->customer_total
+                    : (float) $locked->amount;
+                $netAmount = $locked->net_amount !== null
+                    ? (float) $locked->net_amount
+                    : ($locked->product_amount !== null ? $baseAmount : $calculated['net_amount']);
+
+                $this->createLedger($locked, $gross, $feeRate, $feeAmount, $netAmount);
+
+                if ($locked->customer_total === null) {
+                    $locked->platform_fee = $feeAmount;
+                    $locked->net_amount = $netAmount;
+                    $locked->save();
+                }
+
+                return;
+            }
+
             $gross = (float) $locked->amount;
-            $productAmount = $locked->product_amount !== null
-                ? (float) $locked->product_amount
-                : $gross;
-            $calculated = $this->calculateFromConfig($productAmount);
-            $feeAmount = $locked->payer_fee_amount !== null
-                ? (float) $locked->payer_fee_amount
-                : $calculated['fee_amount'];
-            $feeRate = $locked->platform_fee_rate !== null
-                ? (float) $locked->platform_fee_rate
-                : $calculated['fee_rate'];
-            $netAmount = $locked->product_amount !== null
-                ? $productAmount
-                : $calculated['net_amount'];
+            $calculated = $this->calculateFromConfig($gross);
+            $this->createLedger($locked, $gross, $calculated['fee_rate'], $calculated['fee_amount'], $calculated['net_amount']);
 
-            PlatformFee::query()->create([
-                'payment_id' => $locked->id,
-                'merchant_id' => $locked->merchant_id,
-                'gateway_code' => $locked->gateway_code,
-                'gross_amount' => $gross,
-                'fee_rate' => $feeRate,
-                'fee_amount' => $feeAmount,
-                'net_amount' => $netAmount,
-                'status' => PlatformFeeStatus::Posted,
-            ]);
-
-            $locked->platform_fee = $feeAmount;
-            $locked->net_amount = $netAmount;
+            $locked->platform_fee = $calculated['fee_amount'];
+            $locked->net_amount = $calculated['net_amount'];
             $locked->save();
         });
     }
 
     /**
-     * Calculate the customer charge while preserving the merchant's product value.
+     * Quote an additive charge from the base transaction amount.
+     * Platform fee uses the merchant rule, then the global rule. It is never calculated from the customer total.
+     *
+     * @return array{
+     *     base_amount: float,
+     *     platform_fee_rate: float,
+     *     platform_fee: float,
+     *     convenience_fee: float,
+     *     customer_total: float,
+     *     merchant_settlement: float
+     * }
+     */
+    public function quote(float $baseAmount, int $merchantId, string $gatewayCode, ?DateTimeInterface $at = null): array
+    {
+        $baseAmount = round($baseAmount, 2);
+        $calculated = $this->platformFeeFor($baseAmount, $merchantId, $gatewayCode, $at ?? now());
+        $baseCents = $this->cents($baseAmount);
+        $feeCents = $this->cents($calculated['fee_amount']);
+        $convenienceCents = $this->cents($this->convenienceFeeAmount($merchantId));
+
+        return [
+            'base_amount' => $this->fromCents($baseCents),
+            'platform_fee_rate' => $calculated['fee_rate'],
+            'platform_fee' => $this->fromCents($feeCents),
+            'convenience_fee' => $this->fromCents($convenienceCents),
+            'customer_total' => $this->fromCents($baseCents + $feeCents + $convenienceCents),
+            'merchant_settlement' => $this->fromCents($baseCents),
+        ];
+    }
+
+    /**
+     * Calculate payer charged totals while preserving the merchant's product value.
      *
      * @return array{fee_rate: float, fee_amount: float, product_amount: float, gross_amount: float}
      */
@@ -80,13 +125,12 @@ class PlatformFeeService
     {
         $productAmount = round($productAmount, 2);
         $calculated = $this->calculateFromConfig($productAmount);
-        $feeAmount = $calculated['fee_amount'];
 
         return [
             'fee_rate' => $calculated['fee_rate'],
-            'fee_amount' => $feeAmount,
+            'fee_amount' => $calculated['fee_amount'],
             'product_amount' => $productAmount,
-            'gross_amount' => round($productAmount + $feeAmount, 2),
+            'gross_amount' => round($productAmount + $calculated['fee_amount'], 2),
         ];
     }
 
@@ -109,27 +153,21 @@ class PlatformFeeService
     }
 
     /**
-     * Calculate the KemoPay platform fee from gross amount.
-     * Formula: fee = round(gross × configured percentage / 100, 2).
-     * The percentage comes from the active global platform fee rule.
+     * Calculate the KemoPay platform fee from the base amount.
+     * Formula: fee = round(base × configured percentage / 100, 2).
      *
      * @return array{fee_rate: float, fee_amount: float, net_amount: float}
      */
     public function calculateFromConfig(float $grossAmount): array
     {
         $percentage = PlatformFeeRule::configuredPercentage();
-        $feeAmount = round($grossAmount * $percentage / 100, 2);
-        $netAmount = round($grossAmount - $feeAmount, 2);
 
-        return [
-            'fee_rate' => (float) $percentage / 100,
-            'fee_amount' => $feeAmount,
-            'net_amount' => $netAmount,
-        ];
+        return $this->feeFromRate($grossAmount, ((float) $percentage) / 100);
     }
 
     /**
      * Calculate fee_amount and net_amount from gross and rule.
+     * Percentage rules store fee_value as a rate, such as 0.0150 for 1.50%.
      *
      * @return array{fee_rate: float, fee_amount: float, net_amount: float}
      */
@@ -138,19 +176,101 @@ class PlatformFeeService
         $feeValue = (float) $rule->fee_value;
 
         if ($rule->fee_type === 'percentage') {
-            $feeAmount = round($grossAmount * $feeValue, 2);
-            $feeRate = $feeValue;
-        } else {
-            $feeAmount = round($feeValue, 2);
-            $feeRate = 0.0;
+            return $this->feeFromRate($grossAmount, $feeValue);
         }
 
-        $netAmount = round($grossAmount - $feeAmount, 2);
+        $feeCents = $this->cents($feeValue);
+        $grossCents = $this->cents($grossAmount);
 
         return [
-            'fee_rate' => $feeRate,
-            'fee_amount' => $feeAmount,
-            'net_amount' => $netAmount,
+            'fee_rate' => 0.0,
+            'fee_amount' => $this->fromCents($feeCents),
+            'net_amount' => $this->fromCents($grossCents - $feeCents),
         ];
+    }
+
+    /**
+     * Merchant override when set (0 waives the fee), otherwise the platform default.
+     */
+    public function convenienceFeeAmount(?int $merchantId = null): float
+    {
+        if ($merchantId !== null) {
+            $override = Merchant::query()->whereKey($merchantId)->value('convenience_fee_override');
+            if ($override !== null) {
+                return round(max(0, (float) $override), 2);
+            }
+        }
+
+        return round(max(0, (float) config('platform.fees.convenience_fee', 20)), 2);
+    }
+
+    /**
+     * @return array{fee_rate: float, fee_amount: float, net_amount: float}
+     */
+    private function platformFeeFor(float $baseAmount, int $merchantId, string $gatewayCode, DateTimeInterface $at): array
+    {
+        $rule = $this->feeRuleResolver->resolve($merchantId, $gatewayCode, $at);
+
+        if ($rule instanceof PlatformFeeRule && $rule->fee_type === 'percentage') {
+            return $this->calculateFromRule($baseAmount, $rule);
+        }
+
+        return $this->calculateFromConfig($baseAmount);
+    }
+
+    /**
+     * Legacy net_amount is base minus fee. Additive quotes do not use this net figure.
+     *
+     * @return array{fee_rate: float, fee_amount: float, net_amount: float}
+     */
+    private function feeFromRate(float $baseAmount, float $rate): array
+    {
+        $basisPoints = (int) round($rate * 10000);
+        $baseCents = $this->cents($baseAmount);
+        $feeCents = (int) round($baseCents * $basisPoints / 10000);
+
+        return [
+            'fee_rate' => $basisPoints / 10000,
+            'fee_amount' => $this->fromCents($feeCents),
+            'net_amount' => $this->fromCents($baseCents - $feeCents),
+        ];
+    }
+
+    private function createLedgerFromPayment(Payment $payment): void
+    {
+        $gross = round((float) $payment->amount, 2);
+        $fee = round((float) ($payment->platform_fee ?? 0), 2);
+        $rate = $payment->platform_fee_rate !== null
+            ? round((float) $payment->platform_fee_rate, 4)
+            : ($gross > 0 ? round($fee / $gross, 4) : 0.0);
+        $net = $payment->net_amount !== null
+            ? round((float) $payment->net_amount, 2)
+            : round($gross - $fee, 2);
+
+        $this->createLedger($payment, $gross, $rate, $fee, $net);
+    }
+
+    private function createLedger(Payment $payment, float $gross, float $rate, float $fee, float $net): void
+    {
+        PlatformFee::query()->create([
+            'payment_id' => $payment->id,
+            'merchant_id' => $payment->merchant_id,
+            'gateway_code' => $payment->gateway_code,
+            'gross_amount' => $gross,
+            'fee_rate' => $rate,
+            'fee_amount' => $fee,
+            'net_amount' => $net,
+            'status' => PlatformFeeStatus::Posted,
+        ]);
+    }
+
+    private function cents(float $amount): int
+    {
+        return (int) round($amount * 100);
+    }
+
+    private function fromCents(int $cents): float
+    {
+        return $cents / 100;
     }
 }

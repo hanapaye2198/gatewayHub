@@ -904,6 +904,43 @@ class CoinsWebhookTest extends TestCase
         $this->assertSame('SUCCEEDED', $raw['status']);
     }
 
+    public function test_webhook_keeps_existing_qr_when_status_payload_omits_it(): void
+    {
+        $payment = Payment::factory()->create([
+            'merchant_id' => $this->user->id,
+            'gateway_code' => 'gcash',
+            'provider_reference' => 'ORDER-QR-KEEP',
+            'status' => 'pending',
+            'raw_response' => [
+                'gateway_request_reference' => 'ORDER-QR-KEEP',
+                'data' => [
+                    'requestId' => 'ORDER-QR-KEEP',
+                    'qrCode' => '00020126KEEP',
+                ],
+            ],
+        ]);
+
+        $payload = [
+            'requestId' => 'ORDER-QR-KEEP',
+            'status' => 'PENDING',
+            'timestamp' => (string) (int) (microtime(true) * 1000),
+            'data' => [
+                'requestId' => 'ORDER-QR-KEEP',
+                'status' => 'PENDING',
+            ],
+        ];
+        $signed = $this->signatureService->sign($payload, self::WEBHOOK_SECRET);
+
+        $this->postJson('/api/webhooks?provider=coins', $payload, [
+            'Content-Type' => 'application/json',
+            'X-COINS-SIGNATURE' => $signed['signature'],
+        ])->assertOk();
+
+        $payment->refresh();
+        $this->assertSame('pending', $payment->status);
+        $this->assertSame('00020126KEEP', $payment->getQrData()['value'] ?? null);
+    }
+
     public function test_webhook_returns_200_for_empty_body(): void
     {
         $response = $this->call(

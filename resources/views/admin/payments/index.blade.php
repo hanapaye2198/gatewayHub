@@ -189,8 +189,10 @@
                         <th class="px-7 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Reference</th>
                         <th class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Merchant</th>
                         <th class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Gateway</th>
+                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Product Value</th>
+                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">KemoPay Fee</th>
+                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Convenience Fee</th>
                         <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Customer Paid</th>
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">KemoPay Fee (Payer)</th>
                         <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Merchant Net</th>
                         <th class="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Status</th>
                         <th class="px-7 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Created</th>
@@ -214,24 +216,33 @@
                                 <span class="whitespace-nowrap text-sm text-zinc-600 dark:text-zinc-400">{{ $payment->gateway?->name ?? $payment->gateway_code }}</span>
                             </td>
                             <td class="px-5 py-4 text-right">
-                                <span class="font-mono text-sm tabular-nums text-zinc-900 dark:text-zinc-100">{{ number_format($payment->amount, 2) }}</span>
+                                <span class="font-mono text-sm tabular-nums text-zinc-900 dark:text-zinc-100">{{ number_format((float) ($payment->product_amount ?? $payment->amount), 2) }}</span>
                                 <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
                             </td>
                             <td class="px-5 py-4 text-right">
-                                @if ($payment->platformFee)
-                                    <span class="font-mono text-sm tabular-nums text-zinc-700 dark:text-zinc-300">{{ number_format($payment->platformFee->fee_amount, 2) }}</span>
+                                <span class="font-mono text-sm tabular-nums text-zinc-700 dark:text-zinc-300">{{ number_format((float) ($payment->platform_fee ?? $payment->platformFee?->fee_amount ?? $payment->payer_fee_amount ?? 0), 2) }}</span>
+                                <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
+                            </td>
+                            <td class="px-5 py-4 text-right">
+                                @if ($payment->usesAdditivePricing())
+                                    <span class="font-mono text-sm tabular-nums text-zinc-700 dark:text-zinc-300">{{ number_format((float) $payment->convenience_fee, 2) }}</span>
                                     <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
                                 @else
                                     <span class="text-sm text-zinc-400 dark:text-zinc-500">—</span>
                                 @endif
                             </td>
                             <td class="px-5 py-4 text-right">
-                                @if ($payment->platformFee)
-                                        <span class="font-mono text-sm font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">{{ number_format($payment->platformFee->net_amount, 2) }}</span>
+                                @if ($payment->usesAdditivePricing())
+                                    <span class="font-mono text-sm font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">{{ number_format((float) $payment->customer_total, 2) }}</span>
                                     <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
                                 @else
-                                    <span class="text-sm text-zinc-400 dark:text-zinc-500">—</span>
+                                    <span class="font-mono text-sm font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">{{ number_format((float) $payment->amount, 2) }}</span>
+                                    <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
                                 @endif
+                            </td>
+                            <td class="px-5 py-4 text-right">
+                                <span class="font-mono text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{{ number_format((float) ($payment->net_amount ?? $payment->product_amount ?? $payment->platformFee?->net_amount ?? $payment->amount), 2) }}</span>
+                                <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
                             </td>
                             <td class="px-5 py-4 text-center">
                                 @php $rowDisplayStatus = $displayStatusResolver->resolve($payment); @endphp
@@ -244,7 +255,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-7 py-16 text-center">
+                            <td colspan="10" class="px-7 py-16 text-center">
                                 <div class="flex flex-col items-center gap-3">
                                     <div class="flex size-14 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-700/50">
                                         <flux:icon name="banknotes" class="size-7 text-zinc-400" />

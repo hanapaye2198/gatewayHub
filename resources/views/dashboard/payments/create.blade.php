@@ -23,7 +23,7 @@
                 </div>
             @endif
             <flux:heading size="lg">{{ __('Create Payment') }}</flux:heading>
-            <flux:subheading class="mt-1">{{ __('Create a new payment using the gateway you select.') }}</flux:subheading>
+            <flux:subheading class="mt-1">{{ __('Enter the product value. KemoPay adds the platform fee and convenience fee to the customer total; the merchant receives the full product value.') }}</flux:subheading>
 
             @if ($enabledGateways->isEmpty())
                 <flux:callout variant="warning" icon="exclamation-triangle" class="mt-6">

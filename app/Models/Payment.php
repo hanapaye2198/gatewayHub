@@ -33,10 +33,12 @@ class Payment extends Model
         'amount',
         'product_amount',
         'payer_fee_amount',
-        'platform_fee_rate',
         'currency',
         'platform_fee',
+        'platform_fee_rate',
         'net_amount',
+        'convenience_fee',
+        'customer_total',
         'reference_id',
         'provider_reference',
         'status',
@@ -53,6 +55,18 @@ class Payment extends Model
                 $model->{$model->getKeyName()} = (string) Str::uuid();
             }
         });
+
+        static::updating(function (Payment $model): void {
+            if ($model->getOriginal('customer_total') === null) {
+                return;
+            }
+
+            foreach (['amount', 'platform_fee', 'platform_fee_rate', 'convenience_fee', 'customer_total', 'net_amount', 'currency'] as $key) {
+                if ($model->isDirty($key)) {
+                    $model->setAttribute($key, $model->getOriginal($key));
+                }
+            }
+        });
     }
 
     /**
@@ -66,9 +80,11 @@ class Payment extends Model
             'amount' => 'decimal:2',
             'product_amount' => 'decimal:2',
             'payer_fee_amount' => 'decimal:2',
-            'platform_fee_rate' => 'decimal:6',
             'platform_fee' => 'decimal:2',
+            'platform_fee_rate' => 'decimal:4',
             'net_amount' => 'decimal:2',
+            'convenience_fee' => 'decimal:2',
+            'customer_total' => 'decimal:2',
             'raw_response' => 'array',
             'paid_at' => 'datetime',
         ];
@@ -78,34 +94,101 @@ class Payment extends Model
      * Return only KemoPay-owned financial fields for API and webhook payloads.
      * Provider response fields such as conversion fees are intentionally excluded.
      *
-     * @return array{product_amount: float, gross_amount: float, gatewayhub_platform_fee_percent: float, gatewayhub_platform_fee: float|null, gatewayhub_net_amount: float|null}
+     * @return array{
+     *     product_amount: float,
+     *     gross_amount: float,
+     *     gatewayhub_platform_fee_percent: float,
+     *     gatewayhub_platform_fee: float|null,
+     *     gatewayhub_net_amount: float|null,
+     *     base_amount: float,
+     *     platform_fee_rate: float,
+     *     platform_fee: float|null,
+     *     payer_fee_amount: float|null,
+     *     convenience_fee: float|null,
+     *     customer_total: float|null
+     * }
      */
     public function gatewayHubFeeData(): array
     {
         $ledger = $this->relationLoaded('platformFee') ? $this->getRelation('platformFee') : null;
         $hasLedger = $ledger instanceof PlatformFee;
+        $percent = $this->resolvedPlatformFeePercent($hasLedger ? $ledger : null);
+        $platformFee = $hasLedger
+            ? (float) $ledger->fee_amount
+            : ($this->platform_fee !== null ? (float) $this->platform_fee : null);
+        $netAmount = $hasLedger
+            ? (float) $ledger->net_amount
+            : ($this->net_amount !== null ? (float) $this->net_amount : null);
 
         return [
             'product_amount' => $this->product_amount !== null
                 ? (float) $this->product_amount
                 : (float) $this->amount,
-            'gross_amount' => (float) $this->amount,
-            'gatewayhub_platform_fee_percent' => $hasLedger
-                ? (float) $ledger->fee_rate * 100
-                : ($this->platform_fee_rate !== null
-                    ? (float) $this->platform_fee_rate * 100
-                    : PlatformFeeRule::configuredPercentage()),
-            'gatewayhub_platform_fee' => $hasLedger
-                ? (float) $ledger->fee_amount
-                : ($this->platform_fee !== null
-                    ? (float) $this->platform_fee
-                    : ($this->payer_fee_amount !== null ? (float) $this->payer_fee_amount : null)),
-            'gatewayhub_net_amount' => $hasLedger
-                ? (float) $ledger->net_amount
-                : ($this->net_amount !== null
-                    ? (float) $this->net_amount
-                    : ($this->product_amount !== null ? (float) $this->product_amount : null)),
+            'gross_amount' => $this->customer_total !== null
+                ? (float) $this->customer_total
+                : (float) $this->amount,
+            'gatewayhub_platform_fee_percent' => $percent,
+            'gatewayhub_platform_fee' => $platformFee,
+            'gatewayhub_net_amount' => $netAmount,
+            'base_amount' => $this->product_amount !== null
+                ? (float) $this->product_amount
+                : (float) $this->amount,
+            'platform_fee_rate' => $percent,
+            'platform_fee' => $platformFee,
+            'payer_fee_amount' => $this->payer_fee_amount !== null
+                ? (float) $this->payer_fee_amount
+                : $platformFee,
+            'convenience_fee' => $this->convenience_fee !== null ? (float) $this->convenience_fee : null,
+            'customer_total' => $this->customer_total !== null ? (float) $this->customer_total : null,
         ];
+    }
+
+    /**
+     * Percentage points snapshotted for this payment, such as 3.00 for a 3% fee.
+     */
+    public function platformFeePercent(): ?float
+    {
+        if ($this->platform_fee_rate === null) {
+            return null;
+        }
+
+        $basisPoints = (int) round(((float) $this->platform_fee_rate) * 10000);
+
+        return $basisPoints / 100;
+    }
+
+    public function usesAdditivePricing(): bool
+    {
+        return $this->customer_total !== null;
+    }
+
+    /**
+     * Base amount plus the platform fee. The convenience fee stays separate.
+     */
+    public function amountIncludingPlatformFee(): float
+    {
+        $base = (float) $this->amount;
+        if (! $this->usesAdditivePricing()) {
+            return $base;
+        }
+
+        return round($base + (float) $this->platform_fee, 2);
+    }
+
+    private function resolvedPlatformFeePercent(?PlatformFee $ledger): float
+    {
+        if ($ledger instanceof PlatformFee) {
+            $basisPoints = (int) round(((float) $ledger->fee_rate) * 10000);
+
+            return $basisPoints / 100;
+        }
+
+        $snapshotted = $this->platformFeePercent();
+        if ($snapshotted !== null) {
+            return $snapshotted;
+        }
+
+        return PlatformFeeRule::configuredPercentage();
     }
 
     /**
@@ -195,19 +278,99 @@ class Payment extends Model
             return null;
         }
 
-        $data = $raw['data'] ?? $raw;
-        if (! is_array($data)) {
+        return self::extractQrData($raw);
+    }
+
+    /**
+     * Find a scannable QR payload anywhere in a provider response.
+     * Coins has returned the code as qrCode, qrcode, and qr_string.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{type: string, value: string}|null
+     */
+    public static function extractQrData(array $payload): ?array
+    {
+        return self::findQrData($payload, 0);
+    }
+
+    /**
+     * Keep a provider payload merge from dropping a QR string already stored on the payment.
+     *
+     * @param  array<string, mixed>  $incoming
+     */
+    public function mergeProviderResponse(array $incoming): void
+    {
+        $previous = $this->getQrData();
+        $existing = is_array($this->raw_response) ? $this->raw_response : [];
+        $merged = array_merge($existing, $incoming);
+
+        if (is_array($existing['data'] ?? null) && is_array($incoming['data'] ?? null)) {
+            $merged['data'] = array_merge($existing['data'], $incoming['data']);
+        }
+
+        $this->raw_response = $merged;
+
+        if ($this->getQrData() !== null || $previous === null || $previous['type'] !== 'string') {
+            return;
+        }
+
+        $this->rememberQrString($previous['value']);
+    }
+
+    public function rememberQrString(string $qrString): void
+    {
+        if ($qrString === '') {
+            return;
+        }
+
+        $raw = is_array($this->raw_response) ? $this->raw_response : [];
+        $raw['qr_string'] = $qrString;
+        $this->raw_response = $raw;
+    }
+
+    /**
+     * @param  array<mixed>  $payload
+     * @return array{type: string, value: string}|null
+     */
+    private static function findQrData(array $payload, int $depth): ?array
+    {
+        if ($depth > 6) {
             return null;
         }
 
-        $qrImage = $data['qrImage'] ?? $data['qr_image'] ?? $data['qrImageUrl'] ?? $data['imageUrl'] ?? null;
-        if (is_string($qrImage) && $qrImage !== '') {
-            return ['type' => 'image', 'value' => $qrImage];
+        foreach ($payload as $key => $value) {
+            if (! is_string($value)) {
+                continue;
+            }
+
+            $value = trim($value);
+            if ($value === '' || ! is_string($key)) {
+                continue;
+            }
+
+            $normalized = strtolower((string) preg_replace('/[^a-z0-9]/i', '', $key));
+            if (str_contains($normalized, 'status') || str_contains($normalized, 'merchant')) {
+                continue;
+            }
+
+            if (in_array($normalized, ['qrimage', 'qrimageurl', 'imageurl'], true)) {
+                return ['type' => 'image', 'value' => $value];
+            }
+
+            if (in_array($normalized, ['qrcode', 'qrstring', 'qrdata'], true) || str_starts_with($value, '000201')) {
+                return ['type' => 'string', 'value' => $value];
+            }
         }
 
-        $qrString = $data['qrCode'] ?? $data['qr_string'] ?? $data['qrString'] ?? $data['payload'] ?? null;
-        if (is_string($qrString) && $qrString !== '') {
-            return ['type' => 'string', 'value' => $qrString];
+        foreach ($payload as $value) {
+            if (! is_array($value)) {
+                continue;
+            }
+
+            $nested = self::findQrData($value, $depth + 1);
+            if ($nested !== null) {
+                return $nested;
+            }
         }
 
         return null;

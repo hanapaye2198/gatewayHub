@@ -60,6 +60,7 @@ class Merchant extends Model
             'api_key_encrypted' => 'encrypted',
             'is_active' => 'boolean',
             'webhook_secret' => 'encrypted',
+            'convenience_fee_override' => 'decimal:2',
         ];
     }
 
@@ -255,7 +256,7 @@ class Merchant extends Model
     }
 
     /**
-     * Regenerate API key and keep an encrypted copy for the authenticated dashboard.
+     * Regenerate API key and keep an encrypted copy for dashboard and KemoFi linking.
      */
     public function regenerateApiKey(): string
     {
