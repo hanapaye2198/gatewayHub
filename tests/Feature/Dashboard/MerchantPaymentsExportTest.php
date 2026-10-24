@@ -146,8 +146,9 @@ class MerchantPaymentsExportTest extends TestCase
 
     private function createGateway(string $code, string $name): void
     {
-        Gateway::query()->create([
+        Gateway::query()->updateOrCreate([
             'code' => $code,
+        ], [
             'name' => $name,
             'driver_class' => 'App\\Services\\Gateways\\Drivers\\CoinsDriver',
             'is_global_enabled' => true,

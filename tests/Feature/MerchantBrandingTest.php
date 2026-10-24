@@ -7,6 +7,7 @@ use App\Models\Merchant;
 use App\Models\MerchantGateway;
 use App\Models\User;
 use App\Services\Gateways\Drivers\CoinsDriver;
+use App\Services\Gateways\Exceptions\GatewayException;
 use App\Services\PaymentCreationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -20,8 +21,9 @@ class MerchantBrandingTest extends TestCase
     {
         parent::setUp();
 
-        Gateway::query()->create([
+        Gateway::query()->updateOrCreate([
             'code' => 'coins',
+        ], [
             'name' => 'Coins.ph',
             'driver_class' => CoinsDriver::class,
             'is_global_enabled' => true,
@@ -81,20 +83,9 @@ class MerchantBrandingTest extends TestCase
         $this->assertSame(mb_substr($long, 0, 64), $merchant->getQrMerchantName());
     }
 
-    public function test_payment_creation_sends_qr_code_merchant_name_from_branding(): void
+    public function test_payment_creation_rejects_the_retired_coins_gateway(): void
     {
-        Http::fake([
-            '*' => function (\Illuminate\Http\Client\Request $request) {
-                $body = json_decode($request->body(), true);
-                $this->assertIsArray($body);
-                $this->assertSame('Branded Cafe', $body['qrCodeMerchantName'] ?? null);
-
-                return Http::response([
-                    'status' => 0,
-                    'data' => ['orderId' => 'ord-brand', 'qrCode' => 'qr'],
-                ], 200);
-            },
-        ]);
+        Http::fake();
 
         $user = User::factory()->create();
         $user->merchant->forceFill([
@@ -108,13 +99,18 @@ class MerchantBrandingTest extends TestCase
             'config_json' => [],
         ]);
 
-        $creationService = app(PaymentCreationService::class);
-        $creationService->create($user->merchant, 'coins', [
-            'amount' => 50,
-            'currency' => 'PHP',
-            'reference' => 'BRAND-REF-1',
-        ]);
+        try {
+            app(PaymentCreationService::class)->create($user->merchant, 'coins', [
+                'amount' => 50,
+                'currency' => 'PHP',
+                'reference' => 'BRAND-REF-1',
+            ]);
 
-        Http::assertSentCount(1);
+            $this->fail('Retired Coins payments should be rejected.');
+        } catch (GatewayException $exception) {
+            $this->assertSame('This payment gateway is no longer available.', $exception->getMessage());
+        }
+
+        Http::assertNothingSent();
     }
 }

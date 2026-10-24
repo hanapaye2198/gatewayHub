@@ -146,7 +146,7 @@ class PlatformGatewayConfigTest extends TestCase
         $this->assertSame([], $gateway->config_json ?? []);
     }
 
-    public function test_non_coins_payment_option_does_not_accept_individual_platform_payment_credentials(): void
+    public function test_paymongo_method_does_not_accept_individual_platform_credentials(): void
     {
         $admin = User::factory()->admin()->create();
         $gateway = Gateway::query()->where('code', 'maya')->firstOrFail();
@@ -160,7 +160,7 @@ class PlatformGatewayConfigTest extends TestCase
         ]);
 
         $response->assertRedirect(route('admin.gateways.index'));
-        $response->assertSessionHas('status', 'Gateway "Maya" does not require platform credential fields.');
+        $response->assertSessionHas('error', 'Only the shared PayMongo provider configuration is supported.');
 
         $gateway->refresh();
         $this->assertSame([], $gateway->config_json ?? []);

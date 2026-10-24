@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Auth\KemoFiController;
-use App\Http\Controllers\CoinsQrController;
 use App\Http\Controllers\Dashboard\CreatePaymentController;
 use App\Http\Controllers\Dashboard\MerchantPaymentReportController;
 use App\Http\Controllers\Dashboard\PaymentDetailController;
@@ -23,11 +22,6 @@ Route::get('/payment/cancel/{transaction}', [PaymentRedirectController::class, '
 Route::get('/payment/default/{transaction}', [PaymentRedirectController::class, 'default'])->name('payment.default');
 
 Route::get('/demo/checkout', fn () => view('demo.checkout'))->name('demo.checkout');
-
-Route::middleware(['auth', 'verified'])->group(function (): void {
-    Route::get('/coins/qr', fn () => view('coins.qr'))->name('coins.qr');
-    Route::post('/coins/generate-qr', [CoinsQrController::class, 'generate'])->name('coins.generate-qr');
-});
 
 Route::get('/auth/kemofi/start', [KemoFiController::class, 'redirect'])->name('kemofi.redirect');
 Route::get('/auth/kemofi/callback', [KemoFiController::class, 'callback'])->name('kemofi.callback');

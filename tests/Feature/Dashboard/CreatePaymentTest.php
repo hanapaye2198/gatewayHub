@@ -93,6 +93,8 @@ class CreatePaymentTest extends TestCase
 
     public function test_store_creates_paymongo_gcash_payment_and_redirects(): void
     {
+        config()->set('platform.fees.convenience_fee', 0);
+
         Http::fake(function ($request) {
             return match (parse_url($request->url(), PHP_URL_PATH)) {
                 '/v1/merchants/capabilities/payment_methods' => Http::response([
@@ -137,19 +139,19 @@ class CreatePaymentTest extends TestCase
         $this->assertDatabaseHas('payments', [
             'merchant_id' => $user->id,
             'gateway_code' => 'gcash',
-            'amount' => 101.5,
+            'amount' => 100,
             'product_amount' => 100,
             'payer_fee_amount' => 1.5,
+            'customer_total' => 101.5,
             'currency' => 'PHP',
             'provider_reference' => 'pi_dashboard_gcash_001',
             'status' => 'pending',
         ]);
 
         $payment = Payment::query()->where('merchant_id', $user->id)->firstOrFail();
-        $this->assertSame('qr123', $payment->raw_response['qr_string'] ?? null);
-        $this->assertSame('qr123', $payment->getQrData()['value'] ?? null);
+        $this->assertNull($payment->getQrData()['value'] ?? null);
         $this->assertMatchesRegularExpression(
-            '/^GH-'.$user->id.'-[0-9A-HJKMNP-TV-Z]{26}$/',
+            '/^KP-'.$user->id.'-[0-9A-HJKMNP-TV-Z]{26}$/',
             (string) ($payment->raw_response['gateway_request_reference'] ?? '')
         );
         $this->assertSame($payment->reference_id, $payment->raw_response['merchant_reference'] ?? null);

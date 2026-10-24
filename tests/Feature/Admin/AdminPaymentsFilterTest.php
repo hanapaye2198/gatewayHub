@@ -48,14 +48,16 @@ class AdminPaymentsFilterTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
         $merchant = User::factory()->create();
 
-        Gateway::query()->create([
+        Gateway::query()->updateOrCreate([
             'code' => 'coins',
+        ], [
             'name' => 'Coins.ph',
             'driver_class' => 'App\Services\Gateways\Drivers\CoinsDriver',
             'is_global_enabled' => true,
         ]);
-        Gateway::query()->create([
+        Gateway::query()->updateOrCreate([
             'code' => 'maya',
+        ], [
             'name' => 'Maya',
             'driver_class' => 'App\Services\Gateways\Drivers\MayaDriver',
             'is_global_enabled' => true,
@@ -232,8 +234,9 @@ class AdminPaymentsFilterTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
         $merchant = User::factory()->create(['name' => 'CSV Merchant']);
 
-        Gateway::query()->create([
+        Gateway::query()->updateOrCreate([
             'code' => 'coins',
+        ], [
             'name' => 'Coins.ph',
             'driver_class' => 'App\Services\Gateways\Drivers\CoinsDriver',
             'is_global_enabled' => true,

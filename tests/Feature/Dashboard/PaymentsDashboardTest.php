@@ -97,8 +97,9 @@ class PaymentsDashboardTest extends TestCase
 
     public function test_qr_payment_shows_waiting_state_when_pending(): void
     {
-        Gateway::create([
+        Gateway::query()->updateOrCreate([
             'code' => 'coins',
+        ], [
             'name' => 'Coins.ph',
             'driver_class' => \App\Services\Gateways\Drivers\CoinsDriver::class,
             'is_global_enabled' => true,
@@ -141,8 +142,9 @@ class PaymentsDashboardTest extends TestCase
 
     public function test_maya_labeled_payment_shows_qr_waiting_state_when_pending(): void
     {
-        Gateway::create([
+        Gateway::query()->updateOrCreate([
             'code' => 'maya',
+        ], [
             'name' => 'Maya',
             'driver_class' => \App\Services\Gateways\Drivers\MayaDriver::class,
             'is_global_enabled' => true,
@@ -193,8 +195,9 @@ class PaymentsDashboardTest extends TestCase
 
     public function test_pending_payment_modal_loads_qr_from_coins_when_it_was_not_stored(): void
     {
-        Gateway::query()->create([
+        Gateway::query()->updateOrCreate([
             'code' => 'coins',
+        ], [
             'name' => 'Coins.ph',
             'driver_class' => CoinsDriver::class,
             'is_global_enabled' => true,
@@ -244,13 +247,15 @@ class PaymentsDashboardTest extends TestCase
 
         $detail = $this->actingAs($user)->get(route('dashboard.payments.show', $payment));
         $detail->assertOk();
-        $detail->assertSee('Scan with GCash, Maya, Coins wallet, or other QRPH-compatible apps.');
+        $detail->assertSee('DASH-QR-BACKFILL');
+        $detail->assertSee('Pending');
     }
 
     public function test_qr_payment_shows_paid_state_when_paid(): void
     {
-        Gateway::create([
+        Gateway::query()->updateOrCreate([
             'code' => 'coins',
+        ], [
             'name' => 'Coins.ph',
             'driver_class' => \App\Services\Gateways\Drivers\CoinsDriver::class,
             'is_global_enabled' => true,
@@ -521,7 +526,7 @@ class PaymentsDashboardTest extends TestCase
 
         $this->assertStringContainsString('Created At', $worksheet);
         $this->assertStringContainsString('KemoPay Platform Fee (%)', $worksheet);
-        $this->assertStringContainsString('Net After KemoPay Fee', $worksheet);
+        $this->assertStringContainsString('Merchant Net', $worksheet);
         $this->assertStringContainsString('M-EXPORT-PAID-001', $worksheet);
         $this->assertStringContainsString('200.00', $worksheet);
         $this->assertStringContainsString('1.50', $worksheet);
