@@ -103,7 +103,7 @@ class WebhookProcessor
                     'payment_id' => $payment->id,
                     'provider_amount' => $normalized['amount'],
                     'provider_currency' => $normalized['currency'],
-                    'expected_amount' => (string) $payment->amount,
+                    'expected_amount' => $payment->gatewayChargeAmount(),
                     'expected_currency' => $payment->currency,
                 ]);
                 $this->markEventProcessed($event, $payment->id);
@@ -286,7 +286,7 @@ class WebhookProcessor
             return false;
         }
 
-        if (! preg_match('/^(\d+)\.(\d{2})$/', (string) $payment->amount, $matches)) {
+        if (! preg_match('/^(\d+)\.(\d{2})$/', $payment->gatewayChargeAmount(), $matches)) {
             return false;
         }
 

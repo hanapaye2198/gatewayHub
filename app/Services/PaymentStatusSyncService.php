@@ -218,7 +218,7 @@ class PaymentStatusSyncService
         ];
 
         $this->applyNormalizedStatus($payment, $normalized);
-        $payment->raw_response = $this->mergeRawResponse($payment->raw_response, $providerStatus);
+        $payment->mergeProviderResponse($providerStatus);
         $payment->save();
     }
 
@@ -238,7 +238,7 @@ class PaymentStatusSyncService
             return false;
         }
 
-        if (! preg_match('/^(\d+)\.(\d{2})$/', (string) $payment->amount, $matches)) {
+        if (! preg_match('/^(\d+)\.(\d{2})$/', $payment->gatewayChargeAmount(), $matches)) {
             return false;
         }
 

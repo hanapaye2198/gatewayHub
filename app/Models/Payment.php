@@ -163,6 +163,14 @@ class Payment extends Model
     }
 
     /**
+     * Amount passed to the gateway for collection, including additive fees when present.
+     */
+    public function gatewayChargeAmount(): string
+    {
+        return (string) ($this->customer_total ?? $this->amount);
+    }
+
+    /**
      * Base amount plus the platform fee. The convenience fee stays separate.
      */
     public function amountIncludingPlatformFee(): float

@@ -20,6 +20,13 @@ class QrphGatewayFlowTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set('platform.fees.convenience_fee', 0);
+    }
+
     public function test_api_payment_creation_uses_paymongo_payment_intent_qr_flow(): void
     {
         Http::fake(function ($request) {
@@ -305,6 +312,7 @@ class QrphGatewayFlowTest extends TestCase
         $payment = Payment::factory()->create([
             'gateway_code' => 'qrph',
             'amount' => 150,
+            'customer_total' => 152.25,
             'currency' => 'PHP',
             'provider_reference' => 'pi_qrph_webhook_001',
             'status' => 'pending',
@@ -326,7 +334,7 @@ class QrphGatewayFlowTest extends TestCase
                         'attributes' => [
                             'payment_intent_id' => 'pi_qrph_webhook_001',
                             'status' => 'paid',
-                            'amount' => 15000,
+                            'amount' => 15225,
                             'currency' => 'PHP',
                             'paid_at' => $timestamp,
                             'source' => ['type' => 'qrph'],
@@ -428,6 +436,7 @@ class QrphGatewayFlowTest extends TestCase
         $payment = Payment::factory()->create([
             'gateway_code' => 'qrph',
             'amount' => 150,
+            'customer_total' => 152.25,
             'currency' => 'PHP',
             'provider_reference' => 'pi_qrph_amount_mismatch',
             'status' => 'pending',
@@ -473,7 +482,7 @@ class QrphGatewayFlowTest extends TestCase
                 'data' => [
                     'id' => 'pi_qrph_status_001',
                     'attributes' => [
-                        'amount' => 15000,
+                        'amount' => 15225,
                         'currency' => 'PHP',
                         'status' => 'succeeded',
                         'updated_at' => $timestamp,
@@ -491,6 +500,7 @@ class QrphGatewayFlowTest extends TestCase
         $payment = Payment::factory()->create([
             'gateway_code' => 'qrph',
             'amount' => 150,
+            'customer_total' => 152.25,
             'currency' => 'PHP',
             'provider_reference' => 'pi_qrph_status_001',
             'status' => 'pending',
@@ -518,7 +528,7 @@ class QrphGatewayFlowTest extends TestCase
                 'data' => [
                     'id' => 'pi_qrph_status_fallback',
                     'attributes' => [
-                        'amount' => 15000,
+                        'amount' => 15225,
                         'currency' => 'PHP',
                         'status' => 'succeeded',
                         'updated_at' => $timestamp,
@@ -536,6 +546,7 @@ class QrphGatewayFlowTest extends TestCase
         $payment = Payment::factory()->create([
             'gateway_code' => 'qrph',
             'amount' => 150,
+            'customer_total' => 152.25,
             'currency' => 'PHP',
             'provider_reference' => 'pi_qrph_status_fallback',
             'status' => 'pending',
@@ -577,6 +588,7 @@ class QrphGatewayFlowTest extends TestCase
         $payment = Payment::factory()->create([
             'gateway_code' => 'qrph',
             'amount' => 150,
+            'customer_total' => 152.25,
             'currency' => 'PHP',
             'provider_reference' => 'pi_qrph_wrong_amount',
             'status' => 'pending',
