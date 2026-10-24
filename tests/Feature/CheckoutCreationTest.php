@@ -71,20 +71,20 @@ class CheckoutCreationTest extends TestCase
         $response->assertJsonPath('data.merchant.name', 'Branded Store Name');
         $response->assertJsonPath('data.amount', 100);
         $response->assertJsonPath('data.product_amount', 100);
-        $response->assertJsonPath('data.gross_amount', 121.5);
+        $response->assertJsonPath('data.gross_amount', 101.5);
         $response->assertJsonPath('data.gatewayhub_platform_fee_percent', 1.5);
         $response->assertJsonPath('data.gatewayhub_platform_fee', 1.5);
-        $response->assertJsonPath('data.convenience_fee', 20);
-        $response->assertJsonPath('data.customer_total', 121.5);
+        $response->assertJsonPath('data.convenience_fee', 0);
+        $response->assertJsonPath('data.customer_total', 101.5);
         $response->assertJsonPath('data.gatewayhub_net_amount', 100);
         $this->assertDatabaseHas('payments', [
             'merchant_id' => $user->merchant_id,
             'gateway_code' => 'gcash',
             'amount' => 100,
             'product_amount' => 100,
-            'payer_fee_amount' => 21.5,
+            'payer_fee_amount' => 1.5,
             'platform_fee_rate' => 0.015,
-            'customer_total' => 121.5,
+            'customer_total' => 101.5,
         ]);
         $response->assertJsonStructure([
             'data' => [
@@ -104,7 +104,7 @@ class CheckoutCreationTest extends TestCase
 
         Http::assertSentCount(4);
         Http::assertSent(fn ($request): bool => parse_url($request->url(), PHP_URL_PATH) === '/v1/payment_intents'
-            && data_get($request->data(), 'data.attributes.amount') === 12150);
+            && data_get($request->data(), 'data.attributes.amount') === 10150);
     }
 
     public function test_wallet_payment_uses_fallback_display_name_when_merchant_name_is_blank(): void
@@ -130,8 +130,8 @@ class CheckoutCreationTest extends TestCase
         $response->assertJsonPath('data.redirect_url', 'https://wallet.example/checkout/maya');
         $response->assertJsonPath('data.merchant.name', \App\Models\Merchant::DEFAULT_DISPLAY_NAME);
         $response->assertJsonPath('data.amount', 50);
-        $response->assertJsonPath('data.gross_amount', 70.75);
-        $response->assertJsonPath('data.customer_total', 70.75);
+        $response->assertJsonPath('data.gross_amount', 50.75);
+        $response->assertJsonPath('data.customer_total', 50.75);
     }
 
     public function test_paypal_is_rejected_so_payments_use_only_paymongo_methods(): void

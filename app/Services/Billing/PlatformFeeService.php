@@ -3,7 +3,6 @@
 namespace App\Services\Billing;
 
 use App\Enums\PlatformFeeStatus;
-use App\Models\Merchant;
 use App\Models\Payment;
 use App\Models\PlatformFee;
 use App\Models\PlatformFeeRule;
@@ -86,7 +85,7 @@ class PlatformFeeService
     }
 
     /**
-     * Quote an additive charge from the base transaction amount.
+     * Quote the platform fee from the base transaction amount.
      * Platform fee uses the merchant rule, then the global rule. It is never calculated from the customer total.
      *
      * @return array{
@@ -104,14 +103,13 @@ class PlatformFeeService
         $calculated = $this->platformFeeFor($baseAmount, $merchantId, $gatewayCode, $at ?? now());
         $baseCents = $this->cents($baseAmount);
         $feeCents = $this->cents($calculated['fee_amount']);
-        $convenienceCents = $this->cents($this->convenienceFeeAmount($merchantId));
 
         return [
             'base_amount' => $this->fromCents($baseCents),
             'platform_fee_rate' => $calculated['fee_rate'],
             'platform_fee' => $this->fromCents($feeCents),
-            'convenience_fee' => $this->fromCents($convenienceCents),
-            'customer_total' => $this->fromCents($baseCents + $feeCents + $convenienceCents),
+            'convenience_fee' => 0.0,
+            'customer_total' => $this->fromCents($baseCents + $feeCents),
             'merchant_settlement' => $this->fromCents($baseCents),
         ];
     }
@@ -187,21 +185,6 @@ class PlatformFeeService
             'fee_amount' => $this->fromCents($feeCents),
             'net_amount' => $this->fromCents($grossCents - $feeCents),
         ];
-    }
-
-    /**
-     * Merchant override when set (0 waives the fee), otherwise the platform default.
-     */
-    public function convenienceFeeAmount(?int $merchantId = null): float
-    {
-        if ($merchantId !== null) {
-            $override = Merchant::query()->whereKey($merchantId)->value('convenience_fee_override');
-            if ($override !== null) {
-                return round(max(0, (float) $override), 2);
-            }
-        }
-
-        return round(max(0, (float) config('platform.fees.convenience_fee', 20)), 2);
     }
 
     /**

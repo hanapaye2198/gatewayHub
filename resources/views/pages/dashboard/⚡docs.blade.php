@@ -151,7 +151,7 @@ new class extends Component {
 
     <div class="{{ $cardWrap }}">
         <h2 class="{{ $sectionHeading }}">{{ __('Create Payment') }}</h2>
-        <p class="{{ $bodyText }}">{{ __('Creates a payment and returns the QR or redirect details. The request amount is the product value; KemoPay adds its configured platform fee and convenience fee to the customer total so the merchant receives the full product value. PayMongo methods require PHP 1.00 minimum; GCash, Maya, GrabPay, and ShopeePay allow up to PHP 100,000, while QR Ph allows up to PHP 9,999,999.99.') }}</p>
+        <p class="{{ $bodyText }}">{{ __('Creates a payment and returns the QR or redirect details. The request amount is the product value; KemoPay adds its configured platform fee to the customer total so the merchant receives the full product value. PayMongo methods require PHP 1.00 minimum; GCash, Maya, GrabPay, and ShopeePay allow up to PHP 100,000, while QR Ph allows up to PHP 9,999,999.99.') }}</p>
 
         <h3 class="{{ $subHeading }}">{{ __('Sample Request') }}</h3>
         <pre class="{{ $endpointCardClasses }}" style="{{ $endpointCardStyle }}"><span style="color:#34d399">POST</span> <span style="color:#f4f4f5">/api/payments HTTP/1.1</span>
@@ -186,12 +186,12 @@ new class extends Component {
   <span style="color:#67e8f9">"amount"</span>: <span style="color:#c4b5fd">500</span>,
   <span style="color:#67e8f9">"product_amount"</span>: <span style="color:#c4b5fd">500</span>,
   <span style="color:#67e8f9">"currency"</span>: <span style="color:#fcd34d">"PHP"</span>,
-  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">527.5</span>,
+  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">507.5</span>,
   <span style="color:#67e8f9">"gatewayhub_platform_fee_percent"</span>: <span style="color:#c4b5fd">1.5</span>,
   <span style="color:#67e8f9">"gatewayhub_platform_fee"</span>: <span style="color:#c4b5fd">7.5</span>,
-  <span style="color:#67e8f9">"payer_fee_amount"</span>: <span style="color:#c4b5fd">27.5</span>,
-  <span style="color:#67e8f9">"convenience_fee"</span>: <span style="color:#c4b5fd">20</span>,
-  <span style="color:#67e8f9">"customer_total"</span>: <span style="color:#c4b5fd">527.5</span>,
+  <span style="color:#67e8f9">"payer_fee_amount"</span>: <span style="color:#c4b5fd">7.5</span>,
+  <span style="color:#67e8f9">"convenience_fee"</span>: <span style="color:#c4b5fd">0</span>,
+  <span style="color:#67e8f9">"customer_total"</span>: <span style="color:#c4b5fd">507.5</span>,
   <span style="color:#67e8f9">"gatewayhub_net_amount"</span>: <span style="color:#c4b5fd">500</span>,
   <span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"pending"</span>,
   <span style="color:#67e8f9">"qr_data"</span>: <span style="color:#fcd34d">"000201..."</span>,
@@ -247,7 +247,7 @@ new class extends Component {
             </div>
             <div>
                 <dt class="{{ $fieldKey }}">gross_amount</dt>
-                <dd class="mt-0.5">{{ __('The full customer charge: product value plus the KemoPay platform fee and convenience fee.') }}</dd>
+                <dd class="mt-0.5">{{ __('The full customer charge: product value plus the KemoPay platform fee.') }}</dd>
             </div>
             <div>
                 <dt class="{{ $fieldKey }}">product_amount</dt>
@@ -275,15 +275,15 @@ new class extends Component {
             </div>
             <div>
                 <dt class="{{ $fieldKey }}">payer_fee_amount</dt>
-                <dd class="mt-0.5">{{ __('Total amount added to the product value for the payer, including the platform fee and convenience fee.') }}</dd>
+                <dd class="mt-0.5">{{ __('Total amount added to the product value for the payer. This is the platform fee.') }}</dd>
             </div>
             <div>
                 <dt class="{{ $fieldKey }}">convenience_fee</dt>
-                <dd class="mt-0.5">{{ __('Fixed convenience fee added on top of the base amount. Null on payments created before this fee.') }}</dd>
+                <dd class="mt-0.5">{{ __('Legacy compatibility field. New payments set this to 0; older payments may contain a historical convenience fee.') }}</dd>
             </div>
             <div>
                 <dt class="{{ $fieldKey }}">customer_total</dt>
-                <dd class="mt-0.5">{{ __('Amount sent to PayMongo: product value plus platform fee plus convenience fee.') }}</dd>
+                <dd class="mt-0.5">{{ __('Amount sent to PayMongo: product value plus platform fee.') }}</dd>
             </div>
             <div>
                 <dt class="{{ $fieldKey }}">gatewayhub_net_amount</dt>
@@ -412,12 +412,12 @@ echo 'ok';
   <span style="color:#67e8f9">"gateway"</span>: <span style="color:#fcd34d">"gcash"</span>,
   <span style="color:#67e8f9">"reference"</span>: <span style="color:#fcd34d">"ORDER-20260228-0001"</span>,
   <span style="color:#67e8f9">"product_amount"</span>: <span style="color:#c4b5fd">500</span>,
-  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">527.5</span>,
+  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">507.5</span>,
   <span style="color:#67e8f9">"gatewayhub_platform_fee_percent"</span>: <span style="color:#c4b5fd">1.5</span>,
   <span style="color:#67e8f9">"gatewayhub_platform_fee"</span>: <span style="color:#c4b5fd">7.5</span>,
-  <span style="color:#67e8f9">"payer_fee_amount"</span>: <span style="color:#c4b5fd">27.5</span>,
-  <span style="color:#67e8f9">"convenience_fee"</span>: <span style="color:#c4b5fd">20</span>,
-  <span style="color:#67e8f9">"customer_total"</span>: <span style="color:#c4b5fd">527.5</span>,
+  <span style="color:#67e8f9">"payer_fee_amount"</span>: <span style="color:#c4b5fd">7.5</span>,
+  <span style="color:#67e8f9">"convenience_fee"</span>: <span style="color:#c4b5fd">0</span>,
+  <span style="color:#67e8f9">"customer_total"</span>: <span style="color:#c4b5fd">507.5</span>,
   <span style="color:#67e8f9">"gatewayhub_net_amount"</span>: <span style="color:#c4b5fd">500</span>,
   <span style="color:#67e8f9">"provider_reference"</span>: <span style="color:#fcd34d">"provider-id"</span>,
   <span style="color:#67e8f9">"paid_at"</span>: <span style="color:#fcd34d">"2026-02-28T12:02:00+08:00"</span>,
@@ -426,7 +426,7 @@ echo 'ok';
 }
 }</pre>
         <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{{ __('The data.gateway field matches your payment gateway code (for example gcash, maya, grab_pay, shopeepay, or qrph).') }}</p>
-        <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ __('The fee fields retain their existing JSON names for API compatibility. KemoPay adds its configured platform fee to the customer total; provider processing or conversion fees remain separate.') }}</p>
+        <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{{ __('The fee fields retain their existing JSON names for API compatibility. New payments include only the platform fee; convenience_fee is 0. Provider processing or conversion fees remain separate.') }}</p>
     </div>
 
     <div class="{{ $cardWrap }}">
@@ -458,12 +458,12 @@ echo 'ok';
 <span style="color:#67e8f9">"data"</span>: {
   <span style="color:#67e8f9">"status"</span>: <span style="color:#fcd34d">"success"</span>,
   <span style="color:#67e8f9">"product_amount"</span>: <span style="color:#c4b5fd">500</span>,
-  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">527.5</span>,
+  <span style="color:#67e8f9">"gross_amount"</span>: <span style="color:#c4b5fd">507.5</span>,
   <span style="color:#67e8f9">"gatewayhub_platform_fee_percent"</span>: <span style="color:#c4b5fd">1.5</span>,
   <span style="color:#67e8f9">"gatewayhub_platform_fee"</span>: <span style="color:#c4b5fd">7.5</span>,
-  <span style="color:#67e8f9">"payer_fee_amount"</span>: <span style="color:#c4b5fd">27.5</span>,
-  <span style="color:#67e8f9">"convenience_fee"</span>: <span style="color:#c4b5fd">20</span>,
-  <span style="color:#67e8f9">"customer_total"</span>: <span style="color:#c4b5fd">527.5</span>,
+  <span style="color:#67e8f9">"payer_fee_amount"</span>: <span style="color:#c4b5fd">7.5</span>,
+  <span style="color:#67e8f9">"convenience_fee"</span>: <span style="color:#c4b5fd">0</span>,
+  <span style="color:#67e8f9">"customer_total"</span>: <span style="color:#c4b5fd">507.5</span>,
   <span style="color:#67e8f9">"gatewayhub_net_amount"</span>: <span style="color:#c4b5fd">500</span>
 },
 <span style="color:#67e8f9">"error"</span>: <span style="color:#fda4af">null</span>

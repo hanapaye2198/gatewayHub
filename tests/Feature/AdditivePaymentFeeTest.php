@@ -7,7 +7,6 @@ use App\Models\Gateway;
 use App\Models\Merchant;
 use App\Models\MerchantGateway;
 use App\Models\Payment;
-use App\Models\PlatformAuditLog;
 use App\Models\PlatformFee;
 use App\Models\PlatformFeeRule;
 use App\Models\User;
@@ -34,10 +33,7 @@ class AdditivePaymentFeeTest extends TestCase
     {
         parent::setUp();
 
-        config([
-            'platform.fees.convenience_fee' => 20,
-            'surepay.features.wallet_settlement' => true,
-        ]);
+        config(['surepay.features.wallet_settlement' => true]);
 
         Gateway::query()->updateOrCreate(['code' => 'paymongo'], [
             'name' => 'PayMongo',
@@ -57,7 +53,7 @@ class AdditivePaymentFeeTest extends TestCase
         ]);
     }
 
-    public function test_global_default_adds_one_point_five_percent_and_convenience_fee_on_top(): void
+    public function test_global_default_adds_only_the_one_point_five_percent_platform_fee(): void
     {
         $this->fakePayMongo();
         $capabilityStatus = app(PayMongoMethodCapabilityService::class)->statusForGateway('gcash');
@@ -71,17 +67,36 @@ class AdditivePaymentFeeTest extends TestCase
         $response->assertJsonPath('data.base_amount', 1000);
         $response->assertJsonPath('data.platform_fee_rate', 1.5);
         $response->assertJsonPath('data.platform_fee', 15);
-        $response->assertJsonPath('data.convenience_fee', 20);
-        $response->assertJsonPath('data.customer_total', 1035);
+        $response->assertJsonPath('data.convenience_fee', 0);
+        $response->assertJsonPath('data.customer_total', 1015);
 
         $payment = Payment::query()->firstOrFail();
         $this->assertSame('1000.00', (string) $payment->amount);
         $this->assertSame('15.00', (string) $payment->platform_fee);
         $this->assertSame('0.0150', (string) $payment->platform_fee_rate);
-        $this->assertSame('20.00', (string) $payment->convenience_fee);
-        $this->assertSame('1035.00', (string) $payment->customer_total);
+        $this->assertSame('0.00', (string) $payment->convenience_fee);
+        $this->assertSame('1015.00', (string) $payment->customer_total);
         $this->assertSame('1000.00', (string) $payment->net_amount);
-        $this->assertSame('1035.00', $this->capturedAmounts[0]);
+        $this->assertSame('1015.00', $this->capturedAmounts[0]);
+    }
+
+    public function test_one_peso_product_is_charged_with_only_the_rounded_platform_fee(): void
+    {
+        $this->fakePayMongo();
+        $user = $this->merchant('one-peso-key');
+
+        $response = $this->createPayment($user, 'one-peso-key', 1, 'ONE-PESO');
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.platform_fee', 0.02);
+        $response->assertJsonPath('data.convenience_fee', 0);
+        $response->assertJsonPath('data.customer_total', 1.02);
+        $this->assertSame('1.02', $this->capturedAmounts[0]);
+
+        $payment = Payment::query()->where('reference_id', 'ONE-PESO')->firstOrFail();
+        $this->assertSame('1.00', (string) $payment->amount);
+        $this->assertSame('1.02', (string) $payment->customer_total);
+        $this->assertSame('1.00', (string) $payment->net_amount);
     }
 
     public function test_merchant_override_is_calculated_from_the_base_amount_and_sent_to_paymongo(): void
@@ -96,15 +111,15 @@ class AdditivePaymentFeeTest extends TestCase
         $response->assertJsonPath('data.amount', 1000);
         $response->assertJsonPath('data.platform_fee', 30);
         $response->assertJsonPath('data.platform_fee_rate', 3);
-        $response->assertJsonPath('data.convenience_fee', 20);
-        $response->assertJsonPath('data.customer_total', 1050);
+        $response->assertJsonPath('data.convenience_fee', 0);
+        $response->assertJsonPath('data.customer_total', 1030);
         $this->assertNotSame(31.5, $response->json('data.platform_fee'));
 
         $payment = Payment::query()->where('reference_id', 'OVERRIDE-1000')->firstOrFail();
         $this->assertSame('1000.00', (string) $payment->amount);
         $this->assertSame('30.00', (string) $payment->platform_fee);
-        $this->assertSame('1050.00', (string) $payment->customer_total);
-        $this->assertSame('1050.00', $this->capturedAmounts[0]);
+        $this->assertSame('1030.00', (string) $payment->customer_total);
+        $this->assertSame('1030.00', $this->capturedAmounts[0]);
 
         $this->actingAs($user)
             ->get(route('dashboard.payments.show', $payment))
@@ -113,10 +128,9 @@ class AdditivePaymentFeeTest extends TestCase
             ->assertSee('1,000.00')
             ->assertSee('KemoPay Platform Fee')
             ->assertSee('30.00')
-            ->assertSee('Convenience Fee')
-            ->assertSee('20.00')
+            ->assertDontSee('Convenience Fee')
             ->assertSee('Total')
-            ->assertSee('1,050.00')
+            ->assertSee('1,030.00')
             ->assertSee('Merchant Receives');
     }
 
@@ -134,10 +148,10 @@ class AdditivePaymentFeeTest extends TestCase
         $second = Payment::query()->where('reference_id', 'M2')->firstOrFail();
 
         $this->assertSame('30.00', (string) $first->platform_fee);
-        $this->assertSame('1050.00', (string) $first->customer_total);
+        $this->assertSame('1030.00', (string) $first->customer_total);
         $this->assertSame('15.00', (string) $second->platform_fee);
         $this->assertSame('0.0150', (string) $second->platform_fee_rate);
-        $this->assertSame('1035.00', (string) $second->customer_total);
+        $this->assertSame('1015.00', (string) $second->customer_total);
     }
 
     public function test_changing_the_merchant_rate_does_not_recalculate_an_existing_payment(): void
@@ -159,7 +173,7 @@ class AdditivePaymentFeeTest extends TestCase
         $payment->refresh();
         $this->assertSame('0.0300', (string) $payment->platform_fee_rate);
         $this->assertSame('30.00', (string) $payment->platform_fee);
-        $this->assertSame('1050.00', (string) $payment->customer_total);
+        $this->assertSame('1030.00', (string) $payment->customer_total);
         $this->assertSame('1000.00', (string) $payment->amount);
         $this->assertSame('0.0300', (string) $payment->platformFee?->fee_rate);
         $this->assertSame('30.00', (string) $payment->platformFee?->fee_amount);
@@ -186,14 +200,14 @@ class AdditivePaymentFeeTest extends TestCase
         $payment->refresh();
         $this->assertSame('paid', $payment->status);
         $this->assertSame('30.00', (string) $payment->platform_fee);
-        $this->assertSame('20.00', (string) $payment->convenience_fee);
-        $this->assertSame('1050.00', (string) $payment->customer_total);
+        $this->assertSame('0.00', (string) $payment->convenience_fee);
+        $this->assertSame('1030.00', (string) $payment->customer_total);
         $this->assertSame(1, PlatformFee::query()->where('payment_id', $payment->id)->count());
         $this->assertSame(1, WalletTransaction::query()
             ->where('payment_id', $payment->id)
             ->where('entry_type', WalletTransaction::ENTRY_PAYMENT_RECEIVED_GROSS)
             ->count());
-        $this->assertSame(1, WalletTransaction::query()
+        $this->assertSame(0, WalletTransaction::query()
             ->where('payment_id', $payment->id)
             ->where('entry_type', WalletTransaction::ENTRY_CONVENIENCE_FEE_COLLECTED)
             ->where('direction', 'debit')
@@ -209,7 +223,7 @@ class AdditivePaymentFeeTest extends TestCase
             ->where('payment_id', $payment->id)
             ->where('entry_type', WalletTransaction::ENTRY_PAYMENT_RECEIVED_GROSS)
             ->firstOrFail();
-        $this->assertSame('1050.00', (string) $gross->amount);
+        $this->assertSame('1030.00', (string) $gross->amount);
 
         $settlement = WalletTransaction::query()
             ->where('payment_id', $payment->id)
@@ -318,22 +332,23 @@ class AdditivePaymentFeeTest extends TestCase
         foreach ($cases as [$base, $expectedFee]) {
             $quote = $service->quote($base, (int) $merchant->merchant_id, 'gcash');
             $this->assertSame($expectedFee, $quote['platform_fee']);
-            $this->assertSame(round($base + $expectedFee + 20, 2), $quote['customer_total']);
+            $this->assertSame(round($base + $expectedFee, 2), $quote['customer_total']);
             $this->assertSame(round($base, 2), $quote['base_amount']);
         }
 
         $this->setMerchantRate((int) $merchant->merchant_id, '3.00');
         $threePercent = $service->quote(1000, (int) $merchant->merchant_id, 'gcash');
         $this->assertSame(30.0, $threePercent['platform_fee']);
-        $this->assertSame(1050.0, $threePercent['customer_total']);
+        $this->assertSame(1030.0, $threePercent['customer_total']);
     }
 
-    public function test_merchant_with_waived_convenience_fee_pays_only_the_platform_fee_while_others_keep_it(): void
+    public function test_legacy_merchant_convenience_overrides_do_not_change_new_payment_totals(): void
     {
         $this->fakePayMongo();
         $waived = $this->merchant('waived-key');
         $regular = $this->merchant('regular-key');
-        $this->setMerchantConvenienceFee((int) $waived->merchant_id, '0');
+        Merchant::query()->findOrFail($waived->merchant_id)->forceFill(['convenience_fee_override' => '0.00'])->save();
+        Merchant::query()->findOrFail($regular->merchant_id)->forceFill(['convenience_fee_override' => '99.00'])->save();
 
         $response = $this->createPayment($waived, 'waived-key', 1000, 'WAIVED-1000');
         $this->createPayment($regular, 'regular-key', 1000, 'REGULAR-1000');
@@ -349,9 +364,9 @@ class AdditivePaymentFeeTest extends TestCase
         $this->assertSame('0.00', (string) $first->convenience_fee);
         $this->assertSame('1015.00', (string) $first->customer_total);
         $this->assertSame('1000.00', (string) $first->amount);
-        $this->assertSame('20.00', (string) $second->convenience_fee);
-        $this->assertSame('1035.00', (string) $second->customer_total);
-        $this->assertSame(['1015.00', '1035.00'], $this->capturedAmounts);
+        $this->assertSame('0.00', (string) $second->convenience_fee);
+        $this->assertSame('1015.00', (string) $second->customer_total);
+        $this->assertSame(['1015.00', '1015.00'], $this->capturedAmounts);
 
         $first->update([
             'status' => 'paid',
@@ -371,41 +386,34 @@ class AdditivePaymentFeeTest extends TestCase
             ->amount);
     }
 
-    public function test_merchant_convenience_fee_can_be_set_to_a_custom_amount_and_cleared(): void
+    public function test_legacy_convenience_fee_settings_are_no_longer_available(): void
     {
-        $service = app(PlatformFeeService::class);
-        $merchant = User::factory()->create();
-        $merchantId = (int) $merchant->merchant_id;
+        $superAdmin = User::factory()->superAdmin()->create();
+        $merchantUser = User::factory()->create();
+        $merchant = Merchant::query()->findOrFail($merchantUser->merchant_id);
 
-        $this->setMerchantConvenienceFee($merchantId, '5.50');
-        $this->assertSame(5.5, $service->quote(1000, $merchantId, 'gcash')['convenience_fee']);
-        $this->assertSame(1020.5, $service->quote(1000, $merchantId, 'gcash')['customer_total']);
+        $this->actingAs($superAdmin)
+            ->get(route('admin.merchants.show', $merchant))
+            ->assertOk()
+            ->assertDontSee('convenience fee');
 
-        $this->setMerchantConvenienceFee($merchantId, '');
-        $this->assertNull(Merchant::query()->findOrFail($merchantId)->convenience_fee_override);
-        $this->assertSame(20.0, $service->quote(1000, $merchantId, 'gcash')['convenience_fee']);
-        $this->assertSame(1035.0, $service->quote(1000, $merchantId, 'gcash')['customer_total']);
-
-        $this->assertDatabaseHas('platform_audit_logs', [
-            'action' => PlatformAuditLog::ACTION_MERCHANT_CONVENIENCE_FEE_UPDATED,
-            'merchant_id' => $merchantId,
-        ]);
+        $this->actingAs($superAdmin)
+            ->put('/admin/merchants/'.$merchant->id.'/convenience-fee', ['convenience_fee' => '5.50'])
+            ->assertNotFound();
     }
 
-    public function test_changing_the_merchant_convenience_fee_does_not_recalculate_an_existing_payment(): void
+    public function test_new_payment_records_only_the_platform_fee_snapshot(): void
     {
         $this->fakePayMongo();
         $user = $this->merchant('convenience-snapshot-key');
         $this->createPayment($user, 'convenience-snapshot-key', 1000, 'CONVENIENCE-SNAPSHOT');
 
-        $this->setMerchantConvenienceFee((int) $user->merchant_id, '0');
-
         $payment = Payment::query()->where('reference_id', 'CONVENIENCE-SNAPSHOT')->firstOrFail();
-        $this->assertSame('20.00', (string) $payment->convenience_fee);
-        $this->assertSame('1035.00', (string) $payment->customer_total);
+        $this->assertSame('0.00', (string) $payment->convenience_fee);
+        $this->assertSame('1015.00', (string) $payment->customer_total);
     }
 
-    public function test_only_super_admin_can_configure_the_merchant_convenience_fee(): void
+    public function test_merchant_admin_page_only_offers_platform_fee_configuration(): void
     {
         $superAdmin = User::factory()->superAdmin()->create();
         $admin = User::factory()->admin()->create();
@@ -415,39 +423,13 @@ class AdditivePaymentFeeTest extends TestCase
         $this->actingAs($superAdmin)
             ->get(route('admin.merchants.show', $merchant))
             ->assertOk()
-            ->assertSee('Save convenience fee');
-
-        $this->actingAs($superAdmin)
-            ->put(route('admin.merchants.convenience-fee.update', $merchant), ['convenience_fee' => '-1'])
-            ->assertSessionHasErrors('convenience_fee');
-
-        $this->actingAs($admin)
-            ->put(route('admin.merchants.convenience-fee.update', $merchant), ['convenience_fee' => '0'])
-            ->assertForbidden();
+            ->assertSee('Save platform fee')
+            ->assertDontSee('convenience fee');
 
         $this->actingAs($admin)
             ->get(route('admin.merchants.show', $merchant))
             ->assertOk()
-            ->assertDontSee('Save convenience fee');
-
-        $this->actingAs($merchantUser)
-            ->put(route('admin.merchants.convenience-fee.update', $merchant), ['convenience_fee' => '0'])
-            ->assertRedirect(url('/dashboard'));
-
-        $this->assertNull($merchant->fresh()->convenience_fee_override);
-    }
-
-    private function setMerchantConvenienceFee(int $merchantId, string $amount): void
-    {
-        $superAdmin = User::factory()->superAdmin()->create();
-        $merchant = Merchant::query()->findOrFail($merchantId);
-
-        $this->actingAs($superAdmin)
-            ->put(route('admin.merchants.convenience-fee.update', $merchant), [
-                'convenience_fee' => $amount,
-            ])
-            ->assertRedirect(route('admin.merchants.show', $merchant))
-            ->assertSessionHasNoErrors();
+            ->assertDontSee('Save platform fee');
     }
 
     private function fakePayMongo(): void

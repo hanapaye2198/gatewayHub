@@ -93,8 +93,6 @@ class CreatePaymentTest extends TestCase
 
     public function test_store_creates_paymongo_gcash_payment_and_redirects(): void
     {
-        config()->set('platform.fees.convenience_fee', 0);
-
         Http::fake(function ($request) {
             return match (parse_url($request->url(), PHP_URL_PATH)) {
                 '/v1/merchants/capabilities/payment_methods' => Http::response([

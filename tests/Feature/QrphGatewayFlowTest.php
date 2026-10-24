@@ -24,7 +24,6 @@ class QrphGatewayFlowTest extends TestCase
     {
         parent::setUp();
 
-        config()->set('platform.fees.convenience_fee', 0);
     }
 
     public function test_api_payment_creation_uses_paymongo_payment_intent_qr_flow(): void

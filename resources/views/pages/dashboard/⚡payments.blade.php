@@ -477,7 +477,6 @@ new class extends Component {
                         <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Gateway</th>
                         <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Product Value</th>
                         <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">KemoPay Fee</th>
-                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Convenience Fee</th>
                         <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Customer Paid</th>
                         <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Merchant Receives</th>
                         <th class="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Status</th>
@@ -504,13 +503,6 @@ new class extends Component {
                             </td>
                             <td class="whitespace-nowrap px-5 py-4 text-right font-mono text-sm text-zinc-500 dark:text-zinc-400">
                                 {{ number_format((float) ($payment->platform_fee ?? $payment->platformFee?->fee_amount ?? $payment->payer_fee_amount ?? 0), 2) }} {{ $payment->currency }}
-                            </td>
-                            <td class="whitespace-nowrap px-5 py-4 text-right font-mono text-sm text-zinc-500 dark:text-zinc-400">
-                                @if ($payment->usesAdditivePricing())
-                                    {{ number_format((float) $payment->convenience_fee, 2) }} {{ $payment->currency }}
-                                @else
-                                    —
-                                @endif
                             </td>
                             <td class="whitespace-nowrap px-5 py-4 text-right font-mono text-sm font-medium text-zinc-700 dark:text-zinc-300">
                                 {{ number_format((float) ($payment->customer_total ?? $payment->amount), 2) }} {{ $payment->currency }}

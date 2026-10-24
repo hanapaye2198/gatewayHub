@@ -11,7 +11,7 @@
                 {{ __('This percentage is calculated from the product value and added to the customer total.') }}
             </p>
             <p class="mt-2 max-w-2xl text-sm text-zinc-600 dark:text-zinc-300">
-                {{ __('KemoPay also adds the convenience fee of :fee. The merchant receives the full product value; PayMongo processing fees are separate.', ['fee' => $convenienceFee]) }}
+                {{ __('The platform fee is added to the payer total. The merchant receives the full product value; PayMongo processing fees are separate.') }}
             </p>
         </div>
 

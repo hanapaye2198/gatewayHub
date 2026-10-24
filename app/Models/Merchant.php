@@ -60,7 +60,6 @@ class Merchant extends Model
             'api_key_encrypted' => 'encrypted',
             'is_active' => 'boolean',
             'webhook_secret' => 'encrypted',
-            'convenience_fee_override' => 'decimal:2',
         ];
     }
 

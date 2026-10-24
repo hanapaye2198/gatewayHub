@@ -191,7 +191,6 @@
                         <th class="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Gateway</th>
                         <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Product Value</th>
                         <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">KemoPay Fee</th>
-                        <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Convenience Fee</th>
                         <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Customer Paid</th>
                         <th class="px-5 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Merchant Net</th>
                         <th class="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Status</th>
@@ -222,14 +221,6 @@
                             <td class="px-5 py-4 text-right">
                                 <span class="font-mono text-sm tabular-nums text-zinc-700 dark:text-zinc-300">{{ number_format((float) ($payment->platform_fee ?? $payment->platformFee?->fee_amount ?? $payment->payer_fee_amount ?? 0), 2) }}</span>
                                 <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
-                            </td>
-                            <td class="px-5 py-4 text-right">
-                                @if ($payment->usesAdditivePricing())
-                                    <span class="font-mono text-sm tabular-nums text-zinc-700 dark:text-zinc-300">{{ number_format((float) $payment->convenience_fee, 2) }}</span>
-                                    <span class="ml-1 text-xs text-zinc-400">{{ $payment->currency }}</span>
-                                @else
-                                    <span class="text-sm text-zinc-400 dark:text-zinc-500">—</span>
-                                @endif
                             </td>
                             <td class="px-5 py-4 text-right">
                                 @if ($payment->usesAdditivePricing())

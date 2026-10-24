@@ -12,10 +12,12 @@
             <span class="text-zinc-600 dark:text-zinc-400">{{ __('KemoPay Platform Fee') }}</span>
             <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ number_format((float) $payment->platform_fee, 2) }} {{ $currency }}</span>
         </div>
-        <div class="mt-2 flex items-center justify-between text-sm">
-            <span class="text-zinc-600 dark:text-zinc-400">{{ __('Convenience Fee') }}</span>
-            <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ number_format((float) $payment->convenience_fee, 2) }} {{ $currency }}</span>
-        </div>
+        @if ((float) ($payment->convenience_fee ?? 0) > 0)
+            <div class="mt-2 flex items-center justify-between text-sm">
+                <span class="text-zinc-600 dark:text-zinc-400">{{ __('Legacy Convenience Fee') }}</span>
+                <span class="font-medium text-zinc-900 dark:text-zinc-100">{{ number_format((float) $payment->convenience_fee, 2) }} {{ $currency }}</span>
+            </div>
+        @endif
         <div class="mt-2 border-t border-zinc-200 pt-2 dark:border-zinc-700">
             <div class="flex items-center justify-between text-sm font-semibold">
                 <span class="text-zinc-900 dark:text-zinc-100">{{ __('Total') }}</span>

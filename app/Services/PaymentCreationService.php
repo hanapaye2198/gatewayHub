@@ -175,7 +175,7 @@ class PaymentCreationService
     }
 
     /**
-     * Snapshot fees from the base amount. The gateway is charged customer_total.
+     * Snapshot the platform fee from the base amount. The gateway is charged customer_total.
      *
      * @param  array{amount: float|int|string}  $data
      * @return array{

@@ -171,7 +171,7 @@ class Payment extends Model
     }
 
     /**
-     * Base amount plus the platform fee. The convenience fee stays separate.
+     * Base amount plus the platform fee.
      */
     public function amountIncludingPlatformFee(): float
     {

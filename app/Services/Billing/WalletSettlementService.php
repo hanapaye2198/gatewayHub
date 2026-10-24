@@ -200,7 +200,7 @@ class WalletSettlementService
 
     /**
      * Customer paid the base amount plus fees. The merchant settlement is the base amount.
-     * Platform fee and convenience fee are retained from the amount collected.
+     * Platform fees are retained from the amount collected. Historical convenience fee snapshots are also honored.
      */
     private function recordAdditiveCollection(Payment $lockedPayment): void
     {
